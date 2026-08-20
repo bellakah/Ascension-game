@@ -1,29 +1,38 @@
 import { Assets, Container, Rectangle, Sprite, Texture } from 'pixi.js';
 
 export type Facing = 'up' | 'left' | 'down' | 'right';
+export type Sex = 'male' | 'female';
+export type BodyType = 'light' | 'normal' | 'robust';
+export type CharacterConfig = {
+  name: string;
+  sex: Sex;
+  bodyType: BodyType;
+  skinColor: number;
+  hairStyle: string;
+  hairColor: number;
+  eyeStyle: string;
+  eyeColor: number;
+};
+
 type Animation = 'idle' | 'walk' | 'slash';
-type LayerName = 'body' | 'pants' | 'boots' | 'mail' | 'head' | 'hair' | 'swordBg' | 'swordFg';
+type LayerName = 'body' | 'pants' | 'boots' | 'mail' | 'head' | 'face' | 'hair' | 'swordBg' | 'swordFg';
+
+export const DEFAULT_CHARACTER: CharacterConfig = {
+  name: 'Herói',
+  sex: 'male',
+  bodyType: 'normal',
+  skinColor: 0xf3c39d,
+  hairStyle: 'bedhead',
+  hairColor: 0x30231f,
+  eyeStyle: 'neutral',
+  eyeColor: 0x6d93b8,
+};
 
 const LPC = 'https://raw.githubusercontent.com/LiberatedPixelCup/Universal-LPC-Spritesheet-Character-Generator/master/spritesheets';
 const row: Record<Facing, number> = { up: 0, left: 1, down: 2, right: 3 };
+const bodyWidth: Record<BodyType, number> = { light: .88, normal: 1, robust: 1.1 };
 
 function url(path: string) { return `${LPC}/${path}`; }
-
-const basePaths: Record<Exclude<LayerName, 'swordBg' | 'swordFg'>, (animation: Animation) => string> = {
-  body: (a) => url(`body/bodies/male/${a}.png`),
-  pants: (a) => url(`legs/pants/male/${a}.png`),
-  boots: (a) => url(`feet/boots/basic/male/${a}.png`),
-  mail: (a) => url(`torso/chainmail/male/${a}.png`),
-  head: (a) => url(`head/heads/human/male/${a}.png`),
-  hair: (a) => url(`hair/bedhead/adult/${a}.png`),
-};
-
-function swordPath(animation: Animation, side: 'bg' | 'fg') {
-  if (animation === 'slash') {
-    return url(`weapon/sword/arming/attack_slash/${side}/steel.png`);
-  }
-  return url(`weapon/sword/arming/universal/${side}/${animation}/steel.png`);
-}
 
 export class LpcCharacter {
   readonly view = new Container();
@@ -36,28 +45,47 @@ export class LpcCharacter {
   private frame = 0;
   private clock = 0;
   private readonly scale = 1.35;
+  private readonly config: CharacterConfig;
 
-  static async create() {
-    const character = new LpcCharacter();
+  static async create(config: CharacterConfig = DEFAULT_CHARACTER) {
+    const character = new LpcCharacter({ ...DEFAULT_CHARACTER, ...config });
     await character.load();
     character.render();
     return character;
   }
 
-  private constructor() {
+  private constructor(config: CharacterConfig) {
+    this.config = config;
     this.view.sortableChildren = true;
     const order: Array<[LayerName, number]> = [
       ['swordBg', 5], ['body', 10], ['pants', 14], ['boots', 16],
-      ['mail', 20], ['head', 30], ['hair', 40], ['swordFg', 50],
+      ['mail', 20], ['head', 30], ['face', 35], ['hair', 40], ['swordFg', 50],
     ];
     for (const [name, zIndex] of order) {
       const sprite = new Sprite();
       sprite.anchor.set(0.5, 1);
-      sprite.scale.set(this.scale);
       sprite.zIndex = zIndex;
       this.layers.set(name, sprite);
       this.view.addChild(sprite);
     }
+  }
+
+  private layerPath(name: Exclude<LayerName, 'swordBg' | 'swordFg'>, animation: Animation) {
+    const sex = this.config.sex;
+    switch (name) {
+      case 'body': return url(`body/bodies/${sex}/${animation}.png`);
+      case 'pants': return url(`legs/pants/${sex}/${animation}.png`);
+      case 'boots': return url(`feet/boots/basic/${sex}/${animation}.png`);
+      case 'mail': return url(`torso/chainmail/${sex}/${animation}.png`);
+      case 'head': return url(`head/heads/human/${sex}/${animation}.png`);
+      case 'face': return url(`head/faces/${sex}/${this.config.eyeStyle}/${animation}.png`);
+      case 'hair': return url(`hair/${this.config.hairStyle}/adult/${animation}.png`);
+    }
+  }
+
+  private swordPath(animation: Animation, side: 'bg' | 'fg') {
+    if (animation === 'slash') return url(`weapon/sword/arming/attack_slash/${side}/steel.png`);
+    return url(`weapon/sword/arming/universal/${side}/${animation}/steel.png`);
   }
 
   private async tryLoad(key: string, assetUrl: string) {
@@ -72,28 +100,24 @@ export class LpcCharacter {
 
   private async load() {
     const animations: Animation[] = ['idle', 'walk', 'slash'];
+    const names: Array<Exclude<LayerName, 'swordBg' | 'swordFg'>> = ['body', 'pants', 'boots', 'mail', 'head', 'face', 'hair'];
     const jobs: Promise<void>[] = [];
 
     for (const animation of animations) {
-      for (const [name, makePath] of Object.entries(basePaths) as Array<[Exclude<LayerName, 'swordBg' | 'swordFg'>, (a: Animation) => string]>) {
-        jobs.push(this.tryLoad(`${name}:${animation}`, makePath(animation)));
-      }
-
+      for (const name of names) jobs.push(this.tryLoad(`${name}:${animation}`, this.layerPath(name, animation)));
       for (const side of ['bg', 'fg'] as const) {
         const name: LayerName = side === 'bg' ? 'swordBg' : 'swordFg';
-        jobs.push(this.tryLoad(`${name}:${animation}`, swordPath(animation, side)));
+        jobs.push(this.tryLoad(`${name}:${animation}`, this.swordPath(animation, side)));
       }
     }
 
     await Promise.all(jobs);
-
-    if (!this.sheets.has('body:idle')) {
-      throw new Error('Não foi possível carregar o corpo LPC básico (body:idle).');
-    }
+    if (!this.sheets.has('body:idle')) throw new Error('Não foi possível carregar o corpo LPC básico.');
   }
 
   setFacing(facing: Facing) {
     this.facing = facing;
+    this.render();
   }
 
   attack() {
@@ -155,12 +179,18 @@ export class LpcCharacter {
     });
   }
 
+  private tintFor(name: LayerName) {
+    if (name === 'body' || name === 'head') return this.config.skinColor;
+    if (name === 'hair') return this.config.hairColor;
+    if (name === 'face') return this.config.eyeColor;
+    return 0xffffff;
+  }
+
   private render() {
     for (const [name, sprite] of this.layers) {
       const exact = this.sheets.get(`${name}:${this.animation}`);
       const fallback = this.sheets.get(`${name}:idle`);
       const sheet = exact ?? fallback;
-
       if (!sheet) {
         sprite.visible = false;
         continue;
@@ -168,12 +198,9 @@ export class LpcCharacter {
 
       sprite.visible = true;
       const usingAttackFrame = this.animation === 'slash' && Boolean(exact);
-
-      // LPC usa células ampliadas no ataque (normalmente 192x192) para dar espaço
-      // ao arco da arma. Os pés do personagem continuam na linha de 128 px,
-      // portanto ancorar o frame inteiro no rodapé (y=1) deslocava a espada/corpo.
-      // 128/192 = 2/3 mantém todas as camadas do slash alinhadas ao ponto do jogador.
       sprite.anchor.set(0.5, usingAttackFrame ? 2 / 3 : 1);
+      sprite.scale.set(this.scale * bodyWidth[this.config.bodyType], this.scale);
+      sprite.tint = this.tintFor(name);
       sprite.texture = this.crop(sheet, exact ? this.frame : 0);
       sprite.texture.source.scaleMode = 'nearest';
     }

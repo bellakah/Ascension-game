@@ -1,13 +1,17 @@
 import { Application, Container, Graphics, Text } from 'pixi.js';
 import './style.css';
 import { LpcCharacter, type Facing } from './character/lpcCharacter';
+import { showCharacterCreator } from './character/characterCreator';
 
 const bootStatus = document.querySelector<HTMLDivElement>('#boot-status');
 const setBootMessage = (message: string) => { if (bootStatus) bootStatus.textContent = message; };
 
 async function startGame() {
   try {
-    setBootMessage('Carregando Guerreiro LPC completo...');
+    setBootMessage('Abrindo criação de personagem...');
+    const characterConfig = await showCharacterCreator();
+    if (bootStatus) bootStatus.style.display = 'grid';
+    setBootMessage(`Preparando ${characterConfig.name}...`);
 
     const app = new Application();
     await app.init({ resizeTo: window, backgroundColor: 0x14231d, antialias: false, preference: 'webgl' });
@@ -72,9 +76,9 @@ async function startGame() {
 
     const player = new Container();
     player.addChild(new Graphics().ellipse(0, 5, 25, 10).fill({ color: 0, alpha: 0.25 }));
-    const hero = await LpcCharacter.create();
+    const hero = await LpcCharacter.create(characterConfig);
     player.addChild(hero.view);
-    const playerName = new Text({ text: 'Herói', style: { fill: 0xffffff, fontSize: 14, fontWeight: 'bold', stroke: { color: 0, width: 4 } } });
+    const playerName = new Text({ text: characterConfig.name, style: { fill: 0xffffff, fontSize: 14, fontWeight: 'bold', stroke: { color: 0, width: 4 } } });
     playerName.anchor.set(0.5); playerName.y = -94;
     player.addChild(playerName);
     player.position.set(970, 900);
@@ -276,7 +280,7 @@ async function startGame() {
     const message = error instanceof Error ? error.message : String(error);
     console.error(error);
     setBootMessage(`Erro ao iniciar o jogo: ${message}`);
-    if (bootStatus) { bootStatus.style.background = '#2b1115'; bootStatus.style.color = '#ffd7dc'; }
+    if (bootStatus) { bootStatus.style.display = 'grid'; bootStatus.style.background = '#2b1115'; bootStatus.style.color = '#ffd7dc'; }
   }
 }
 
