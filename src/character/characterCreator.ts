@@ -172,7 +172,7 @@ async function showAccountGate(): Promise<string> {
             username,
             displayName,
             passwordHash,
-            characters: Array.from<CharacterRecord | null>({ length: MAX_CHARACTERS }, () => null),
+            characters: Array.from({ length: MAX_CHARACTERS }, (): CharacterRecord | null => null),
           };
           saveAccounts(accounts);
         } else {
