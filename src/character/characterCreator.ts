@@ -62,7 +62,7 @@ export function createDefaultProgress(): CharacterProgress {
     defense: 5,
     coins: 0,
     map: 'Floresta Inicial',
-    position: { x: 970, y: 900 },
+    position: { x: 970, y: 1380 },
     quests: {
       'forest.wolf': { status: 'not_started', progress: 0, target: 1 },
     },
@@ -90,7 +90,7 @@ function normalizeProgress(value?: Partial<CharacterProgress>): CharacterProgres
     level: Math.max(1, Number(source.level ?? base.level)),
     exp: Math.max(0, Number(source.exp ?? base.exp)),
     expToNext: Math.max(1, Number(source.expToNext ?? base.expToNext)),
-    hp: Math.max(1, Number(source.hp ?? base.hp)),
+    hp: Math.max(0, Number(source.hp ?? base.hp)),
     maxHp: Math.max(1, Number(source.maxHp ?? base.maxHp)),
     attack: Math.max(1, Number(source.attack ?? base.attack)),
     defense: Math.max(0, Number(source.defense ?? base.defense)),
