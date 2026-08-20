@@ -7,7 +7,7 @@ import { ensureInventoryState, getItem } from '../items/itemCatalog';
 import { spawnMonsterLoot, updateGroundLoot, type GroundLoot } from '../items/lootSystem';
 import { createSkillBar } from '../skills/skillBar';
 import { createSkillController } from '../skills/skillController';
-import { WARRIOR_SKILLS, getSkill, type SkillId } from '../skills/skillCatalog';
+import { getSkill, type SkillId } from '../skills/skillCatalog';
 import { createHud, showDialog, updateHud } from './hud';
 import { createMonsters, damageMonster, findAttackTarget, killMonster, updateMonsters, type Monster } from './monsterSystem';
 import { currentQuest, ensureQuestStates, interactQuest, registerQuestKill } from './quests';
@@ -28,6 +28,8 @@ export async function startGame() {
     ensureQuestStates(progress);
     const inventoryState = ensureInventoryState(progress);
     const skillController = createSkillController(progress);
+    const classDef = skillController.classDef;
+    const classSkills = skillController.skills;
     if (bootStatus) bootStatus.style.display = 'grid';
     setBootMessage(`Preparando ${config.name}...`);
 
@@ -116,7 +118,7 @@ export async function startGame() {
     });
 
     let useSkill: (skillId: SkillId) => void = () => {};
-    const skillBar = createSkillBar({ onUse: (skillId) => useSkill(skillId) });
+    const skillBar = createSkillBar(classSkills, { onUse: (skillId) => useSkill(skillId) });
 
     const respawnScreen = createRespawnScreen({
       onRespawn: () => {
@@ -190,6 +192,19 @@ export async function startGame() {
       app.ticker.add(tick);
     };
 
+    const magicLink = (target: Monster, color: number) => {
+      const effect = new Graphics().moveTo(player.x, player.y - 34).lineTo(target.view.x, target.view.y - 22).stroke({ width: 5, color, alpha: .85 });
+      effect.circle(target.view.x, target.view.y - 22, 15).stroke({ width: 3, color, alpha: .75 });
+      world.addChild(effect);
+      let remaining = 180;
+      const tick = (ticker: Ticker) => {
+        remaining -= ticker.deltaMS;
+        effect.alpha = Math.max(0, remaining / 180);
+        if (remaining <= 0) { app.ticker.remove(tick); world.removeChild(effect); effect.destroy(); }
+      };
+      app.ticker.add(tick);
+    };
+
     const grantExp = (amount: number) => {
       progress.exp += amount;
       let leveled = false;
@@ -197,9 +212,9 @@ export async function startGame() {
         progress.exp -= progress.expToNext;
         progress.level += 1;
         progress.expToNext = Math.round(progress.expToNext * 1.35);
-        progress.maxHp += 12;
-        progress.attack += 4;
-        progress.defense += 1;
+        progress.maxHp += classDef.id === 'mage' ? 8 : 12;
+        progress.attack += classDef.id === 'mage' ? 5 : 4;
+        progress.defense += classDef.id === 'mage' ? 1 : 1;
         playerHp = progress.maxHp;
         leveled = true;
       }
@@ -252,6 +267,8 @@ export async function startGame() {
       player.position.set(bestX, bestY);
     };
 
+    const playClassAction = () => classDef.basicAttack.animation === 'spellcast' ? hero.cast() : hero.attack();
+
     useSkill = (skillId: SkillId) => {
       if (uiOpen() || hero.isAttacking) return;
       if (isInSafeZone(player.x, player.y)) {
@@ -260,9 +277,10 @@ export async function startGame() {
       }
 
       const skill = getSkill(skillId);
+      if (!skill || skill.classId !== classDef.id) return;
       let target: Monster | null = null;
       let targets: Monster[] = [];
-      if (skill.kind === 'melee' || skill.kind === 'charge') {
+      if (skill.kind === 'melee' || skill.kind === 'charge' || skill.kind === 'target') {
         target = findAttackTarget(monsters, player.x, player.y, skill.range ?? 120);
         if (!target) { showDialog(hud, `${skill.name}: nenhum alvo no alcance.`); return; }
       }
@@ -272,32 +290,26 @@ export async function startGame() {
       }
 
       const check = skillController.canUse(skillId);
-      if (!check.ok) { showDialog(hud, check.reason ?? 'Habilidade indisponível.'); return; }
+      if ('reason' in check && check.reason) { showDialog(hud, check.reason); return; }
       const activated = skillController.activate(skillId);
-      if (!activated.ok) { showDialog(hud, activated.reason ?? 'Habilidade indisponível.'); return; }
+      if ('reason' in activated && activated.reason) { showDialog(hud, activated.reason); return; }
 
       const baseAttack = attackPower();
+      const color = skill.effectColor ?? 0xf0b85d;
       if (skill.kind === 'melee' && target) {
-        faceTarget(target);
-        hero.attack();
-        attackCooldown = 30;
-        pulse(82, 0xf0b85d, 280);
-        hitMonster(target, baseAttack * (skill.damageMultiplier ?? 1), 0xffd08b);
+        faceTarget(target); hero.attack(); attackCooldown = 30; pulse(82, color, 280); hitMonster(target, baseAttack * (skill.damageMultiplier ?? 1), color);
       } else if (skill.kind === 'charge' && target) {
-        faceTarget(target);
-        dashToward(target);
-        hero.attack();
-        attackCooldown = 34;
-        pulse(58, 0x79c9ff, 300);
-        hitMonster(target, baseAttack * (skill.damageMultiplier ?? 1), 0x9ddcff);
+        faceTarget(target); dashToward(target); hero.attack(); attackCooldown = 34; pulse(58, color, 300); hitMonster(target, baseAttack * (skill.damageMultiplier ?? 1), color);
+      } else if (skill.kind === 'target' && target) {
+        faceTarget(target); hero.cast(); attackCooldown = 32; magicLink(target, color); hitMonster(target, baseAttack * (skill.damageMultiplier ?? 1), color);
       } else if (skill.kind === 'aoe') {
-        hero.attack();
-        attackCooldown = 38;
-        pulse(skill.radius ?? 165, 0xe9c760, 480);
-        for (const monster of targets) hitMonster(monster, baseAttack * (skill.damageMultiplier ?? 1), 0xffe191);
+        if (classDef.id === 'mage') hero.cast(); else hero.attack();
+        attackCooldown = 38; pulse(skill.radius ?? 165, color, 480);
+        for (const monster of targets) hitMonster(monster, baseAttack * (skill.damageMultiplier ?? 1), color);
       } else if (skill.kind === 'buff') {
-        pulse(105, 0xf39a45, 650);
-        floating(player.x, player.y - 105, `ATQ +${skill.buffAttackPercent ?? 0}%`, 0xffc66f);
+        if (classDef.id === 'mage') hero.cast();
+        pulse(105, color, 650);
+        floating(player.x, player.y - 105, `ATQ +${skill.buffAttackPercent ?? 0}%`, color);
         showDialog(hud, `${skill.name}: Ataque +${skill.buffAttackPercent ?? 0}% por ${Math.round((skill.buffDurationMs ?? 0) / 1000)}s.`);
       }
 
@@ -314,10 +326,7 @@ export async function startGame() {
         if (d < merchantDistance) { merchantDistance = d; nearestMerchant = merchant; }
       }
       if (nearestMerchant && merchantDistance < 120) {
-        keys.clear();
-        resetStick();
-        shop.open(nearestMerchant.shopId);
-        return;
+        keys.clear(); resetStick(); shop.open(nearestMerchant.shopId); return;
       }
       if (distance(player.x, player.y, npc.x, npc.y) >= 115) return;
       const result = interactQuest(progress);
@@ -332,15 +341,14 @@ export async function startGame() {
 
     const attack = () => {
       if (uiOpen() || attackCooldown > 0 || hero.isAttacking) return;
-      if (isInSafeZone(player.x, player.y)) {
-        showDialog(hud, 'Área segura: combates não são permitidos dentro da vila.');
-        return;
-      }
-      if (!hero.attack()) return;
-      attackCooldown = 30;
-      const target = findAttackTarget(monsters, player.x, player.y);
+      if (isInSafeZone(player.x, player.y)) { showDialog(hud, 'Área segura: combates não são permitidos dentro da vila.'); return; }
+      const target = findAttackTarget(monsters, player.x, player.y, classDef.basicAttack.range);
       if (!target) return;
-      hitMonster(target, attackPower());
+      faceTarget(target);
+      if (!playClassAction()) return;
+      attackCooldown = classDef.basicAttack.cooldownTicks;
+      if (classDef.id === 'mage') magicLink(target, 0x82b7ff);
+      hitMonster(target, attackPower(), classDef.id === 'mage' ? 0x9ddcff : 0xffc2b8);
     };
 
     hud.attack.addEventListener('pointerdown', attack);
@@ -356,7 +364,7 @@ export async function startGame() {
       keys.add(key);
       if (event.code === 'Space') attack();
       if (key === 'e') interact();
-      const skill = WARRIOR_SKILLS.find((entry) => String(entry.slot) === key);
+      const skill = classSkills.find((entry) => String(entry.slot) === key);
       if (skill) { event.preventDefault(); useSkill(skill.id); }
     }, true);
     window.addEventListener('keyup', (event) => keys.delete(event.key.toLowerCase()));
@@ -384,10 +392,7 @@ export async function startGame() {
       attackCooldown = Math.max(0, attackCooldown - ticker.deltaTime);
       skillController.tick(ticker.deltaMS, uiOpen());
       skillUiMs += ticker.deltaMS;
-      if (skillUiMs >= 100) {
-        skillUiMs = 0;
-        skillBar.refresh(skillController.snapshot(), uiOpen());
-      }
+      if (skillUiMs >= 100) { skillUiMs = 0; skillBar.refresh(skillController.snapshot(), uiOpen()); }
 
       let dx = uiOpen() ? 0 : stickX, dy = uiOpen() ? 0 : stickY;
       if (!uiOpen()) {
@@ -422,10 +427,7 @@ export async function startGame() {
           if (isDead) return;
           playerHp = Math.max(0, playerHp - damage);
           floating(player.x, player.y - 90, `-${damage}`, 0xff8f8f);
-          if (playerHp <= 0) {
-            enterDeathState();
-            return;
-          }
+          if (playerHp <= 0) { enterDeathState(); return; }
           refresh();
         });
 
