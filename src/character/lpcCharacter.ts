@@ -15,7 +15,7 @@ export type CharacterConfig = {
 };
 
 type Animation = 'idle' | 'walk' | 'slash';
-type LayerName = 'body' | 'pants' | 'boots' | 'mail' | 'head' | 'face' | 'hair' | 'swordBg' | 'swordFg';
+type LayerName = 'body' | 'pants' | 'boots' | 'mail' | 'head' | 'eyes' | 'hair' | 'swordBg' | 'swordFg';
 
 export const DEFAULT_CHARACTER: CharacterConfig = {
   name: 'Herói',
@@ -31,6 +31,13 @@ export const DEFAULT_CHARACTER: CharacterConfig = {
 const LPC = 'https://raw.githubusercontent.com/LiberatedPixelCup/Universal-LPC-Spritesheet-Character-Generator/master/spritesheets';
 const row: Record<Facing, number> = { up: 0, left: 1, down: 2, right: 3 };
 const bodyWidth: Record<BodyType, number> = { light: .88, normal: 1, robust: 1.1 };
+const eyePalette = new Map<number, string>([
+  [0x6d93b8, 'blue'],
+  [0x5f8f63, 'green'],
+  [0x8a653e, 'brown'],
+  [0x5a4a73, 'purple'],
+  [0x444444, 'gray'],
+]);
 
 function url(path: string) { return `${LPC}/${path}`; }
 
@@ -59,7 +66,7 @@ export class LpcCharacter {
     this.view.sortableChildren = true;
     const order: Array<[LayerName, number]> = [
       ['swordBg', 5], ['body', 10], ['pants', 14], ['boots', 16],
-      ['mail', 20], ['head', 30], ['face', 35], ['hair', 40], ['swordFg', 50],
+      ['mail', 20], ['head', 30], ['eyes', 35], ['hair', 40], ['swordFg', 50],
     ];
     for (const [name, zIndex] of order) {
       const sprite = new Sprite();
@@ -70,6 +77,10 @@ export class LpcCharacter {
     }
   }
 
+  private eyeColorName() {
+    return eyePalette.get(this.config.eyeColor) ?? 'blue';
+  }
+
   private layerPath(name: Exclude<LayerName, 'swordBg' | 'swordFg'>, animation: Animation) {
     const sex = this.config.sex;
     switch (name) {
@@ -78,7 +89,7 @@ export class LpcCharacter {
       case 'boots': return url(`feet/boots/basic/${sex}/${animation}.png`);
       case 'mail': return url(`torso/chainmail/${sex}/${animation}.png`);
       case 'head': return url(`head/heads/human/${sex}/${animation}.png`);
-      case 'face': return url(`head/faces/${sex}/${this.config.eyeStyle}/${animation}.png`);
+      case 'eyes': return url(`eyes/human/adult/${this.config.eyeStyle}/${animation}/${this.eyeColorName()}.png`);
       case 'hair': return url(`hair/${this.config.hairStyle}/adult/${animation}.png`);
     }
   }
@@ -100,7 +111,7 @@ export class LpcCharacter {
 
   private async load() {
     const animations: Animation[] = ['idle', 'walk', 'slash'];
-    const names: Array<Exclude<LayerName, 'swordBg' | 'swordFg'>> = ['body', 'pants', 'boots', 'mail', 'head', 'face', 'hair'];
+    const names: Array<Exclude<LayerName, 'swordBg' | 'swordFg'>> = ['body', 'pants', 'boots', 'mail', 'head', 'eyes', 'hair'];
     const jobs: Promise<void>[] = [];
 
     for (const animation of animations) {
@@ -182,7 +193,6 @@ export class LpcCharacter {
   private tintFor(name: LayerName) {
     if (name === 'body' || name === 'head') return this.config.skinColor;
     if (name === 'hair') return this.config.hairColor;
-    if (name === 'face') return this.config.eyeColor;
     return 0xffffff;
   }
 
