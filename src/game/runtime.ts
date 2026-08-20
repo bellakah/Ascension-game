@@ -9,6 +9,8 @@ import { createHud, showDialog, updateHud } from './hud';
 import { createMonsters, damageMonster, findAttackTarget, killMonster, updateMonsters } from './monsterSystem';
 import { currentQuest, ensureQuestStates, interactQuest, registerQuestKill } from './quests';
 import { createRespawnScreen } from './respawn';
+import { createShop } from './shopSystem';
+import { createVillageMerchants } from './villageNpcs';
 import { collides, createElandra, createWorld, distance, isInSafeZone, nearestVillage, SPAWN, WORLD_H, WORLD_W } from './world';
 
 const bootStatus = document.querySelector<HTMLDivElement>('#boot-status');
@@ -34,6 +36,7 @@ export async function startGame() {
     const { world, obstacles } = createWorld();
     app.stage.addChild(world);
     const { npc, mark: npcMark } = createElandra(world);
+    const merchants = createVillageMerchants(world);
 
     const player = new Container();
     player.addChild(new Graphics().ellipse(0, 5, 25, 10).fill({ color: 0, alpha: .25 }));
@@ -100,6 +103,13 @@ export async function startGame() {
       notify: (message) => showDialog(hud, message),
     });
 
+    const shop = createShop(progress, {
+      getCoins: () => coins,
+      setCoins: (value) => { coins = Math.max(0, Math.floor(value)); progress.coins = coins; },
+      onChanged: () => { inventory.refresh(); characterSheet.refresh(); refresh(); save(); },
+      notify: (message) => showDialog(hud, message),
+    });
+
     const respawnScreen = createRespawnScreen({
       onRespawn: () => {
         const village = nearestVillage(deathPosition.x, deathPosition.y, progress.map || 'Floresta Inicial');
@@ -121,9 +131,9 @@ export async function startGame() {
       },
     });
 
-    const uiOpen = () => isDead || respawnScreen.isOpen() || inventory.isOpen() || characterSheet.isOpen();
-    hud.inventory.addEventListener('pointerdown', () => { if (isDead) return; characterSheet.close(); inventory.toggle(); });
-    hud.character.addEventListener('pointerdown', () => { if (isDead) return; inventory.close(); characterSheet.toggle(); });
+    const uiOpen = () => isDead || respawnScreen.isOpen() || inventory.isOpen() || characterSheet.isOpen() || shop.isOpen();
+    hud.inventory.addEventListener('pointerdown', () => { if (isDead) return; shop.close(); characterSheet.close(); inventory.toggle(); });
+    hud.character.addEventListener('pointerdown', () => { if (isDead) return; shop.close(); inventory.close(); characterSheet.toggle(); });
 
     const enterDeathState = () => {
       if (respawnScreen.isOpen()) return;
@@ -136,6 +146,7 @@ export async function startGame() {
       resetStick();
       inventory.close();
       characterSheet.close();
+      shop.close();
       const village = nearestVillage(deathPosition.x, deathPosition.y, progress.map || 'Floresta Inicial');
       if (village) respawnScreen.show(village);
       refresh();
@@ -181,7 +192,20 @@ export async function startGame() {
     };
 
     const interact = () => {
-      if (uiOpen() || distance(player.x, player.y, npc.x, npc.y) >= 115) return;
+      if (uiOpen()) return;
+      let nearestMerchant: typeof merchants[number] | null = null;
+      let merchantDistance = Infinity;
+      for (const merchant of merchants) {
+        const d = distance(player.x, player.y, merchant.npc.x, merchant.npc.y);
+        if (d < merchantDistance) { merchantDistance = d; nearestMerchant = merchant; }
+      }
+      if (nearestMerchant && merchantDistance < 120) {
+        keys.clear();
+        resetStick();
+        shop.open(nearestMerchant.shopId);
+        return;
+      }
+      if (distance(player.x, player.y, npc.x, npc.y) >= 115) return;
       const result = interactQuest(progress);
       if (result.type === 'all_done') showDialog(hud, 'Elandra: Você já concluiu todas as missões de teste.');
       else if (result.type === 'accepted') showDialog(hud, `Elandra: ${result.quest.objective}. Recompensa: ${result.quest.rewardExp} EXP e ${result.quest.rewardCoins} moedas.`);
@@ -213,7 +237,9 @@ export async function startGame() {
       const key = event.key.toLowerCase();
       if (isDead) { event.preventDefault(); return; }
       if (key === 'i' && characterSheet.isOpen()) characterSheet.close();
+      if (key === 'i' && shop.isOpen()) shop.close();
       if (key === 'c' && inventory.isOpen()) inventory.close();
+      if (key === 'c' && shop.isOpen()) shop.close();
       if (uiOpen() && event.key !== 'Escape' && key !== 'i' && key !== 'c') return;
       keys.add(key);
       if (event.code === 'Space') attack();

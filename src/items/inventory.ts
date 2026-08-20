@@ -208,17 +208,30 @@ export function createInventory(progress: CharacterProgress, callbacks: Inventor
     const item = getItem(selection.itemId);
     if (!item) { selection = null; renderDetails(); return; }
     const stats = statText(item.id), isInventory = selection.source === 'inventory';
-    const canUse = isInventory && item.category === 'consumable', canEquip = isInventory && Boolean(item.equipSlot), canUnequip = selection.source === 'equipment';
+    const canUse = isInventory && (Boolean(item.heal) || Boolean(item.capacityBonus));
+    const canEquip = isInventory && Boolean(item.equipSlot), canUnequip = selection.source === 'equipment';
     details.innerHTML = `
       <div class="detail-top rarity-${item.rarity}"><span class="detail-icon">${item.icon}</span><div><span class="detail-rarity">${ITEM_RARITY_LABELS[item.rarity]}</span><h3>${item.name}</h3><small>${ITEM_CATEGORY_LABELS[item.category]}</small></div></div>
       <p class="detail-description">${item.description}</p>
       ${stats.length ? `<div class="detail-stats">${stats.map((row) => `<span>${row}</span>`).join('')}</div>` : ''}
       ${item.heal ? `<div class="detail-stats"><span>Recupera ${item.heal} HP</span></div>` : ''}
+      ${item.capacityBonus ? `<div class="detail-stats"><span>Inventário +${item.capacityBonus} slots permanentes</span><span>Capacidade atual: ${state.inventoryCapacity}/48</span></div>` : ''}
       ${canEquip ? comparisonHtml(state, item.id) : ''}
       <div class="detail-meta"><span>Valor base</span><strong>🪙 ${item.value}</strong></div>
       <div class="detail-actions">${canUse ? '<button id="detail-use" class="primary-action" type="button">Usar</button>' : ''}${canEquip ? '<button id="detail-equip" class="primary-action" type="button">Equipar</button>' : ''}${canUnequip ? '<button id="detail-unequip" class="primary-action" type="button">Desequipar</button>' : ''}${isInventory ? '<button id="detail-discard" class="danger-action" type="button">Descartar 1</button>' : ''}</div>`;
 
     details.querySelector<HTMLButtonElement>('#detail-use')?.addEventListener('click', () => {
+      if (item.capacityBonus) {
+        if (state.inventoryCapacity >= 48) { callbacks.notify('Seu inventário já atingiu o limite atual de 48 slots.'); return; }
+        if (!removeItem(state, item.id, 1)) return;
+        const before = state.inventoryCapacity;
+        state.inventoryCapacity = Math.min(48, state.inventoryCapacity + item.capacityBonus);
+        callbacks.notify(`${item.name}: capacidade aumentada de ${before} para ${state.inventoryCapacity} slots.`);
+        callbacks.onChanged();
+        if (!state.inventory.some((stack) => stack.itemId === item.id)) selection = null;
+        render();
+        return;
+      }
       if (!item.heal) return;
       const hp = callbacks.getHp();
       if (hp >= state.maxHp) { callbacks.notify('Seu HP já está cheio.'); return; }
