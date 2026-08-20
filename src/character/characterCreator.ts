@@ -1,6 +1,8 @@
 import './account.css';
 import { DEFAULT_CHARACTER, type CharacterConfig } from './lpcCharacter';
 import { showAppearanceCreator } from './appearanceCreator';
+import { getClassDefinition, normalizeClassId, type ClassId, type ClassName } from '../classes/classCatalog';
+import { showClassSelection } from '../classes/classSelection';
 
 const LPC = 'https://raw.githubusercontent.com/LiberatedPixelCup/Universal-LPC-Spritesheet-Character-Generator/master/spritesheets';
 const ACCOUNTS_KEY = 'ascension.accounts.v1';
@@ -9,7 +11,8 @@ const MAX_CHARACTERS = 6;
 
 export type QuestStatus = 'not_started' | 'active' | 'ready' | 'completed';
 export type CharacterProgress = {
-  className: 'Guerreiro';
+  classId: ClassId;
+  className: ClassName;
   level: number;
   exp: number;
   expToNext: number;
@@ -50,16 +53,18 @@ type AccountRecord = {
 
 type AccountStore = Record<string, AccountRecord>;
 
-export function createDefaultProgress(): CharacterProgress {
+export function createDefaultProgress(classId: ClassId = 'warrior'): CharacterProgress {
+  const classDef = getClassDefinition(classId);
   return {
-    className: 'Guerreiro',
+    classId: classDef.id,
+    className: classDef.name,
     level: 1,
     exp: 0,
     expToNext: 100,
-    hp: 100,
-    maxHp: 100,
-    attack: 34,
-    defense: 5,
+    hp: classDef.baseStats.maxHp,
+    maxHp: classDef.baseStats.maxHp,
+    attack: classDef.baseStats.attack,
+    defense: classDef.baseStats.defense,
     coins: 0,
     map: 'Floresta Inicial',
     position: { x: 970, y: 1380 },
@@ -67,14 +72,16 @@ export function createDefaultProgress(): CharacterProgress {
       'forest.wolf': { status: 'not_started', progress: 0, target: 1 },
     },
     inventory: [],
-    equipment: { weapon: 'basic_sword', armor: 'chainmail', boots: 'basic_boots' },
+    equipment: { ...classDef.startingEquipment },
     lastPlayedAt: Date.now(),
   };
 }
 
 function normalizeProgress(value?: Partial<CharacterProgress>): CharacterProgress {
-  const base = createDefaultProgress();
   const source = value ?? {};
+  const classId = normalizeClassId((source as Partial<CharacterProgress>).classId ?? source.className);
+  const classDef = getClassDefinition(classId);
+  const base = createDefaultProgress(classId);
   const quests = { ...base.quests, ...(source.quests ?? {}) };
   for (const [id, quest] of Object.entries(quests)) {
     quests[id] = {
@@ -86,7 +93,8 @@ function normalizeProgress(value?: Partial<CharacterProgress>): CharacterProgres
   return {
     ...base,
     ...source,
-    className: 'Guerreiro',
+    classId: classDef.id,
+    className: classDef.name,
     level: Math.max(1, Number(source.level ?? base.level)),
     exp: Math.max(0, Number(source.exp ?? base.exp)),
     expToNext: Math.max(1, Number(source.expToNext ?? base.expToNext)),
@@ -117,7 +125,7 @@ function loadAccounts(): AccountStore {
       account.characters = account.characters.map((record) => {
         if (!record) return null;
         const legacy = record as CharacterRecord & { progress?: CharacterProgress };
-        if (!legacy.progress) migrated = true;
+        if (!legacy.progress || !legacy.progress.classId) migrated = true;
         return {
           id: legacy.id,
           createdAt: legacy.createdAt || Date.now(),
@@ -364,11 +372,13 @@ async function showCharacterSelection(accountKey: string): Promise<SelectedChara
     createButton.addEventListener('click', async () => {
       if (account.characters[selected]) return;
       root.style.display = 'none';
+      const classId = await showClassSelection();
+      if (!classId) { root.style.display = 'block'; return; }
       const created = await showAppearanceCreator({ ...DEFAULT_CHARACTER, name: '' });
       root.style.display = 'block';
       if (!created) return;
       if (account.characters.some((item) => item?.config.name.toLowerCase() === created.name.toLowerCase())) { errorBox.textContent = 'Já existe um personagem com esse nome nesta conta.'; return; }
-      account.characters[selected] = { id: makeId(), createdAt: Date.now(), config: created, progress: createDefaultProgress() };
+      account.characters[selected] = { id: makeId(), createdAt: Date.now(), config: created, progress: createDefaultProgress(classId) };
       persistAccount();
       render();
     });
