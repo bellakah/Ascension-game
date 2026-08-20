@@ -1,4 +1,5 @@
 import type { CharacterProgress } from '../character/characterCreator';
+import { getClassDefinition, normalizeClassId, type ClassId } from '../classes/classCatalog';
 
 export type ItemCategory = 'consumable' | 'material' | 'weapon' | 'equipment' | 'accessory';
 export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'epic';
@@ -24,6 +25,7 @@ export type ItemDefinition = {
   stats?: ItemStats;
   heal?: number;
   capacityBonus?: number;
+  allowedClasses?: ClassId[];
 };
 
 export const ITEM_CATEGORY_LABELS: Record<ItemCategory | 'all', string> = {
@@ -41,10 +43,11 @@ const ITEMS: ItemDefinition[] = [
   { id: 'wolf_fang', name: 'Presa Sombria', description: 'Uma presa afiada impregnada pela energia escura da floresta.', icon: '🦷', category: 'material', rarity: 'uncommon', stackMax: 30, value: 12 },
   { id: 'toxic_sludge', name: 'Gosma Tóxica', description: 'Substância viscosa deixada pelos Lodos Tóxicos. Ainda borbulha levemente.', icon: '🟢', category: 'material', rarity: 'common', stackMax: 50, value: 5 },
   { id: 'sludge_core', name: 'Núcleo de Lodo', description: 'Núcleo condensado de um Lodo Tóxico. É utilizado em alquimia.', icon: '🔮', category: 'material', rarity: 'uncommon', stackMax: 30, value: 15 },
-  { id: 'basic_sword', name: 'Espada de Treino', description: 'Espada simples entregue a novos guerreiros.', icon: '⚔️', category: 'weapon', rarity: 'common', stackMax: 1, value: 10, equipSlot: 'weapon', stats: {} },
-  { id: 'iron_sword', name: 'Espada de Ferro', description: 'Uma lâmina bem equilibrada, superior à espada de treino.', icon: '🗡️', category: 'weapon', rarity: 'uncommon', stackMax: 1, value: 55, equipSlot: 'weapon', stats: { attack: 7 } },
-  { id: 'shadow_fang_blade', name: 'Lâmina da Presa Sombria', description: 'Arma rara feita com presas dos lobos da floresta.', icon: '⚔️', category: 'weapon', rarity: 'rare', stackMax: 1, value: 140, equipSlot: 'weapon', stats: { attack: 13 } },
-  { id: 'chainmail', name: 'Cota de Malha Inicial', description: 'Armadura básica do Guerreiro.', icon: '🥋', category: 'equipment', rarity: 'common', stackMax: 1, value: 12, equipSlot: 'armor', stats: {} },
+  { id: 'basic_sword', name: 'Espada de Treino', description: 'Espada simples entregue a novos guerreiros.', icon: '⚔️', category: 'weapon', rarity: 'common', stackMax: 1, value: 10, equipSlot: 'weapon', stats: {}, allowedClasses: ['warrior'] },
+  { id: 'iron_sword', name: 'Espada de Ferro', description: 'Uma lâmina bem equilibrada, superior à espada de treino.', icon: '🗡️', category: 'weapon', rarity: 'uncommon', stackMax: 1, value: 55, equipSlot: 'weapon', stats: { attack: 7 }, allowedClasses: ['warrior'] },
+  { id: 'shadow_fang_blade', name: 'Lâmina da Presa Sombria', description: 'Arma rara feita com presas dos lobos da floresta.', icon: '⚔️', category: 'weapon', rarity: 'rare', stackMax: 1, value: 140, equipSlot: 'weapon', stats: { attack: 13 }, allowedClasses: ['warrior'] },
+  { id: 'apprentice_staff', name: 'Cajado de Aprendiz', description: 'Cajado simples de madeira usado por magos iniciantes para canalizar Mana.', icon: '🪄', category: 'weapon', rarity: 'common', stackMax: 1, value: 16, equipSlot: 'weapon', stats: {}, allowedClasses: ['mage'] },
+  { id: 'chainmail', name: 'Cota de Malha Inicial', description: 'Armadura básica do Guerreiro.', icon: '🥋', category: 'equipment', rarity: 'common', stackMax: 1, value: 12, equipSlot: 'armor', stats: {}, allowedClasses: ['warrior'] },
   { id: 'hunter_armor', name: 'Couraça do Caçador', description: 'Couraça leve reforçada para enfrentar criaturas da floresta.', icon: '🛡️', category: 'equipment', rarity: 'uncommon', stackMax: 1, value: 65, equipSlot: 'armor', stats: { defense: 3, maxHp: 10 } },
   { id: 'basic_boots', name: 'Botas de Viagem', description: 'Botas simples e confortáveis para longas caminhadas.', icon: '🥾', category: 'equipment', rarity: 'common', stackMax: 1, value: 8, equipSlot: 'boots', stats: {} },
   { id: 'forest_boots', name: 'Botas da Floresta', description: 'Botas reforçadas cobertas por couro resistente.', icon: '👢', category: 'equipment', rarity: 'uncommon', stackMax: 1, value: 48, equipSlot: 'boots', stats: { defense: 2 } },
@@ -63,11 +66,12 @@ export function ensureInventoryState(progress: CharacterProgress): InventoryProg
   if (!Array.isArray(state.inventory)) state.inventory = [];
   state.inventory = state.inventory.filter((stack) => stack && getItem(stack.itemId) && Number(stack.quantity) > 0).map((stack) => ({ itemId: stack.itemId, quantity: Math.max(1, Math.floor(Number(stack.quantity))) }));
 
+  const defaults = getClassDefinition(normalizeClassId(state.classId)).startingEquipment;
   const rawEquipment = (state.equipment ?? {}) as Partial<Record<EquipmentSlot, string | null>>;
   const has = (slot: EquipmentSlot) => Object.prototype.hasOwnProperty.call(rawEquipment, slot);
-  if (!has('weapon')) rawEquipment.weapon = 'basic_sword';
-  if (!has('armor')) rawEquipment.armor = 'chainmail';
-  if (!has('boots')) rawEquipment.boots = 'basic_boots';
+  if (!has('weapon')) rawEquipment.weapon = defaults.weapon;
+  if (!has('armor')) rawEquipment.armor = defaults.armor;
+  if (!has('boots')) rawEquipment.boots = defaults.boots;
   if (!has('head')) rawEquipment.head = null;
   if (!has('legs')) rawEquipment.legs = null;
   if (!has('accessory1')) rawEquipment.accessory1 = null;
@@ -135,6 +139,8 @@ function statValue(itemId: string | null, stat: keyof ItemStats) { return itemId
 export function equipItem(progress: CharacterProgress, itemId: string) {
   const state = ensureInventoryState(progress), item = getItem(itemId);
   if (!item?.equipSlot) return { ok: false, reason: 'Este item não pode ser equipado.' };
+  const classId = normalizeClassId(state.classId);
+  if (item.allowedClasses?.length && !item.allowedClasses.includes(classId)) return { ok: false, reason: `${item.name} não pode ser usado pela classe ${getClassDefinition(classId).name}.` };
   let slot: EquipmentSlot;
   if (item.equipSlot === 'accessory') slot = state.equipment.accessory1 ? 'accessory2' : 'accessory1'; else slot = item.equipSlot;
   const oldId = state.equipment[slot];
