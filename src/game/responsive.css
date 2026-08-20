@@ -1,0 +1,527 @@
+/* Responsive UI modes: desktop, mobile portrait and mobile landscape. */
+html[data-ui-mode] body,
+html[data-ui-mode] #app { height: var(--app-height, 100dvh); }
+
+#hud .utility-dock,
+#hud .action-dock { pointer-events: none; }
+#hud .utility-dock > button,
+#hud .action-dock > button,
+#quest-toggle { pointer-events: auto; touch-action: manipulation; }
+#quest-toggle,
+.desktop-shortcuts { display: none; }
+
+/* ---------------- Desktop ---------------- */
+html[data-ui-mode='desktop'] .topbar {
+  top: 16px;
+  left: 16px;
+  right: auto;
+  max-width: none;
+  display: grid;
+  grid-template-columns: auto auto 250px auto;
+  align-items: center;
+  gap: 8px;
+}
+html[data-ui-mode='desktop'] .brand,
+html[data-ui-mode='desktop'] .player-progression,
+html[data-ui-mode='desktop'] .coins { min-height: 36px; display: flex; align-items: center; }
+html[data-ui-mode='desktop'] .hp-shell { width: 250px; height: 28px; }
+html[data-ui-mode='desktop'] #quest-box { top: 68px; left: 16px; width: 310px; }
+html[data-ui-mode='desktop'] #stick,
+html[data-ui-mode='desktop'] .action-dock,
+html[data-ui-mode='desktop'] #attack-btn,
+html[data-ui-mode='desktop'] #interact-btn { display: none !important; }
+html[data-ui-mode='desktop'] .utility-dock {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  gap: 8px;
+}
+html[data-ui-mode='desktop'] .utility-dock #character-button,
+html[data-ui-mode='desktop'] .utility-dock #inventory-button {
+  position: static !important;
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 12px !important;
+  font-size: 20px !important;
+  opacity: .9 !important;
+}
+html[data-ui-mode='desktop'] .desktop-shortcuts {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 11px;
+  background: rgba(8,16,12,.7);
+  color: #9cafA5;
+  font-size: 10px;
+  white-space: nowrap;
+  backdrop-filter: blur(5px);
+}
+html[data-ui-mode='desktop'] .desktop-shortcuts kbd {
+  margin-right: 3px;
+  padding: 2px 5px;
+  border: 1px solid rgba(255,255,255,.13);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: #18251f;
+  color: #e8eeeB;
+  font: inherit;
+  font-weight: 900;
+}
+html[data-ui-mode='desktop'] #dialog-box { bottom: 62px; }
+
+/* ---------------- Shared mobile HUD ---------------- */
+html[data-ui-mode^='mobile'] .brand { display: none; }
+html[data-ui-mode^='mobile'] .desktop-shortcuts { display: none; }
+html[data-ui-mode^='mobile'] .player-progression span { display: none; }
+html[data-ui-mode^='mobile'] #quest-toggle {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(240,201,77,.3);
+  background: rgba(26,38,31,.9);
+  color: #ffe17b;
+  box-shadow: 0 5px 16px rgba(0,0,0,.24);
+  -webkit-tap-highlight-color: transparent;
+}
+html[data-ui-mode^='mobile'] #quest-toggle span { display: none; }
+html[data-ui-mode^='mobile'] #quest-toggle.quest-ready {
+  border-color: rgba(112,198,255,.6);
+  box-shadow: 0 0 0 2px rgba(112,198,255,.12), 0 5px 16px rgba(0,0,0,.24);
+}
+html[data-ui-mode^='mobile'] #quest-box { display: none; }
+html[data-ui-mode^='mobile'] #hud.quest-open #quest-box { display: block; }
+html[data-ui-mode^='mobile'] #quest-text {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+html[data-ui-mode^='mobile'] .utility-dock {
+  position: absolute;
+  display: flex;
+  gap: 6px;
+}
+html[data-ui-mode^='mobile'] .utility-dock #character-button,
+html[data-ui-mode^='mobile'] .utility-dock #inventory-button {
+  position: static !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,.25) !important;
+}
+html[data-ui-mode^='mobile'] .action-dock { position: absolute; }
+html[data-ui-mode^='mobile'] .action-dock #attack-btn,
+html[data-ui-mode^='mobile'] .action-dock #interact-btn { position: absolute !important; }
+
+/* ---------------- Mobile portrait ---------------- */
+html[data-ui-mode='mobile-portrait'] .topbar {
+  top: max(8px, env(safe-area-inset-top));
+  left: 8px;
+  right: 8px;
+  max-width: none;
+  display: grid;
+  grid-template-columns: auto minmax(120px,1fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+html[data-ui-mode='mobile-portrait'] .player-progression {
+  grid-column: 1;
+  min-height: 32px;
+  padding: 0 9px;
+  font-size: 11px;
+}
+html[data-ui-mode='mobile-portrait'] .hp-shell {
+  grid-column: 2;
+  width: 100%;
+  height: 22px;
+}
+html[data-ui-mode='mobile-portrait'] #hp-text { font-size: 10px; }
+html[data-ui-mode='mobile-portrait'] .coins {
+  grid-column: 3;
+  min-height: 32px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+html[data-ui-mode='mobile-portrait'] #quest-toggle {
+  top: calc(max(8px, env(safe-area-inset-top)) + 40px);
+  left: 8px;
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  font-size: 18px;
+}
+html[data-ui-mode='mobile-portrait'] #quest-box {
+  top: calc(max(8px, env(safe-area-inset-top)) + 88px);
+  left: 8px;
+  width: min(270px, calc(100vw - 16px));
+  max-height: 92px;
+  padding: 9px 10px;
+  font-size: 11px;
+}
+html[data-ui-mode='mobile-portrait'] #quest-box strong { font-size: 9px; }
+html[data-ui-mode='mobile-portrait'] .utility-dock {
+  top: calc(max(8px, env(safe-area-inset-top)) + 40px);
+  right: 8px;
+}
+html[data-ui-mode='mobile-portrait'] .utility-dock #character-button,
+html[data-ui-mode='mobile-portrait'] .utility-dock #inventory-button {
+  width: 42px !important;
+  height: 42px !important;
+  font-size: 18px !important;
+}
+html[data-ui-mode='mobile-portrait'] #stick {
+  left: max(16px, env(safe-area-inset-left));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  width: 112px;
+  height: 112px;
+}
+html[data-ui-mode='mobile-portrait'] #knob {
+  width: 50px;
+  height: 50px;
+  left: 29px;
+  top: 29px;
+}
+html[data-ui-mode='mobile-portrait'] .action-dock {
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  width: 118px;
+  height: 124px;
+}
+html[data-ui-mode='mobile-portrait'] .action-dock #attack-btn {
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 78px !important;
+  height: 78px !important;
+  font-size: 27px !important;
+}
+html[data-ui-mode='mobile-portrait'] .action-dock #interact-btn {
+  left: 0 !important;
+  top: 0 !important;
+  width: 48px !important;
+  height: 48px !important;
+  font-size: 19px !important;
+}
+html[data-ui-mode='mobile-portrait'] #dialog-box {
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 142px);
+  width: calc(100vw - 28px);
+  padding: 9px 11px;
+  font-size: 11px;
+}
+
+/* ---------------- Mobile landscape ---------------- */
+html[data-ui-mode='mobile-landscape'] .topbar {
+  top: max(6px, env(safe-area-inset-top));
+  left: max(8px, env(safe-area-inset-left));
+  right: auto;
+  width: min(330px, 44vw);
+  max-width: none;
+  display: grid;
+  grid-template-columns: auto minmax(120px,1fr);
+  align-items: center;
+  gap: 5px;
+}
+html[data-ui-mode='mobile-landscape'] .player-progression {
+  min-height: 27px;
+  padding: 0 8px;
+  font-size: 10px;
+}
+html[data-ui-mode='mobile-landscape'] .hp-shell {
+  width: 100%;
+  height: 19px;
+  border-width: 1px;
+}
+html[data-ui-mode='mobile-landscape'] #hp-text { font-size: 9px; }
+html[data-ui-mode='mobile-landscape'] .coins { display: none; }
+html[data-ui-mode='mobile-landscape'] #quest-toggle {
+  top: calc(max(6px, env(safe-area-inset-top)) + 34px);
+  left: max(8px, env(safe-area-inset-left));
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  font-size: 16px;
+}
+html[data-ui-mode='mobile-landscape'] #quest-box {
+  top: calc(max(6px, env(safe-area-inset-top)) + 74px);
+  left: max(8px, env(safe-area-inset-left));
+  width: min(250px, 34vw);
+  max-height: 74px;
+  padding: 7px 9px;
+  font-size: 10px;
+}
+html[data-ui-mode='mobile-landscape'] #quest-box strong { margin-bottom: 1px; font-size: 8px; }
+html[data-ui-mode='mobile-landscape'] .utility-dock {
+  top: max(6px, env(safe-area-inset-top));
+  right: max(8px, env(safe-area-inset-right));
+}
+html[data-ui-mode='mobile-landscape'] .utility-dock #character-button,
+html[data-ui-mode='mobile-landscape'] .utility-dock #inventory-button {
+  width: 38px !important;
+  height: 38px !important;
+  font-size: 16px !important;
+}
+html[data-ui-mode='mobile-landscape'] #stick {
+  left: max(12px, env(safe-area-inset-left));
+  bottom: max(10px, env(safe-area-inset-bottom));
+  width: 92px;
+  height: 92px;
+}
+html[data-ui-mode='mobile-landscape'] #knob {
+  width: 42px;
+  height: 42px;
+  left: 23px;
+  top: 23px;
+}
+html[data-ui-mode='mobile-landscape'] .action-dock {
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(10px, env(safe-area-inset-bottom));
+  width: 100px;
+  height: 98px;
+}
+html[data-ui-mode='mobile-landscape'] .action-dock #attack-btn {
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 66px !important;
+  height: 66px !important;
+  font-size: 23px !important;
+  border-width: 2px !important;
+}
+html[data-ui-mode='mobile-landscape'] .action-dock #interact-btn {
+  left: 0 !important;
+  top: 0 !important;
+  width: 40px !important;
+  height: 40px !important;
+  font-size: 16px !important;
+}
+html[data-ui-mode='mobile-landscape'] #dialog-box {
+  top: calc(max(6px, env(safe-area-inset-top)) + 42px);
+  bottom: auto;
+  width: min(420px, 48vw);
+  padding: 7px 10px;
+  font-size: 10px;
+}
+
+/* ---------------- Mobile portrait menus ---------------- */
+html[data-ui-mode='mobile-portrait'] #inventory-overlay,
+html[data-ui-mode='mobile-portrait'] #character-sheet-overlay,
+html[data-ui-mode='mobile-portrait'] #respawn-overlay { height: var(--app-height, 100dvh); }
+html[data-ui-mode='mobile-portrait'] .inventory-window,
+html[data-ui-mode='mobile-portrait'] .character-sheet-window { height: var(--app-height, 100dvh); max-height: none; }
+html[data-ui-mode='mobile-portrait'] .inventory-kicker { display: none; }
+html[data-ui-mode='mobile-portrait'] .inventory-header { padding-top: max(10px, env(safe-area-inset-top)); }
+html[data-ui-mode='mobile-portrait'] .inventory-title-block h2 { font-size: 19px; }
+html[data-ui-mode='mobile-portrait'] .inventory-search { width: min(132px, 35vw); min-height: 36px; }
+html[data-ui-mode='mobile-portrait'] .inventory-tool,
+html[data-ui-mode='mobile-portrait'] .inventory-close { min-height: 36px; }
+html[data-ui-mode='mobile-portrait'] .inventory-tab {
+  width: 42px;
+  min-height: 38px;
+  justify-content: center;
+  padding: 0;
+}
+html[data-ui-mode='mobile-portrait'] .inventory-tab strong { display: none; }
+html[data-ui-mode='mobile-portrait'] .inventory-main { min-height: 0; }
+html[data-ui-mode='mobile-portrait'] .inventory-slot { min-height: 62px; }
+html[data-ui-mode='mobile-portrait'] .equipment-card .panel-heading small { display: none; }
+html[data-ui-mode='mobile-portrait'] .inventory-footer { display: none; }
+
+html[data-ui-mode='mobile-portrait'] .sheet-header { padding: max(10px,env(safe-area-inset-top)) 12px 9px; }
+html[data-ui-mode='mobile-portrait'] .sheet-header h2 { font-size: 21px; }
+html[data-ui-mode='mobile-portrait'] .sheet-header p { font-size: 10px; }
+html[data-ui-mode='mobile-portrait'] .sheet-body { padding: 6px; }
+html[data-ui-mode='mobile-portrait'] .sheet-equipment-panel { padding: 7px; }
+html[data-ui-mode='mobile-portrait'] .sheet-character-layout { min-height: 285px; }
+html[data-ui-mode='mobile-portrait'] .sheet-avatar-wrap { min-height: 270px; }
+html[data-ui-mode='mobile-portrait'] .sheet-avatar { transform: scale(1.75); margin-top: 42px; margin-bottom: 42px; }
+html[data-ui-mode='mobile-portrait'] .sheet-equip-slot { min-height: 50px; }
+html[data-ui-mode='mobile-portrait'] .sheet-footer { display: none; }
+
+html[data-ui-mode='mobile-portrait'] .creator-header p { display: none; }
+html[data-ui-mode='mobile-portrait'] .creator-header { margin-bottom: 10px; }
+html[data-ui-mode='mobile-portrait'] #creator-preview { min-height: 195px; }
+html[data-ui-mode='mobile-portrait'] #creator-preview canvas { width: 170px; height: 195px; }
+
+html[data-ui-mode='mobile-portrait'] .character-slot { min-height: 150px; }
+html[data-ui-mode='mobile-portrait'] .slot-avatar { width: 72px; height: 72px; }
+html[data-ui-mode='mobile-portrait'] .selection-panel { margin-top: 9px; padding: 10px; }
+
+/* ---------------- Mobile landscape menus ---------------- */
+html[data-ui-mode='mobile-landscape'] #inventory-overlay,
+html[data-ui-mode='mobile-landscape'] #character-sheet-overlay,
+html[data-ui-mode='mobile-landscape'] #respawn-overlay { height: var(--app-height, 100dvh); padding: 0; place-items: stretch; }
+html[data-ui-mode='mobile-landscape'] .inventory-window,
+html[data-ui-mode='mobile-landscape'] .character-sheet-window {
+  width: 100%;
+  height: var(--app-height, 100dvh);
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+}
+html[data-ui-mode='mobile-landscape'] .inventory-header {
+  min-height: 46px;
+  padding: max(5px,env(safe-area-inset-top)) 8px 5px;
+}
+html[data-ui-mode='mobile-landscape'] .inventory-kicker { display: none; }
+html[data-ui-mode='mobile-landscape'] .inventory-title-block h2 { font-size: 17px; }
+html[data-ui-mode='mobile-landscape'] #inventory-capacity { font-size: 9px; }
+html[data-ui-mode='mobile-landscape'] .inventory-search { width: 120px; min-height: 32px; }
+html[data-ui-mode='mobile-landscape'] .inventory-tool,
+html[data-ui-mode='mobile-landscape'] .inventory-close { min-height: 32px; height: 32px; }
+html[data-ui-mode='mobile-landscape'] .inventory-close { width: 34px; }
+html[data-ui-mode='mobile-landscape'] .inventory-tabs { min-height: 38px; padding: 4px 8px; }
+html[data-ui-mode='mobile-landscape'] .inventory-tab { width: 36px; min-height: 30px; justify-content: center; padding: 0; }
+html[data-ui-mode='mobile-landscape'] .inventory-tab strong { display: none; }
+html[data-ui-mode='mobile-landscape'] .inventory-body {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0,1.55fr) minmax(215px,.75fr);
+  overflow: hidden;
+}
+html[data-ui-mode='mobile-landscape'] .inventory-main {
+  min-height: 0;
+  padding: 7px 7px 8px 9px;
+  border-right: 1px solid rgba(255,255,255,.065);
+  border-bottom: 0;
+}
+html[data-ui-mode='mobile-landscape'] .inventory-toolbar { margin-bottom: 4px; font-size: 8px; }
+html[data-ui-mode='mobile-landscape'] .inventory-grid {
+  grid-template-columns: repeat(6,minmax(48px,1fr));
+  gap: 5px;
+  overflow-y: auto;
+  padding: 1px 4px 6px 0;
+}
+html[data-ui-mode='mobile-landscape'] .inventory-slot { min-height: 50px; border-radius: 8px; }
+html[data-ui-mode='mobile-landscape'] .slot-icon { font-size: 23px; }
+html[data-ui-mode='mobile-landscape'] .slot-name { display: none; }
+html[data-ui-mode='mobile-landscape'] .inventory-side { overflow-y: auto; padding: 7px; }
+html[data-ui-mode='mobile-landscape'] .equipment-card { padding: 7px; }
+html[data-ui-mode='mobile-landscape'] .equipment-grid { grid-template-columns: 1fr; gap: 4px; }
+html[data-ui-mode='mobile-landscape'] .equipment-slot { min-height: 41px; grid-template-columns: 30px 1fr; padding: 4px 6px; }
+html[data-ui-mode='mobile-landscape'] .equipment-icon { width: 28px; height: 28px; font-size: 16px; }
+html[data-ui-mode='mobile-landscape'] .item-details { min-height: 0; margin-top: 6px; padding: 8px; }
+html[data-ui-mode='mobile-landscape'] .details-empty { min-height: 90px; }
+html[data-ui-mode='mobile-landscape'] .detail-description { display: none; }
+html[data-ui-mode='mobile-landscape'] .detail-top { grid-template-columns: 40px 1fr; gap: 7px; }
+html[data-ui-mode='mobile-landscape'] .detail-icon { width: 40px; height: 40px; font-size: 23px; }
+html[data-ui-mode='mobile-landscape'] .detail-top h3 { font-size: 12px; }
+html[data-ui-mode='mobile-landscape'] .detail-stats { margin: 5px 0; padding: 5px 7px; font-size: 8px; }
+html[data-ui-mode='mobile-landscape'] .detail-actions { margin-top: 6px; }
+html[data-ui-mode='mobile-landscape'] .detail-actions button { min-height: 31px; }
+html[data-ui-mode='mobile-landscape'] .inventory-footer { display: none; }
+
+html[data-ui-mode='mobile-landscape'] .sheet-header {
+  min-height: 45px;
+  padding: max(5px,env(safe-area-inset-top)) 10px 5px;
+}
+html[data-ui-mode='mobile-landscape'] .sheet-kicker { display: none; }
+html[data-ui-mode='mobile-landscape'] .sheet-header h2 { font-size: 18px; }
+html[data-ui-mode='mobile-landscape'] .sheet-header p { font-size: 9px; }
+html[data-ui-mode='mobile-landscape'] .sheet-close { width: 34px; height: 34px; font-size: 22px; }
+html[data-ui-mode='mobile-landscape'] .sheet-body {
+  min-height: 0;
+  grid-template-columns: minmax(0,1.45fr) minmax(235px,.75fr);
+  gap: 6px;
+  padding: 6px;
+  overflow: hidden;
+}
+html[data-ui-mode='mobile-landscape'] .sheet-equipment-panel,
+html[data-ui-mode='mobile-landscape'] .sheet-stats-panel { padding: 6px; overflow: auto; }
+html[data-ui-mode='mobile-landscape'] .sheet-panel-title { margin-bottom: 5px; }
+html[data-ui-mode='mobile-landscape'] .sheet-character-layout {
+  grid-template-columns: minmax(95px,1fr) 105px minmax(95px,1fr);
+  gap: 5px;
+  min-height: 0;
+  height: calc(var(--app-height,100dvh) - 92px);
+}
+html[data-ui-mode='mobile-landscape'] .sheet-slot-column { gap: 4px; }
+html[data-ui-mode='mobile-landscape'] .sheet-equip-slot {
+  min-height: 43px;
+  grid-template-columns: 28px 1fr;
+  gap: 4px;
+  padding: 4px;
+}
+html[data-ui-mode='mobile-landscape'] .sheet-slot-icon { width: 27px; height: 27px; font-size: 15px; }
+html[data-ui-mode='mobile-landscape'] .sheet-equip-slot small { font-size: 6px; }
+html[data-ui-mode='mobile-landscape'] .sheet-equip-slot strong { font-size: 8px; }
+html[data-ui-mode='mobile-landscape'] .sheet-equip-slot em { display: none; }
+html[data-ui-mode='mobile-landscape'] .sheet-avatar-wrap { min-height: 0; height: 100%; border-radius: 70px 70px 15px 15px; }
+html[data-ui-mode='mobile-landscape'] .sheet-avatar { transform: scale(1.45); margin: 30px 0 35px; }
+html[data-ui-mode='mobile-landscape'] #sheet-class-label { bottom: 24px; font-size: 9px; }
+html[data-ui-mode='mobile-landscape'] #sheet-level-label { bottom: 12px; font-size: 8px; }
+html[data-ui-mode='mobile-landscape'] .sheet-stats { gap: 4px; }
+html[data-ui-mode='mobile-landscape'] .sheet-stat { min-height: 48px; grid-template-columns: 25px 1fr; gap: 4px; padding: 5px; }
+html[data-ui-mode='mobile-landscape'] .sheet-stat > span { width: 23px; height: 23px; font-size: 12px; }
+html[data-ui-mode='mobile-landscape'] .sheet-stat small { font-size: 6px; }
+html[data-ui-mode='mobile-landscape'] .sheet-stat strong { font-size: 12px; }
+html[data-ui-mode='mobile-landscape'] .sheet-stat em { display: none; }
+html[data-ui-mode='mobile-landscape'] .sheet-exp-card { margin-top: 5px; padding: 6px; }
+html[data-ui-mode='mobile-landscape'] .sheet-selected-item { display: none; }
+html[data-ui-mode='mobile-landscape'] .sheet-footer { display: none; }
+
+html[data-ui-mode='mobile-landscape'] #character-creator { height: var(--app-height,100dvh); }
+html[data-ui-mode='mobile-landscape'] .creator-shell { min-height: 0; padding: max(6px,env(safe-area-inset-top)) 8px max(6px,env(safe-area-inset-bottom)); }
+html[data-ui-mode='mobile-landscape'] .creator-header { align-items: center; margin-bottom: 6px; }
+html[data-ui-mode='mobile-landscape'] .creator-header h1 { font-size: 20px; }
+html[data-ui-mode='mobile-landscape'] .creator-header p { display: none; }
+html[data-ui-mode='mobile-landscape'] .creator-layout { grid-template-columns: 210px minmax(0,1fr); gap: 8px; }
+html[data-ui-mode='mobile-landscape'] .creator-preview-panel { position: sticky; top: 0; padding: 7px; }
+html[data-ui-mode='mobile-landscape'] #creator-preview { min-height: 165px; }
+html[data-ui-mode='mobile-landscape'] #creator-preview canvas { width: 145px; height: 166px; }
+html[data-ui-mode='mobile-landscape'] .preview-rotate { margin-top: 5px; }
+html[data-ui-mode='mobile-landscape'] .preview-rotate button { height: 31px; }
+html[data-ui-mode='mobile-landscape'] .preview-summary { padding-top: 6px; }
+html[data-ui-mode='mobile-landscape'] .creator-controls {
+  max-height: calc(var(--app-height,100dvh) - 54px);
+  overflow-y: auto;
+  padding: 9px;
+}
+html[data-ui-mode='mobile-landscape'] .creator-section { margin-bottom: 10px; }
+html[data-ui-mode='mobile-landscape'] .creator-section h3 { margin-bottom: 5px; }
+html[data-ui-mode='mobile-landscape'] .visual-option-grid { grid-template-columns: repeat(5,minmax(64px,1fr)); gap: 5px; }
+html[data-ui-mode='mobile-landscape'] .visual-card { min-height: 75px; }
+html[data-ui-mode='mobile-landscape'] .lpc-thumb { transform: scale(.82); }
+html[data-ui-mode='mobile-landscape'] .color-dot { width: 31px; height: 31px; }
+
+html[data-ui-mode='mobile-landscape'] #account-gate,
+html[data-ui-mode='mobile-landscape'] #character-select { height: var(--app-height,100dvh); }
+html[data-ui-mode='mobile-landscape'] .account-shell { min-height: var(--app-height,100dvh); padding: 7px 12px; }
+html[data-ui-mode='mobile-landscape'] .auth-card { padding: 13px; }
+html[data-ui-mode='mobile-landscape'] .auth-brand { margin-bottom: 7px; }
+html[data-ui-mode='mobile-landscape'] .auth-brand h1 { font-size: 21px; }
+html[data-ui-mode='mobile-landscape'] .auth-brand p,
+html[data-ui-mode='mobile-landscape'] .account-note { display: none; }
+html[data-ui-mode='mobile-landscape'] .auth-tabs { margin: 7px 0; }
+html[data-ui-mode='mobile-landscape'] .auth-form { gap: 6px; }
+html[data-ui-mode='mobile-landscape'] .auth-form input { height: 38px; }
+html[data-ui-mode='mobile-landscape'] .auth-submit { min-height: 40px; }
+html[data-ui-mode='mobile-landscape'] .select-shell { min-height: 0; padding: max(6px,env(safe-area-inset-top)) 8px max(6px,env(safe-area-inset-bottom)); }
+html[data-ui-mode='mobile-landscape'] .select-header { margin-bottom: 6px; }
+html[data-ui-mode='mobile-landscape'] .select-header h1 { font-size: 20px; }
+html[data-ui-mode='mobile-landscape'] .character-grid { grid-template-columns: repeat(3,1fr); gap: 6px; }
+html[data-ui-mode='mobile-landscape'] .character-slot { min-height: 112px; padding: 6px; border-radius: 11px; }
+html[data-ui-mode='mobile-landscape'] .slot-avatar { width: 54px; height: 54px; margin-top: 4px; transform: scale(.9); }
+html[data-ui-mode='mobile-landscape'] .slot-avatar-layer { left: -5px; top: -5px; }
+html[data-ui-mode='mobile-landscape'] .slot-name { margin-top: 1px; font-size: 11px; }
+html[data-ui-mode='mobile-landscape'] .slot-meta { font-size: 8px; }
+html[data-ui-mode='mobile-landscape'] .empty-slot .empty-plus { width: 42px; height: 42px; margin: 5px auto 3px; font-size: 23px; }
+html[data-ui-mode='mobile-landscape'] .selection-panel { margin-top: 6px; padding: 7px; }
+html[data-ui-mode='mobile-landscape'] .selection-info strong { font-size: 12px; }
+html[data-ui-mode='mobile-landscape'] .selection-info span { font-size: 9px; }
+html[data-ui-mode='mobile-landscape'] .selection-actions button { min-height: 34px; }
+
+html[data-ui-mode='mobile-landscape'] .respawn-card {
+  width: min(520px, calc(100vw - 28px));
+  align-self: center;
+  justify-self: center;
+  padding: 13px 18px;
+}
+html[data-ui-mode='mobile-landscape'] .respawn-emblem { width: 50px; height: 50px; margin-bottom: 5px; }
+html[data-ui-mode='mobile-landscape'] .respawn-emblem span { font-size: 22px; }
+html[data-ui-mode='mobile-landscape'] .respawn-card h1 { margin: 2px 0 4px; font-size: 23px; }
+html[data-ui-mode='mobile-landscape'] .respawn-copy { margin-bottom: 8px; font-size: 10px; }
+html[data-ui-mode='mobile-landscape'] .respawn-destination { margin-bottom: 8px; padding: 7px; }
+html[data-ui-mode='mobile-landscape'] #respawn-button { min-height: 40px; }
+html[data-ui-mode='mobile-landscape'] .respawn-note { margin-top: 5px; }
