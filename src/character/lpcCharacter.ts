@@ -167,6 +167,13 @@ export class LpcCharacter {
       }
 
       sprite.visible = true;
+      const usingAttackFrame = this.animation === 'slash' && Boolean(exact);
+
+      // LPC usa células ampliadas no ataque (normalmente 192x192) para dar espaço
+      // ao arco da arma. Os pés do personagem continuam na linha de 128 px,
+      // portanto ancorar o frame inteiro no rodapé (y=1) deslocava a espada/corpo.
+      // 128/192 = 2/3 mantém todas as camadas do slash alinhadas ao ponto do jogador.
+      sprite.anchor.set(0.5, usingAttackFrame ? 2 / 3 : 1);
       sprite.texture = this.crop(sheet, exact ? this.frame : 0);
       sprite.texture.source.scaleMode = 'nearest';
     }
