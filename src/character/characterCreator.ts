@@ -16,27 +16,27 @@ const hairBySex: Record<Sex, Option[]> = {
   ],
   female: [
     { id: 'bob', label: 'Bob' },
-    { id: 'braid', label: 'Trança' },
+    { id: 'bob_side_part', label: 'Lateral' },
     { id: 'bangs_bun', label: 'Coque' },
-    { id: 'bangslong', label: 'Franja longa' },
-    { id: 'bunches', label: 'Duplo' },
+    { id: 'bangsshort', label: 'Franja curta' },
+    { id: 'bedhead', label: 'Despojado' },
   ],
 };
 
 const eyesBySex: Record<Sex, Option[]> = {
   male: [
     { id: 'neutral', label: 'Clássico' },
-    { id: 'happy', label: 'Suave' },
+    { id: 'anger', label: 'Intenso' },
+    { id: 'sad', label: 'Suave' },
     { id: 'eyeroll', label: 'Arqueado' },
-    { id: 'look_l', label: 'Focado E' },
-    { id: 'look_r', label: 'Focado D' },
+    { id: 'look_l', label: 'Lateral' },
   ],
   female: [
     { id: 'neutral', label: 'Clássico' },
-    { id: 'happy', label: 'Suave' },
+    { id: 'anger', label: 'Intenso' },
+    { id: 'sad', label: 'Suave' },
     { id: 'eyeroll', label: 'Arqueado' },
-    { id: 'look_l', label: 'Focado E' },
-    { id: 'look_r', label: 'Focado D' },
+    { id: 'look_l', label: 'Lateral' },
   ],
 };
 
@@ -53,11 +53,27 @@ function cloneDefault(): CharacterConfig {
   return { ...DEFAULT_CHARACTER };
 }
 
+function sanitizeConfig(value: CharacterConfig): CharacterConfig {
+  const sex: Sex = value.sex === 'female' ? 'female' : 'male';
+  const validHair = hairBySex[sex].some((item) => item.id === value.hairStyle);
+  const validEyes = eyesBySex[sex].some((item) => item.id === value.eyeStyle);
+  const validEyeColor = eyeColors.includes(value.eyeColor);
+
+  return {
+    ...cloneDefault(),
+    ...value,
+    sex,
+    hairStyle: validHair ? value.hairStyle : hairBySex[sex][0].id,
+    eyeStyle: validEyes ? value.eyeStyle : eyesBySex[sex][0].id,
+    eyeColor: validEyeColor ? value.eyeColor : eyeColors[0],
+  };
+}
+
 function loadSaved(): CharacterConfig {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return cloneDefault();
-    return { ...cloneDefault(), ...JSON.parse(raw) } as CharacterConfig;
+    return sanitizeConfig({ ...cloneDefault(), ...JSON.parse(raw) } as CharacterConfig);
   } catch {
     return cloneDefault();
   }
@@ -103,7 +119,7 @@ function createEyeThumb(sex: Sex, eyeStyle: string) {
   thumb.className = 'lpc-thumb face-thumb';
   addThumbLayer(thumb, `body/bodies/${sex}/idle.png`, 1);
   addThumbLayer(thumb, `head/heads/human/${sex}/idle.png`, 2);
-  addThumbLayer(thumb, `head/faces/${sex}/${eyeStyle}/idle.png`, 3);
+  addThumbLayer(thumb, `eyes/human/adult/${eyeStyle}/idle/blue.png`, 3);
   return thumb;
 }
 
