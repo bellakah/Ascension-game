@@ -45,7 +45,7 @@ export function createSkillController(progress: CharacterProgress) {
 
   const activate = (skillId: SkillId): SkillActivation => {
     const check = canUse(skillId);
-    if (!check.ok) return { ok: false, reason: check.reason };
+    if ('reason' in check && check.reason) return { ok: false, reason: check.reason };
     const skill = getSkill(skillId);
     state.energy = Math.max(0, state.energy - skill.energyCost);
     cooldowns[skillId] = skill.cooldownMs;
