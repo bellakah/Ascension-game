@@ -6,6 +6,8 @@ type SkillProgress = CharacterProgress & {
   maxEnergy?: number;
 };
 
+type SkillAvailability = { ok: true } | { ok: false; reason: string };
+
 export type SkillSnapshot = {
   energy: number;
   maxEnergy: number;
@@ -28,11 +30,11 @@ export function createSkillController(progress: CharacterProgress) {
   let buffAttackPercent = 0;
   let buffRemainingMs = 0;
 
-  const canUse = (skillId: SkillId) => {
+  const canUse = (skillId: SkillId): SkillAvailability => {
     const skill = getSkill(skillId);
     if (cooldowns[skillId] > 0) return { ok: false, reason: `${skill.name} ainda está em recarga.` };
     if (state.energy < skill.energyCost) return { ok: false, reason: `Energia insuficiente para ${skill.name}.` };
-    return { ok: true as const };
+    return { ok: true };
   };
 
   const activate = (skillId: SkillId) => {
