@@ -6,7 +6,7 @@ export type Hud = ReturnType<typeof createHud>;
 export function createHud(progress: CharacterProgress) {
   const root = document.createElement('div');
   root.id = 'hud';
-  root.innerHTML = `<div class="topbar"><div class="brand">ASCENSION <span>• ${progress.map}</span></div><div class="player-progression"><strong id="level-text"></strong><span id="exp-text"></span></div><div class="hp-shell"><div id="hp-fill"></div><span id="hp-text"></span></div><div class="coins">🪙 <span id="coins"></span></div></div><div id="quest-box"><strong id="quest-title">Missão</strong><div id="quest-text"></div></div><div id="dialog-box" class="hidden"></div><div id="stick"><div id="knob"></div></div><button id="attack-btn">⚔</button><button id="interact-btn">💬</button>`;
+  root.innerHTML = `<div class="topbar"><div class="brand">ASCENSION <span>• ${progress.map}</span></div><div class="player-progression"><strong id="level-text"></strong><span id="exp-text"></span></div><div class="hp-shell"><div id="hp-fill"></div><span id="hp-text"></span></div><div class="coins">🪙 <span id="coins"></span></div></div><div id="quest-box"><strong id="quest-title">Missão</strong><div id="quest-text"></div></div><div id="dialog-box" class="hidden"></div><div id="stick"><div id="knob"></div></div><button id="inventory-button" title="Inventário">🎒</button><button id="attack-btn">⚔</button><button id="interact-btn">💬</button>`;
   document.body.appendChild(root);
   return {
     root,
@@ -20,6 +20,7 @@ export function createHud(progress: CharacterProgress) {
     dialog: root.querySelector<HTMLDivElement>('#dialog-box')!,
     stick: root.querySelector<HTMLDivElement>('#stick')!,
     knob: root.querySelector<HTMLDivElement>('#knob')!,
+    inventory: root.querySelector<HTMLButtonElement>('#inventory-button')!,
     attack: root.querySelector<HTMLButtonElement>('#attack-btn')!,
     interact: root.querySelector<HTMLButtonElement>('#interact-btn')!,
   };

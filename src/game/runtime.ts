@@ -1,6 +1,9 @@
 import { Application, Container, Graphics, Text, Ticker } from 'pixi.js';
 import { LpcCharacter, type Facing } from '../character/lpcCharacter';
 import { persistSelectedCharacter, showCharacterCreator } from '../character/characterCreator';
+import { createInventory } from '../items/inventory';
+import { ensureInventoryState, getItem } from '../items/itemCatalog';
+import { spawnMonsterLoot, updateGroundLoot, type GroundLoot } from '../items/lootSystem';
 import { createHud, showDialog, updateHud } from './hud';
 import { createMonsters, damageMonster, findAttackTarget, killMonster, updateMonsters } from './monsterSystem';
 import { currentQuest, ensureQuestStates, interactQuest, registerQuestKill } from './quests';
@@ -16,6 +19,7 @@ export async function startGame() {
     const config = selected.config;
     const progress = selected.progress;
     ensureQuestStates(progress);
+    ensureInventoryState(progress);
     if (bootStatus) bootStatus.style.display = 'grid';
     setBootMessage(`Preparando ${config.name}...`);
 
@@ -42,6 +46,7 @@ export async function startGame() {
     world.addChild(player);
 
     const monsters = await createMonsters(world);
+    const groundLoot: GroundLoot[] = [];
     const hud = createHud(progress);
     let playerHp = Math.max(1, Math.min(progress.maxHp, progress.hp));
     let coins = progress.coins;
@@ -69,13 +74,21 @@ export async function startGame() {
 
     const refresh = () => { updateHud(hud, progress, playerHp, coins); syncNpc(); };
 
+    const inventory = createInventory(progress, {
+      getHp: () => playerHp,
+      setHp: (value) => { playerHp = Math.max(1, Math.min(progress.maxHp, value)); progress.hp = playerHp; refresh(); },
+      onChanged: () => { refresh(); save(); },
+      notify: (message) => showDialog(hud, message),
+    });
+    hud.inventory.addEventListener('pointerdown', () => inventory.toggle());
+
     const floating = (x: number, y: number, text: string, color: number) => {
       const node = new Text({ text, style: { fill: color, fontSize: 14, fontWeight: 'bold', stroke: { color: 0, width: 4 } } });
       node.anchor.set(.5); node.position.set(x, y); world.addChild(node);
       let life = 55;
       const tick = (ticker: Ticker) => {
         life -= ticker.deltaTime; node.y -= .55 * ticker.deltaTime; node.alpha = Math.max(0, life / 55);
-        if (life <= 0) { app.ticker.remove(tick); world.removeChild(node); }
+        if (life <= 0) { app.ticker.remove(tick); world.removeChild(node); node.destroy(); }
       };
       app.ticker.add(tick);
     };
@@ -99,14 +112,15 @@ export async function startGame() {
     const onKill = (monster: typeof monsters[number]) => {
       grantExp(monster.expReward);
       coins += monster.coinReward;
+      spawnMonsterLoot(world, monster.kind, monster.view.x, monster.view.y, groundLoot);
       floating(monster.view.x, monster.view.y - 45, `+${monster.expReward} EXP`, 0xaee8ff);
       const result = registerQuestKill(progress, monster.kind);
       if (result?.becameReady) showDialog(hud, `${result.quest.title}: objetivo concluído! Volte para Elandra.`);
-      refresh(); save();
+      inventory.refresh(); refresh(); save();
     };
 
     const interact = () => {
-      if (distance(player.x, player.y, npc.x, npc.y) >= 115) return;
+      if (inventory.isOpen() || distance(player.x, player.y, npc.x, npc.y) >= 115) return;
       const result = interactQuest(progress);
       if (result.type === 'all_done') showDialog(hud, 'Elandra: Você já concluiu todas as missões de teste.');
       else if (result.type === 'accepted') showDialog(hud, `Elandra: ${result.quest.objective}. Recompensa: ${result.quest.rewardExp} EXP e ${result.quest.rewardCoins} moedas.`);
@@ -118,7 +132,7 @@ export async function startGame() {
     };
 
     const attack = () => {
-      if (attackCooldown > 0 || hero.isAttacking || !hero.attack()) return;
+      if (inventory.isOpen() || attackCooldown > 0 || hero.isAttacking || !hero.attack()) return;
       attackCooldown = 30;
       const target = findAttackTarget(monsters, player.x, player.y);
       if (!target) return;
@@ -131,6 +145,7 @@ export async function startGame() {
     hud.interact.addEventListener('pointerdown', interact);
     const keys = new Set<string>();
     window.addEventListener('keydown', (event) => {
+      if (inventory.isOpen() && event.key !== 'Escape' && event.key.toLowerCase() !== 'i') return;
       keys.add(event.key.toLowerCase());
       if (event.code === 'Space') attack();
       if (event.key.toLowerCase() === 'e') interact();
@@ -146,7 +161,7 @@ export async function startGame() {
       stickX = dx / max; stickY = dy / max; hud.knob.style.transform = `translate(${dx}px, ${dy}px)`;
     };
     const resetStick = () => { stickX = 0; stickY = 0; hud.knob.style.transform = 'translate(0, 0)'; };
-    hud.stick.addEventListener('pointerdown', (e) => { hud.stick.setPointerCapture(e.pointerId); updateStick(e.clientX, e.clientY); });
+    hud.stick.addEventListener('pointerdown', (e) => { if (!inventory.isOpen()) { hud.stick.setPointerCapture(e.pointerId); updateStick(e.clientX, e.clientY); } });
     hud.stick.addEventListener('pointermove', (e) => { if (hud.stick.hasPointerCapture(e.pointerId)) updateStick(e.clientX, e.clientY); });
     hud.stick.addEventListener('pointerup', resetStick);
     hud.stick.addEventListener('pointercancel', resetStick);
@@ -159,11 +174,13 @@ export async function startGame() {
       if (autosaveMs >= 3000) { autosaveMs = 0; save(); }
       attackCooldown = Math.max(0, attackCooldown - ticker.deltaTime);
 
-      let dx = stickX, dy = stickY;
-      if (keys.has('a') || keys.has('arrowleft')) dx -= 1;
-      if (keys.has('d') || keys.has('arrowright')) dx += 1;
-      if (keys.has('w') || keys.has('arrowup')) dy -= 1;
-      if (keys.has('s') || keys.has('arrowdown')) dy += 1;
+      let dx = inventory.isOpen() ? 0 : stickX, dy = inventory.isOpen() ? 0 : stickY;
+      if (!inventory.isOpen()) {
+        if (keys.has('a') || keys.has('arrowleft')) dx -= 1;
+        if (keys.has('d') || keys.has('arrowright')) dx += 1;
+        if (keys.has('w') || keys.has('arrowup')) dy -= 1;
+        if (keys.has('s') || keys.has('arrowdown')) dy += 1;
+      }
       const len = Math.hypot(dx, dy), moving = len > 0 && !hero.isAttacking;
       if (moving) {
         dx /= Math.max(1, len); dy /= Math.max(1, len);
@@ -177,18 +194,29 @@ export async function startGame() {
       }
       hero.update(moving, ticker.deltaTime);
 
-      updateMonsters(monsters, ticker, player, progress.defense, (damage) => {
-        playerHp = Math.max(0, playerHp - damage);
-        floating(player.x, player.y - 90, `-${damage}`, 0xff8f8f);
-        if (playerHp <= 0) { playerHp = progress.maxHp; player.position.set(SPAWN.x, SPAWN.y); showDialog(hud, 'Você foi derrotado e retornou ao ponto inicial.'); save(); }
-        refresh();
-      });
+      if (!inventory.isOpen()) {
+        updateMonsters(monsters, ticker, player, progress.defense, (damage) => {
+          playerHp = Math.max(0, playerHp - damage);
+          floating(player.x, player.y - 90, `-${damage}`, 0xff8f8f);
+          if (playerHp <= 0) { playerHp = progress.maxHp; player.position.set(SPAWN.x, SPAWN.y); showDialog(hud, 'Você foi derrotado e retornou ao ponto inicial.'); save(); }
+          refresh();
+        });
+
+        updateGroundLoot(groundLoot, ticker, player, progress, (itemId, quantity) => {
+          const item = getItem(itemId);
+          if (item) {
+            floating(player.x, player.y - 75, `+${quantity} ${item.icon}`, 0xffe7a0);
+            showDialog(hud, `${quantity}x ${item.name} adicionado ao inventário.`);
+          }
+          inventory.refresh(); save();
+        }, () => showDialog(hud, 'Inventário cheio. O item continuará no chão por um tempo.'));
+      }
 
       world.x = Math.max(Math.min(0, app.screen.width - WORLD_W), Math.min(0, app.screen.width / 2 - player.x));
       world.y = Math.max(Math.min(0, app.screen.height - WORLD_H), Math.min(0, app.screen.height / 2 - player.y));
     });
 
-    refresh(); save();
+    refresh(); inventory.refresh(); save();
     if (bootStatus) bootStatus.remove();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
