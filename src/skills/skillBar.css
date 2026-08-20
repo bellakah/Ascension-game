@@ -35,13 +35,14 @@ html[data-ui-mode='mobile-portrait'] .skill-cost { top: 2px; right: 3px; font-si
 html[data-ui-mode='mobile-portrait'] .skill-cooldown { font-size: 12px; }
 html[data-ui-mode='mobile-portrait'] .skill-buff { font-size: 8px; }
 
-html[data-ui-mode='mobile-landscape'] #skill-bar { left: auto; right: calc(max(12px,env(safe-area-inset-right)) + 72px); bottom: max(9px,env(safe-area-inset-bottom)); transform: none; display: flex; flex-direction: row-reverse; align-items: end; gap: 5px; }
+html[data-ui-mode='mobile-landscape'] #skill-bar { left: auto; right: calc(max(12px,env(safe-area-inset-right)) + 104px); bottom: max(9px,env(safe-area-inset-bottom)); transform: none; display: flex; flex-direction: row-reverse; align-items: end; gap: 5px; }
 html[data-ui-mode='mobile-landscape'] .skill-energy { width: 105px; padding: 3px 5px; }
 html[data-ui-mode='mobile-landscape'] #skill-energy-text { min-width: 31px; font-size: 7px; }
 html[data-ui-mode='mobile-landscape'] .skill-buttons { gap: 4px; }
 html[data-ui-mode='mobile-landscape'] .skill-button { width: 39px; height: 39px; border-radius: 9px; }
 html[data-ui-mode='mobile-landscape'] .skill-icon { font-size: 18px; }
-html[data-ui-mode='mobile-landscape'] .skill-name,.skill-key { display: none; }
+html[data-ui-mode='mobile-landscape'] .skill-name,
+html[data-ui-mode='mobile-landscape'] .skill-key { display: none; }
 html[data-ui-mode='mobile-landscape'] .skill-cost { top: 2px; right: 3px; font-size: 6px; }
 html[data-ui-mode='mobile-landscape'] .skill-cooldown { font-size: 11px; }
 html[data-ui-mode='mobile-landscape'] .skill-buff { display: none; }
