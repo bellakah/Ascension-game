@@ -1,6 +1,7 @@
 import { Application, Container, Graphics, Text, Ticker } from 'pixi.js';
 import { LpcCharacter, type Facing } from '../character/lpcCharacter';
 import { persistSelectedCharacter, showCharacterCreator } from '../character/characterCreator';
+import { createCharacterSheet } from '../character/characterSheet';
 import { createInventory } from '../items/inventory';
 import { ensureInventoryState, getItem } from '../items/itemCatalog';
 import { spawnMonsterLoot, updateGroundLoot, type GroundLoot } from '../items/lootSystem';
@@ -19,7 +20,7 @@ export async function startGame() {
     const config = selected.config;
     const progress = selected.progress;
     ensureQuestStates(progress);
-    ensureInventoryState(progress);
+    const inventoryState = ensureInventoryState(progress);
     if (bootStatus) bootStatus.style.display = 'grid';
     setBootMessage(`Preparando ${config.name}...`);
 
@@ -35,7 +36,7 @@ export async function startGame() {
 
     const player = new Container();
     player.addChild(new Graphics().ellipse(0, 5, 25, 10).fill({ color: 0, alpha: .25 }));
-    const hero = await LpcCharacter.create(config);
+    const hero = await LpcCharacter.create(config, inventoryState.equipment);
     player.addChild(hero.view);
     const playerName = new Text({ text: config.name, style: { fill: 0xffffff, fontSize: 14, fontWeight: 'bold', stroke: { color: 0, width: 4 } } });
     playerName.anchor.set(.5); playerName.y = -94; player.addChild(playerName);
@@ -73,14 +74,23 @@ export async function startGame() {
     };
 
     const refresh = () => { updateHud(hud, progress, playerHp, coins); syncNpc(); };
+    const characterSheet = createCharacterSheet(config, progress);
+
+    const syncEquipmentVisuals = () => {
+      void hero.setEquipment(ensureInventoryState(progress).equipment);
+      characterSheet.refresh();
+    };
 
     const inventory = createInventory(progress, {
       getHp: () => playerHp,
       setHp: (value) => { playerHp = Math.max(1, Math.min(progress.maxHp, value)); progress.hp = playerHp; refresh(); },
-      onChanged: () => { refresh(); save(); },
+      onChanged: () => { syncEquipmentVisuals(); refresh(); save(); },
       notify: (message) => showDialog(hud, message),
     });
-    hud.inventory.addEventListener('pointerdown', () => inventory.toggle());
+
+    const uiOpen = () => inventory.isOpen() || characterSheet.isOpen();
+    hud.inventory.addEventListener('pointerdown', () => { characterSheet.close(); inventory.toggle(); });
+    hud.character.addEventListener('pointerdown', () => { inventory.close(); characterSheet.toggle(); });
 
     const floating = (x: number, y: number, text: string, color: number) => {
       const node = new Text({ text, style: { fill: color, fontSize: 14, fontWeight: 'bold', stroke: { color: 0, width: 4 } } });
@@ -107,6 +117,7 @@ export async function startGame() {
         leveled = true;
       }
       if (leveled) showDialog(hud, `Nível ${progress.level}! HP, ataque e defesa aumentaram.`);
+      characterSheet.refresh();
     };
 
     const onKill = (monster: typeof monsters[number]) => {
@@ -116,11 +127,11 @@ export async function startGame() {
       floating(monster.view.x, monster.view.y - 45, `+${monster.expReward} EXP`, 0xaee8ff);
       const result = registerQuestKill(progress, monster.kind);
       if (result?.becameReady) showDialog(hud, `${result.quest.title}: objetivo concluído! Volte para Elandra.`);
-      inventory.refresh(); refresh(); save();
+      inventory.refresh(); refresh(); save(); characterSheet.refresh();
     };
 
     const interact = () => {
-      if (inventory.isOpen() || distance(player.x, player.y, npc.x, npc.y) >= 115) return;
+      if (uiOpen() || distance(player.x, player.y, npc.x, npc.y) >= 115) return;
       const result = interactQuest(progress);
       if (result.type === 'all_done') showDialog(hud, 'Elandra: Você já concluiu todas as missões de teste.');
       else if (result.type === 'accepted') showDialog(hud, `Elandra: ${result.quest.objective}. Recompensa: ${result.quest.rewardExp} EXP e ${result.quest.rewardCoins} moedas.`);
@@ -128,11 +139,11 @@ export async function startGame() {
         grantExp(result.quest.rewardExp); coins += result.quest.rewardCoins;
         showDialog(hud, `Missão concluída! +${result.quest.rewardExp} EXP e +${result.quest.rewardCoins} moedas.`);
       } else showDialog(hud, `Elandra: ${result.quest.objective}. Progresso ${result.state.progress}/${result.state.target}.`);
-      refresh(); save();
+      refresh(); save(); characterSheet.refresh();
     };
 
     const attack = () => {
-      if (inventory.isOpen() || attackCooldown > 0 || hero.isAttacking || !hero.attack()) return;
+      if (uiOpen() || attackCooldown > 0 || hero.isAttacking || !hero.attack()) return;
       attackCooldown = 30;
       const target = findAttackTarget(monsters, player.x, player.y);
       if (!target) return;
@@ -145,10 +156,13 @@ export async function startGame() {
     hud.interact.addEventListener('pointerdown', interact);
     const keys = new Set<string>();
     window.addEventListener('keydown', (event) => {
-      if (inventory.isOpen() && event.key !== 'Escape' && event.key.toLowerCase() !== 'i') return;
-      keys.add(event.key.toLowerCase());
+      const key = event.key.toLowerCase();
+      if (key === 'i' && characterSheet.isOpen()) characterSheet.close();
+      if (key === 'c' && inventory.isOpen()) inventory.close();
+      if (uiOpen() && event.key !== 'Escape' && key !== 'i' && key !== 'c') return;
+      keys.add(key);
       if (event.code === 'Space') attack();
-      if (event.key.toLowerCase() === 'e') interact();
+      if (key === 'e') interact();
     });
     window.addEventListener('keyup', (event) => keys.delete(event.key.toLowerCase()));
 
@@ -161,7 +175,7 @@ export async function startGame() {
       stickX = dx / max; stickY = dy / max; hud.knob.style.transform = `translate(${dx}px, ${dy}px)`;
     };
     const resetStick = () => { stickX = 0; stickY = 0; hud.knob.style.transform = 'translate(0, 0)'; };
-    hud.stick.addEventListener('pointerdown', (e) => { if (!inventory.isOpen()) { hud.stick.setPointerCapture(e.pointerId); updateStick(e.clientX, e.clientY); } });
+    hud.stick.addEventListener('pointerdown', (e) => { if (!uiOpen()) { hud.stick.setPointerCapture(e.pointerId); updateStick(e.clientX, e.clientY); } });
     hud.stick.addEventListener('pointermove', (e) => { if (hud.stick.hasPointerCapture(e.pointerId)) updateStick(e.clientX, e.clientY); });
     hud.stick.addEventListener('pointerup', resetStick);
     hud.stick.addEventListener('pointercancel', resetStick);
@@ -174,8 +188,8 @@ export async function startGame() {
       if (autosaveMs >= 3000) { autosaveMs = 0; save(); }
       attackCooldown = Math.max(0, attackCooldown - ticker.deltaTime);
 
-      let dx = inventory.isOpen() ? 0 : stickX, dy = inventory.isOpen() ? 0 : stickY;
-      if (!inventory.isOpen()) {
+      let dx = uiOpen() ? 0 : stickX, dy = uiOpen() ? 0 : stickY;
+      if (!uiOpen()) {
         if (keys.has('a') || keys.has('arrowleft')) dx -= 1;
         if (keys.has('d') || keys.has('arrowright')) dx += 1;
         if (keys.has('w') || keys.has('arrowup')) dy -= 1;
@@ -194,7 +208,7 @@ export async function startGame() {
       }
       hero.update(moving, ticker.deltaTime);
 
-      if (!inventory.isOpen()) {
+      if (!uiOpen()) {
         updateMonsters(monsters, ticker, player, progress.defense, (damage) => {
           playerHp = Math.max(0, playerHp - damage);
           floating(player.x, player.y - 90, `-${damage}`, 0xff8f8f);
@@ -208,7 +222,7 @@ export async function startGame() {
             floating(player.x, player.y - 75, `+${quantity} ${item.icon}`, 0xffe7a0);
             showDialog(hud, `${quantity}x ${item.name} adicionado ao inventário.`);
           }
-          inventory.refresh(); save();
+          inventory.refresh(); save(); characterSheet.refresh();
         }, () => showDialog(hud, 'Inventário cheio. O item continuará no chão por um tempo.'));
       }
 
@@ -216,7 +230,7 @@ export async function startGame() {
       world.y = Math.max(Math.min(0, app.screen.height - WORLD_H), Math.min(0, app.screen.height / 2 - player.y));
     });
 
-    refresh(); inventory.refresh(); save();
+    refresh(); inventory.refresh(); characterSheet.refresh(); save();
     if (bootStatus) bootStatus.remove();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
