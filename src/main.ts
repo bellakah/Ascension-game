@@ -153,6 +153,7 @@ async function startGame() {
       progress.map = 'Floresta Inicial';
       progress.position = { x: Math.round(player.x), y: Math.round(player.y) };
       progress.lastPlayedAt = Date.now();
+      selectedCharacter.progress = progress;
       persistSelectedCharacter(selectedCharacter);
     }
 
