@@ -1,0 +1,9 @@
+.detail-comparison { margin: 10px 0; padding: 10px; border: 1px solid rgba(255,255,255,.07); border-radius: 10px; background: rgba(7,14,11,.58); }
+.detail-comparison-head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 7px; color: #7f9389; font-size: 8px; text-transform: uppercase; letter-spacing: .6px; }
+.detail-comparison-head strong { max-width: 62%; overflow: hidden; color: #b8c8c0; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; text-transform: none; letter-spacing: 0; }
+.detail-comparison-rows { display: grid; gap: 5px; }
+.comparison-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; color: #94a69d; font-size: 9px; }
+.comparison-row strong { min-width: 42px; text-align: right; font-size: 10px; }
+.comparison-row.positive strong { color: #7ddd91; }
+.comparison-row.negative strong { color: #ef8f86; }
+.comparison-row.neutral strong { color: #82938b; }
