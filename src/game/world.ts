@@ -3,8 +3,143 @@ import { Container, Graphics, Text } from 'pixi.js';
 export const WORLD_W = 2200;
 export const WORLD_H = 1600;
 export const PLAYER_RADIUS = 20;
-export const SPAWN = { x: 970, y: 900 };
 export type Obstacle = { x: number; y: number; radius: number };
+export type SafeZone = { x: number; y: number; width: number; height: number };
+export type Village = {
+  id: string;
+  name: string;
+  map: string;
+  safeZone: SafeZone;
+  respawn: { x: number; y: number };
+};
+
+export const VILLAGES: Village[] = [
+  {
+    id: 'clearing-village',
+    name: 'Vila da Clareira',
+    map: 'Floresta Inicial',
+    safeZone: { x: 780, y: 1155, width: 380, height: 380 },
+    respawn: { x: 970, y: 1380 },
+  },
+];
+
+export const SPAWN = { ...VILLAGES[0].respawn };
+
+export function isInSafeZone(x: number, y: number, map = 'Floresta Inicial') {
+  return VILLAGES.some((village) => {
+    if (village.map !== map) return false;
+    const zone = village.safeZone;
+    return x >= zone.x && x <= zone.x + zone.width && y >= zone.y && y <= zone.y + zone.height;
+  });
+}
+
+export function nearestVillage(x: number, y: number, map = 'Floresta Inicial') {
+  const candidates = VILLAGES.filter((village) => village.map === map);
+  const pool = candidates.length ? candidates : VILLAGES;
+  return pool.reduce((best, village) => {
+    if (!best) return village;
+    const bestDistance = distance(x, y, best.respawn.x, best.respawn.y);
+    const nextDistance = distance(x, y, village.respawn.x, village.respawn.y);
+    return nextDistance < bestDistance ? village : best;
+  }, pool[0]);
+}
+
+function createVillage(world: Container, obstacles: Obstacle[], village: Village) {
+  const zone = village.safeZone;
+  world.addChild(
+    new Graphics()
+      .roundRect(zone.x, zone.y, zone.width, zone.height, 32)
+      .fill({ color: 0x6f985c, alpha: .6 })
+      .stroke({ width: 5, color: 0xbfe6a3, alpha: .68 }),
+  );
+
+  const safeLabel = new Text({
+    text: `🛡 ${village.name} • ÁREA SEGURA`,
+    style: { fill: 0xe9ffd8, fontSize: 15, fontWeight: 'bold', stroke: { color: 0x17321f, width: 5 } },
+  });
+  safeLabel.anchor.set(.5);
+  safeLabel.position.set(zone.x + zone.width / 2, zone.y + 23);
+  world.addChild(safeLabel);
+
+  const addHouse = (x: number, y: number, roof: number) => {
+    const house = new Container();
+    house.addChild(
+      new Graphics().ellipse(0, 34, 57, 17).fill({ color: 0, alpha: .16 }),
+      new Graphics().roundRect(-48, -30, 96, 68, 9).fill(0xd1b17a).stroke({ width: 3, color: 0x76583c }),
+      new Graphics().poly([-59, -28, 0, -78, 59, -28]).fill(roof).stroke({ width: 3, color: 0x5a3d2e }),
+      new Graphics().roundRect(-12, 2, 24, 36, 4).fill(0x6e4833),
+      new Graphics().roundRect(-37, -8, 20, 18, 3).fill(0x9ed0d8).stroke({ width: 2, color: 0x5b745f }),
+      new Graphics().roundRect(17, -8, 20, 18, 3).fill(0x9ed0d8).stroke({ width: 2, color: 0x5b745f }),
+    );
+    house.position.set(x, y);
+    world.addChild(house);
+    obstacles.push({ x, y: y + 10, radius: 48 });
+  };
+
+  addHouse(845, 1285, 0x8d523b);
+  addHouse(1095, 1285, 0x5b6f91);
+
+  const well = new Container();
+  well.addChild(
+    new Graphics().ellipse(0, 15, 29, 11).fill({ color: 0, alpha: .16 }),
+    new Graphics().circle(0, 0, 24).fill(0x8c8a78).stroke({ width: 4, color: 0x55584e }),
+    new Graphics().circle(0, 0, 14).fill(0x4b8291),
+    new Graphics().rect(-28, -42, 6, 44).fill(0x704b30),
+    new Graphics().rect(22, -42, 6, 44).fill(0x704b30),
+    new Graphics().rect(-31, -45, 62, 7).fill(0x704b30),
+  );
+  well.position.set(1090, 1450);
+  world.addChild(well);
+  obstacles.push({ x: 1090, y: 1450, radius: 25 });
+
+  const fire = new Container();
+  fire.addChild(
+    new Graphics().circle(0, 8, 19).stroke({ width: 6, color: 0x777065 }),
+    new Graphics().poly([-10, 7, 0, -22, 10, 7]).fill(0xf28d42),
+    new Graphics().poly([-6, 5, 0, -12, 6, 5]).fill(0xffdc67),
+  );
+  fire.position.set(850, 1450);
+  world.addChild(fire);
+
+  const shrine = new Container();
+  shrine.addChild(
+    new Graphics().circle(0, 0, 32).fill({ color: 0xcdf2b1, alpha: .13 }).stroke({ width: 2, color: 0xcdf2b1, alpha: .45 }),
+    new Graphics().circle(0, 0, 15).fill({ color: 0xe6ffd2, alpha: .22 }).stroke({ width: 2, color: 0xeaffdc }),
+    new Graphics().poly([0, -12, 8, 0, 0, 12, -8, 0]).fill(0xe8ffd9),
+  );
+  shrine.position.set(village.respawn.x, village.respawn.y);
+  world.addChild(shrine);
+
+  const respawnText = new Text({
+    text: 'Ponto de Renascimento',
+    style: { fill: 0xdfffd2, fontSize: 11, fontWeight: 'bold', stroke: { color: 0x17321f, width: 4 } },
+  });
+  respawnText.anchor.set(.5);
+  respawnText.position.set(village.respawn.x, village.respawn.y + 43);
+  world.addChild(respawnText);
+
+  const sign = new Container();
+  sign.addChild(
+    new Graphics().rect(-4, 0, 8, 36).fill(0x68482f),
+    new Graphics().roundRect(-55, -28, 110, 34, 6).fill(0x8e653e).stroke({ width: 3, color: 0x553b29 }),
+  );
+  const signText = new Text({ text: village.name, style: { fill: 0xffefc1, fontSize: 11, fontWeight: 'bold' } });
+  signText.anchor.set(.5); signText.y = -11; sign.addChild(signText);
+  sign.position.set(970, 1178);
+  world.addChild(sign);
+
+  const fence = (x: number, y: number, width: number) => {
+    world.addChild(
+      new Graphics().rect(x, y, width, 5).fill(0x8a6745),
+      new Graphics().rect(x + 8, y - 10, 6, 25).fill(0x735238),
+      new Graphics().rect(x + width - 14, y - 10, 6, 25).fill(0x735238),
+    );
+  };
+  fence(790, 1210, 95);
+  fence(1055, 1210, 95);
+  fence(790, 1510, 115);
+  fence(1035, 1510, 115);
+}
 
 export function createWorld() {
   const world = new Container();
@@ -34,9 +169,11 @@ export function createWorld() {
   const trees = [
     [220,240],[420,410],[610,220],[300,720],[590,880],[250,1180],[540,1390],
     [1400,220],[1640,390],[1900,250],[1470,760],[1840,840],[1430,1200],[1740,1370],
-    [1060,280],[900,1250],[1180,1380],[710,570],[1310,540],
+    [1060,280],[690,1280],[1260,1400],[710,570],[1310,540],
   ];
   trees.forEach(([x, y], i) => addTree(x, y, i % 3 === 0 ? 1.15 : 1));
+
+  for (const village of VILLAGES) createVillage(world, obstacles, village);
   return { world, obstacles };
 }
 
