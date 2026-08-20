@@ -1,4 +1,5 @@
 import './inventory.css';
+import './inventoryComparison.css';
 import type { CharacterProgress } from '../character/characterCreator';
 import {
   ITEM_CATEGORY_LABELS,
@@ -12,6 +13,7 @@ import {
   unequipItem,
   type EquipmentSlot,
   type ItemCategory,
+  type ItemStats,
 } from './itemCatalog';
 
 type InventoryCallbacks = {
@@ -53,6 +55,35 @@ function statText(itemId: string) {
   if (item.stats.defense) rows.push(`Defesa +${item.stats.defense}`);
   if (item.stats.maxHp) rows.push(`HP máximo +${item.stats.maxHp}`);
   return rows;
+}
+
+function statValue(itemId: string | null | undefined, stat: keyof ItemStats) {
+  return itemId ? (getItem(itemId)?.stats?.[stat] ?? 0) : 0;
+}
+
+function targetSlot(progress: CharacterProgress, itemId: string): EquipmentSlot | null {
+  const state = ensureInventoryState(progress);
+  const item = getItem(itemId);
+  if (!item?.equipSlot) return null;
+  if (item.equipSlot === 'accessory') return state.equipment.accessory1 ? 'accessory2' : 'accessory1';
+  return item.equipSlot;
+}
+
+function comparisonHtml(progress: CharacterProgress, itemId: string) {
+  const state = ensureInventoryState(progress);
+  const slot = targetSlot(state, itemId);
+  if (!slot) return '';
+  const currentId = state.equipment[slot];
+  const current = currentId ? getItem(currentId) : undefined;
+  const label = EQUIPMENT_SLOTS.find((entry) => entry.id === slot)?.label ?? slot;
+  const rows: Array<[keyof ItemStats, string]> = [['attack', 'Ataque'], ['defense', 'Defesa'], ['maxHp', 'HP máximo']];
+  const body = rows.map(([stat, name]) => {
+    const delta = statValue(itemId, stat) - statValue(currentId, stat);
+    const cls = delta > 0 ? 'positive' : delta < 0 ? 'negative' : 'neutral';
+    const text = delta > 0 ? `▲ +${delta}` : delta < 0 ? `▼ ${delta}` : '— 0';
+    return `<div class="comparison-row ${cls}"><span>${name}</span><strong>${text}</strong></div>`;
+  }).join('');
+  return `<div class="detail-comparison"><div class="detail-comparison-head"><span>Comparação · ${label}</span><strong>${current ? current.name : 'Slot vazio'}</strong></div><div class="detail-comparison-rows">${body}</div></div>`;
 }
 
 export function createInventory(progress: CharacterProgress, callbacks: InventoryCallbacks) {
@@ -183,6 +214,7 @@ export function createInventory(progress: CharacterProgress, callbacks: Inventor
       <p class="detail-description">${item.description}</p>
       ${stats.length ? `<div class="detail-stats">${stats.map((row) => `<span>${row}</span>`).join('')}</div>` : ''}
       ${item.heal ? `<div class="detail-stats"><span>Recupera ${item.heal} HP</span></div>` : ''}
+      ${canEquip ? comparisonHtml(state, item.id) : ''}
       <div class="detail-meta"><span>Valor base</span><strong>🪙 ${item.value}</strong></div>
       <div class="detail-actions">${canUse ? '<button id="detail-use" class="primary-action" type="button">Usar</button>' : ''}${canEquip ? '<button id="detail-equip" class="primary-action" type="button">Equipar</button>' : ''}${canUnequip ? '<button id="detail-unequip" class="primary-action" type="button">Desequipar</button>' : ''}${isInventory ? '<button id="detail-discard" class="danger-action" type="button">Descartar 1</button>' : ''}</div>`;
 

@@ -1,0 +1,6 @@
+#character-button { position: absolute; right: 96px; bottom: 142px; width: 62px; height: 62px; pointer-events: auto; border: 2px solid rgba(139,190,225,.34); border-radius: 50%; background: rgba(49,76,91,.92); color: white; font-size: 25px; box-shadow: 0 6px 16px rgba(0,0,0,.28); -webkit-tap-highlight-color: transparent; }
+#character-button:active { transform: scale(.94); }
+@media (max-width: 700px) {
+  #character-button { right: 174px; bottom: 39px; width: 58px; height: 58px; font-size: 23px; }
+}
+@media (min-width: 900px) { #character-button { opacity: .78; } }
