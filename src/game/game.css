@@ -1,0 +1,5 @@
+.player-progression { width: max-content; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 9px; background: rgba(20,28,21,.72); font-size: 12px; }
+.player-progression strong { color: #ffe18a; }
+.player-progression span { color: #d7e2dc; font-weight: 700; }
+#quest-box { top: 185px; }
+@media (min-width: 900px) { #quest-box { top: 170px; } }
