@@ -8,7 +8,8 @@ import { spawnMonsterLoot, updateGroundLoot, type GroundLoot } from '../items/lo
 import { createHud, showDialog, updateHud } from './hud';
 import { createMonsters, damageMonster, findAttackTarget, killMonster, updateMonsters } from './monsterSystem';
 import { currentQuest, ensureQuestStates, interactQuest, registerQuestKill } from './quests';
-import { collides, createElandra, createWorld, distance, SPAWN, WORLD_H, WORLD_W } from './world';
+import { createRespawnScreen } from './respawn';
+import { collides, createElandra, createWorld, distance, isInSafeZone, nearestVillage, SPAWN, WORLD_H, WORLD_W } from './world';
 
 const bootStatus = document.querySelector<HTMLDivElement>('#boot-status');
 const setBootMessage = (message: string) => { if (bootStatus) bootStatus.textContent = message; };
@@ -49,13 +50,19 @@ export async function startGame() {
     const monsters = await createMonsters(world);
     const groundLoot: GroundLoot[] = [];
     const hud = createHud(progress);
-    let playerHp = Math.max(1, Math.min(progress.maxHp, progress.hp));
+    let playerHp = Math.max(0, Math.min(progress.maxHp, Number.isFinite(progress.hp) ? progress.hp : progress.maxHp));
     let coins = progress.coins;
     let attackCooldown = 0;
     let autosaveMs = 0;
+    let isDead = playerHp <= 0;
+    let deathPosition = { x: player.x, y: player.y };
+    let wasSafe = isInSafeZone(player.x, player.y);
+    const keys = new Set<string>();
+    let stickX = 0, stickY = 0;
+    const resetStick = () => { stickX = 0; stickY = 0; hud.knob.style.transform = 'translate(0, 0)'; };
 
     const save = () => {
-      progress.hp = Math.max(1, Math.ceil(playerHp));
+      progress.hp = isDead ? 0 : Math.max(1, Math.ceil(playerHp));
       progress.coins = coins;
       progress.map = 'Floresta Inicial';
       progress.position = { x: Math.round(player.x), y: Math.round(player.y) };
@@ -83,14 +90,57 @@ export async function startGame() {
 
     const inventory = createInventory(progress, {
       getHp: () => playerHp,
-      setHp: (value) => { playerHp = Math.max(1, Math.min(progress.maxHp, value)); progress.hp = playerHp; refresh(); },
+      setHp: (value) => {
+        if (isDead) return;
+        playerHp = Math.max(1, Math.min(progress.maxHp, value));
+        progress.hp = playerHp;
+        refresh();
+      },
       onChanged: () => { syncEquipmentVisuals(); refresh(); save(); },
       notify: (message) => showDialog(hud, message),
     });
 
-    const uiOpen = () => inventory.isOpen() || characterSheet.isOpen();
-    hud.inventory.addEventListener('pointerdown', () => { characterSheet.close(); inventory.toggle(); });
-    hud.character.addEventListener('pointerdown', () => { inventory.close(); characterSheet.toggle(); });
+    const respawnScreen = createRespawnScreen({
+      onRespawn: () => {
+        const village = nearestVillage(deathPosition.x, deathPosition.y, progress.map || 'Floresta Inicial');
+        if (!village) return;
+        isDead = false;
+        playerHp = progress.maxHp;
+        progress.hp = playerHp;
+        player.alpha = 1;
+        player.position.set(village.respawn.x, village.respawn.y);
+        progress.position = { x: village.respawn.x, y: village.respawn.y };
+        keys.clear();
+        resetStick();
+        wasSafe = true;
+        respawnScreen.hide();
+        refresh();
+        characterSheet.refresh();
+        save();
+        showDialog(hud, `Você renasceu em ${village.name}. Esta é uma área segura.`);
+      },
+    });
+
+    const uiOpen = () => isDead || respawnScreen.isOpen() || inventory.isOpen() || characterSheet.isOpen();
+    hud.inventory.addEventListener('pointerdown', () => { if (isDead) return; characterSheet.close(); inventory.toggle(); });
+    hud.character.addEventListener('pointerdown', () => { if (isDead) return; inventory.close(); characterSheet.toggle(); });
+
+    const enterDeathState = () => {
+      if (respawnScreen.isOpen()) return;
+      isDead = true;
+      playerHp = 0;
+      progress.hp = 0;
+      deathPosition = { x: player.x, y: player.y };
+      player.alpha = .42;
+      keys.clear();
+      resetStick();
+      inventory.close();
+      characterSheet.close();
+      const village = nearestVillage(deathPosition.x, deathPosition.y, progress.map || 'Floresta Inicial');
+      if (village) respawnScreen.show(village);
+      refresh();
+      save();
+    };
 
     const floating = (x: number, y: number, text: string, color: number) => {
       const node = new Text({ text, style: { fill: color, fontSize: 14, fontWeight: 'bold', stroke: { color: 0, width: 4 } } });
@@ -143,7 +193,12 @@ export async function startGame() {
     };
 
     const attack = () => {
-      if (uiOpen() || attackCooldown > 0 || hero.isAttacking || !hero.attack()) return;
+      if (uiOpen() || attackCooldown > 0 || hero.isAttacking) return;
+      if (isInSafeZone(player.x, player.y)) {
+        showDialog(hud, 'Área segura: combates não são permitidos dentro da vila.');
+        return;
+      }
+      if (!hero.attack()) return;
       attackCooldown = 30;
       const target = findAttackTarget(monsters, player.x, player.y);
       if (!target) return;
@@ -154,19 +209,18 @@ export async function startGame() {
 
     hud.attack.addEventListener('pointerdown', attack);
     hud.interact.addEventListener('pointerdown', interact);
-    const keys = new Set<string>();
     window.addEventListener('keydown', (event) => {
       const key = event.key.toLowerCase();
+      if (isDead) { event.preventDefault(); return; }
       if (key === 'i' && characterSheet.isOpen()) characterSheet.close();
       if (key === 'c' && inventory.isOpen()) inventory.close();
       if (uiOpen() && event.key !== 'Escape' && key !== 'i' && key !== 'c') return;
       keys.add(key);
       if (event.code === 'Space') attack();
       if (key === 'e') interact();
-    });
+    }, true);
     window.addEventListener('keyup', (event) => keys.delete(event.key.toLowerCase()));
 
-    let stickX = 0, stickY = 0;
     const updateStick = (clientX: number, clientY: number) => {
       const r = hud.stick.getBoundingClientRect();
       let dx = clientX - (r.left + r.width / 2), dy = clientY - (r.top + r.height / 2);
@@ -174,7 +228,6 @@ export async function startGame() {
       if (len > max) { dx = dx / len * max; dy = dy / len * max; }
       stickX = dx / max; stickY = dy / max; hud.knob.style.transform = `translate(${dx}px, ${dy}px)`;
     };
-    const resetStick = () => { stickX = 0; stickY = 0; hud.knob.style.transform = 'translate(0, 0)'; };
     hud.stick.addEventListener('pointerdown', (e) => { if (!uiOpen()) { hud.stick.setPointerCapture(e.pointerId); updateStick(e.clientX, e.clientY); } });
     hud.stick.addEventListener('pointermove', (e) => { if (hud.stick.hasPointerCapture(e.pointerId)) updateStick(e.clientX, e.clientY); });
     hud.stick.addEventListener('pointerup', resetStick);
@@ -182,6 +235,8 @@ export async function startGame() {
 
     document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
     window.addEventListener('pagehide', save);
+
+    if (isDead) enterDeathState();
 
     app.ticker.add((ticker: Ticker) => {
       autosaveMs += ticker.deltaMS;
@@ -208,11 +263,23 @@ export async function startGame() {
       }
       hero.update(moving, ticker.deltaTime);
 
+      if (!isDead) {
+        const safeNow = isInSafeZone(player.x, player.y);
+        if (safeNow !== wasSafe) {
+          wasSafe = safeNow;
+          showDialog(hud, safeNow ? '🛡 Você entrou em uma área segura.' : 'Você saiu da área segura. Monstros podem atacar novamente.');
+        }
+      }
+
       if (!uiOpen()) {
         updateMonsters(monsters, ticker, player, progress.defense, (damage) => {
+          if (isDead) return;
           playerHp = Math.max(0, playerHp - damage);
           floating(player.x, player.y - 90, `-${damage}`, 0xff8f8f);
-          if (playerHp <= 0) { playerHp = progress.maxHp; player.position.set(SPAWN.x, SPAWN.y); showDialog(hud, 'Você foi derrotado e retornou ao ponto inicial.'); save(); }
+          if (playerHp <= 0) {
+            enterDeathState();
+            return;
+          }
           refresh();
         });
 

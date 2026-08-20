@@ -1,7 +1,7 @@
 import { Container, Graphics, Text, Ticker } from 'pixi.js';
 import { ToxicSludgeView } from '../monsters/toxicSludge';
 import type { MonsterKind } from './quests';
-import { distance } from './world';
+import { distance, isInSafeZone } from './world';
 
 export type Monster = {
   id: string;
@@ -104,11 +104,27 @@ function respawn(monster: Monster) {
   monster.sludge?.reset();
 }
 
+function moveToward(monster: Monster, x: number, y: number, dt: number) {
+  const d = distance(monster.view.x, monster.view.y, x, y);
+  if (d <= 1) return;
+  const vx = (x - monster.view.x) / d;
+  const vy = (y - monster.view.y) / d;
+  const nextX = monster.view.x + vx * monster.speed * dt;
+  const nextY = monster.view.y + vy * monster.speed * dt;
+  if (!isInSafeZone(nextX, nextY)) {
+    monster.view.x = nextX;
+    monster.view.y = nextY;
+    monster.sludge?.setFacingLeft(vx < 0);
+  }
+}
+
 export function updateMonsters(
   monsters: Monster[], ticker: Ticker, player: Container, defense: number,
   onPlayerDamage: (damage: number) => void,
 ) {
   const dt = ticker.deltaTime;
+  const playerSafe = isInSafeZone(player.x, player.y);
+
   for (const monster of monsters) {
     monster.sludge?.update(dt);
     if (!monster.alive) {
@@ -117,15 +133,24 @@ export function updateMonsters(
       if (monster.respawnLeft <= 0) respawn(monster);
       continue;
     }
-    monster.attackCooldown = Math.max(0, monster.attackCooldown - dt);
-    const d = distance(monster.view.x, monster.view.y, player.x, player.y);
-    if (d < monster.aggro && d > monster.attackRange) {
-      const vx = (player.x - monster.view.x) / Math.max(1, d);
-      const vy = (player.y - monster.view.y) / Math.max(1, d);
-      monster.view.x += vx * monster.speed * dt;
-      monster.view.y += vy * monster.speed * dt;
-      monster.sludge?.setFacingLeft(vx < 0);
+
+    if (isInSafeZone(monster.view.x, monster.view.y)) {
+      monster.view.position.set(monster.spawnX, monster.spawnY);
+      monster.attackCooldown = 0;
+      continue;
     }
+
+    monster.attackCooldown = Math.max(0, monster.attackCooldown - dt);
+
+    if (playerSafe) {
+      const homeDistance = distance(monster.view.x, monster.view.y, monster.spawnX, monster.spawnY);
+      if (homeDistance > 8) moveToward(monster, monster.spawnX, monster.spawnY, dt * .8);
+      continue;
+    }
+
+    const d = distance(monster.view.x, monster.view.y, player.x, player.y);
+    if (d < monster.aggro && d > monster.attackRange) moveToward(monster, player.x, player.y, dt);
+
     if (d <= monster.attackRange && monster.attackCooldown <= 0) {
       monster.attackCooldown = monster.kind === 'wolf' ? 58 : 70;
       monster.sludge?.attack();
