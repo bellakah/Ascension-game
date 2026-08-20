@@ -3,12 +3,14 @@ import type { CharacterProgress } from '../character/characterCreator';
 import {
   ITEM_CATEGORY_LABELS,
   ITEM_RARITY_LABELS,
+  ensureInventoryState,
   equipItem,
   getItem,
   inventorySlotsUsed,
   organizeInventory,
   removeItem,
   unequipItem,
+  type EquipmentSlot,
   type ItemCategory,
 } from './itemCatalog';
 
@@ -21,7 +23,7 @@ type InventoryCallbacks = {
 
 type Selection =
   | { source: 'inventory'; itemId: string }
-  | { source: 'equipment'; itemId: string; slot: keyof CharacterProgress['equipment'] }
+  | { source: 'equipment'; itemId: string; slot: EquipmentSlot }
   | null;
 
 const TABS: Array<{ id: ItemCategory | 'all'; icon: string }> = [
@@ -33,7 +35,7 @@ const TABS: Array<{ id: ItemCategory | 'all'; icon: string }> = [
   { id: 'accessory', icon: '◇' },
 ];
 
-const EQUIPMENT_SLOTS: Array<{ id: keyof CharacterProgress['equipment']; label: string; icon: string }> = [
+const EQUIPMENT_SLOTS: Array<{ id: EquipmentSlot; label: string; icon: string }> = [
   { id: 'head', label: 'Cabeça', icon: '◒' },
   { id: 'armor', label: 'Peitoral', icon: '♜' },
   { id: 'legs', label: 'Pernas', icon: '▥' },
@@ -54,6 +56,7 @@ function statText(itemId: string) {
 }
 
 export function createInventory(progress: CharacterProgress, callbacks: InventoryCallbacks) {
+  const state = ensureInventoryState(progress);
   let activeTab: ItemCategory | 'all' = 'all';
   let search = '';
   let selection: Selection = null;
@@ -103,10 +106,7 @@ export function createInventory(progress: CharacterProgress, callbacks: Inventor
   const power = root.querySelector<HTMLElement>('#inventory-power')!;
   const searchInput = root.querySelector<HTMLInputElement>('#inventory-search')!;
 
-  const setSelection = (next: Selection) => {
-    selection = next;
-    render();
-  };
+  const setSelection = (next: Selection) => { selection = next; render(); };
 
   const renderTabs = () => {
     tabs.replaceChildren();
@@ -122,7 +122,7 @@ export function createInventory(progress: CharacterProgress, callbacks: Inventor
 
   const renderGrid = () => {
     grid.replaceChildren();
-    const stacks = progress.inventory
+    const stacks = state.inventory
       .map((stack, index) => ({ ...stack, index, item: getItem(stack.itemId) }))
       .filter((entry) => entry.item)
       .filter((entry) => activeTab === 'all' || entry.item!.category === activeTab)
@@ -140,7 +140,7 @@ export function createInventory(progress: CharacterProgress, callbacks: Inventor
     }
 
     if (activeTab === 'all' && !search) {
-      const empty = Math.max(0, progress.inventoryCapacity - progress.inventory.length);
+      const empty = Math.max(0, state.inventoryCapacity - state.inventory.length);
       for (let i = 0; i < empty; i++) {
         const node = document.createElement('span');
         node.className = 'inventory-slot empty';
@@ -148,7 +148,6 @@ export function createInventory(progress: CharacterProgress, callbacks: Inventor
         grid.appendChild(node);
       }
     }
-
     filterLabel.textContent = ITEM_CATEGORY_LABELS[activeTab];
     resultCount.textContent = `${stacks.length} ${stacks.length === 1 ? 'pilha' : 'pilhas'}`;
   };
@@ -156,7 +155,7 @@ export function createInventory(progress: CharacterProgress, callbacks: Inventor
   const renderEquipment = () => {
     equipmentGrid.replaceChildren();
     for (const slot of EQUIPMENT_SLOTS) {
-      const itemId = progress.equipment[slot.id];
+      const itemId = state.equipment[slot.id];
       const item = itemId ? getItem(itemId) : undefined;
       const button = document.createElement('button');
       button.type = 'button';
@@ -167,7 +166,7 @@ export function createInventory(progress: CharacterProgress, callbacks: Inventor
       if (item) button.addEventListener('click', () => setSelection({ source: 'equipment', itemId: item.id, slot: slot.id }));
       equipmentGrid.appendChild(button);
     }
-    power.textContent = `ATQ ${progress.attack} · DEF ${progress.defense}`;
+    power.textContent = `ATQ ${state.attack} · DEF ${state.defense}`;
   };
 
   const renderDetails = () => {
@@ -177,104 +176,59 @@ export function createInventory(progress: CharacterProgress, callbacks: Inventor
     }
     const item = getItem(selection.itemId);
     if (!item) { selection = null; renderDetails(); return; }
-    const stats = statText(item.id);
-    const isInventory = selection.source === 'inventory';
-    const canUse = isInventory && item.category === 'consumable';
-    const canEquip = isInventory && Boolean(item.equipSlot);
-    const canUnequip = selection.source === 'equipment';
+    const stats = statText(item.id), isInventory = selection.source === 'inventory';
+    const canUse = isInventory && item.category === 'consumable', canEquip = isInventory && Boolean(item.equipSlot), canUnequip = selection.source === 'equipment';
     details.innerHTML = `
-      <div class="detail-top rarity-${item.rarity}">
-        <span class="detail-icon">${item.icon}</span>
-        <div><span class="detail-rarity">${ITEM_RARITY_LABELS[item.rarity]}</span><h3>${item.name}</h3><small>${ITEM_CATEGORY_LABELS[item.category]}</small></div>
-      </div>
+      <div class="detail-top rarity-${item.rarity}"><span class="detail-icon">${item.icon}</span><div><span class="detail-rarity">${ITEM_RARITY_LABELS[item.rarity]}</span><h3>${item.name}</h3><small>${ITEM_CATEGORY_LABELS[item.category]}</small></div></div>
       <p class="detail-description">${item.description}</p>
       ${stats.length ? `<div class="detail-stats">${stats.map((row) => `<span>${row}</span>`).join('')}</div>` : ''}
       ${item.heal ? `<div class="detail-stats"><span>Recupera ${item.heal} HP</span></div>` : ''}
       <div class="detail-meta"><span>Valor base</span><strong>🪙 ${item.value}</strong></div>
-      <div class="detail-actions">
-        ${canUse ? '<button id="detail-use" class="primary-action" type="button">Usar</button>' : ''}
-        ${canEquip ? '<button id="detail-equip" class="primary-action" type="button">Equipar</button>' : ''}
-        ${canUnequip ? '<button id="detail-unequip" class="primary-action" type="button">Desequipar</button>' : ''}
-        ${isInventory ? '<button id="detail-discard" class="danger-action" type="button">Descartar 1</button>' : ''}
-      </div>`;
+      <div class="detail-actions">${canUse ? '<button id="detail-use" class="primary-action" type="button">Usar</button>' : ''}${canEquip ? '<button id="detail-equip" class="primary-action" type="button">Equipar</button>' : ''}${canUnequip ? '<button id="detail-unequip" class="primary-action" type="button">Desequipar</button>' : ''}${isInventory ? '<button id="detail-discard" class="danger-action" type="button">Descartar 1</button>' : ''}</div>`;
 
     details.querySelector<HTMLButtonElement>('#detail-use')?.addEventListener('click', () => {
       if (!item.heal) return;
       const hp = callbacks.getHp();
-      if (hp >= progress.maxHp) { callbacks.notify('Seu HP já está cheio.'); return; }
-      if (!removeItem(progress, item.id, 1)) return;
-      const next = Math.min(progress.maxHp, hp + item.heal);
-      progress.hp = next;
-      callbacks.setHp(next);
-      callbacks.notify(`${item.name}: +${Math.round(next - hp)} HP.`);
-      callbacks.onChanged();
-      if (!progress.inventory.some((stack) => stack.itemId === item.id)) selection = null;
+      if (hp >= state.maxHp) { callbacks.notify('Seu HP já está cheio.'); return; }
+      if (!removeItem(state, item.id, 1)) return;
+      const next = Math.min(state.maxHp, hp + item.heal);
+      state.hp = next; callbacks.setHp(next); callbacks.notify(`${item.name}: +${Math.round(next - hp)} HP.`); callbacks.onChanged();
+      if (!state.inventory.some((stack) => stack.itemId === item.id)) selection = null;
       render();
     });
 
     details.querySelector<HTMLButtonElement>('#detail-equip')?.addEventListener('click', () => {
-      const result = equipItem(progress, item.id);
+      const result = equipItem(state, item.id);
       if (!result.ok) { callbacks.notify(result.reason ?? 'Não foi possível equipar.'); return; }
-      const hp = Math.min(callbacks.getHp(), progress.maxHp);
-      progress.hp = hp;
-      callbacks.setHp(hp);
-      callbacks.notify(`${item.name} equipado.`);
-      callbacks.onChanged();
-      selection = { source: 'equipment', itemId: item.id, slot: result.slot! };
-      render();
+      const hp = Math.min(callbacks.getHp(), state.maxHp); state.hp = hp; callbacks.setHp(hp); callbacks.notify(`${item.name} equipado.`); callbacks.onChanged();
+      selection = { source: 'equipment', itemId: item.id, slot: result.slot! }; render();
     });
 
     details.querySelector<HTMLButtonElement>('#detail-unequip')?.addEventListener('click', () => {
       if (selection?.source !== 'equipment') return;
-      const result = unequipItem(progress, selection.slot);
+      const result = unequipItem(state, selection.slot);
       if (!result.ok) { callbacks.notify(result.reason ?? 'Não foi possível desequipar.'); return; }
-      const hp = Math.min(callbacks.getHp(), progress.maxHp);
-      progress.hp = hp;
-      callbacks.setHp(hp);
-      callbacks.notify(`${item.name} guardado no inventário.`);
-      callbacks.onChanged();
-      selection = { source: 'inventory', itemId: item.id };
-      render();
+      const hp = Math.min(callbacks.getHp(), state.maxHp); state.hp = hp; callbacks.setHp(hp); callbacks.notify(`${item.name} guardado no inventário.`); callbacks.onChanged();
+      selection = { source: 'inventory', itemId: item.id }; render();
     });
 
     details.querySelector<HTMLButtonElement>('#detail-discard')?.addEventListener('click', () => {
-      if (!removeItem(progress, item.id, 1)) return;
-      callbacks.notify(`1x ${item.name} descartado.`);
-      callbacks.onChanged();
-      if (!progress.inventory.some((stack) => stack.itemId === item.id)) selection = null;
+      if (!removeItem(state, item.id, 1)) return;
+      callbacks.notify(`1x ${item.name} descartado.`); callbacks.onChanged();
+      if (!state.inventory.some((stack) => stack.itemId === item.id)) selection = null;
       render();
     });
   };
 
-  const render = () => {
-    renderTabs();
-    renderGrid();
-    renderEquipment();
-    renderDetails();
-    capacity.textContent = `${inventorySlotsUsed(progress)} / ${progress.inventoryCapacity} slots`;
-  };
-
-  const open = () => {
-    root.classList.remove('inventory-hidden');
-    root.classList.add('inventory-visible');
-    render();
-  };
-  const close = () => {
-    root.classList.add('inventory-hidden');
-    root.classList.remove('inventory-visible');
-  };
+  const render = () => { renderTabs(); renderGrid(); renderEquipment(); renderDetails(); capacity.textContent = `${inventorySlotsUsed(state)} / ${state.inventoryCapacity} slots`; };
+  const open = () => { root.classList.remove('inventory-hidden'); root.classList.add('inventory-visible'); render(); };
+  const close = () => { root.classList.add('inventory-hidden'); root.classList.remove('inventory-visible'); };
   const toggle = () => root.classList.contains('inventory-hidden') ? open() : close();
 
   root.querySelector<HTMLButtonElement>('#inventory-close')!.addEventListener('click', close);
-  root.querySelector<HTMLButtonElement>('#inventory-sort')!.addEventListener('click', () => {
-    organizeInventory(progress);
-    callbacks.notify('Inventário organizado.');
-    callbacks.onChanged();
-    render();
-  });
+  root.querySelector<HTMLButtonElement>('#inventory-sort')!.addEventListener('click', () => { organizeInventory(state); callbacks.notify('Inventário organizado.'); callbacks.onChanged(); render(); });
   searchInput.addEventListener('input', () => { search = searchInput.value.trim().toLocaleLowerCase('pt-BR'); render(); });
   root.addEventListener('pointerdown', (event) => { if (event.target === root) close(); });
-
   window.addEventListener('keydown', (event) => {
     if (event.key.toLowerCase() === 'i' && !event.repeat && document.activeElement !== searchInput) { event.preventDefault(); toggle(); }
     if (event.key === 'Escape' && !root.classList.contains('inventory-hidden')) close();
