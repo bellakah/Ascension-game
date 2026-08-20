@@ -6,6 +6,7 @@ const setBootMessage = (message: string) => { if (bootStatus) bootStatus.textCon
 
 const LPC = 'https://raw.githubusercontent.com/LiberatedPixelCup/Universal-LPC-Spritesheet-Character-Generator/master/spritesheets';
 const BODY_WALK = `${LPC}/body/bodies/male/walk.png`;
+const HEAD_WALK = `${LPC}/head/heads/human/male/walk.png`;
 const MAIL_WALK = `${LPC}/torso/chainmail/male/walk.png`;
 const FRAME = 64;
 const WALK_FRAMES = 9;
@@ -54,11 +55,22 @@ async function startGame() {
     npc.addChild(new Graphics().ellipse(0,22,22,9).fill({color:0,alpha:.22}),new Graphics().roundRect(-18,-28,36,50,9).fill(0x4f78b8).stroke({width:3,color:0xbfd8ff}),new Graphics().circle(0,-39,14).fill(0xe4b991),npcMark,npcName);
     npc.position.set(970,520); world.addChild(npc);
 
-    const [bodySheet, mailSheet] = await Promise.all([Assets.load<Texture>(BODY_WALK), Assets.load<Texture>(MAIL_WALK)]);
+    const [bodySheet, headSheet, mailSheet] = await Promise.all([
+      Assets.load<Texture>(BODY_WALK),
+      Assets.load<Texture>(HEAD_WALK),
+      Assets.load<Texture>(MAIL_WALK),
+    ]);
     const player = new Container();
     const shadow = new Graphics().ellipse(0, 5, 25, 10).fill({ color:0, alpha:.25 }); player.addChild(shadow);
-    const body = new Sprite(); const mail = new Sprite();
-    for (const s of [body, mail]) { s.anchor.set(.5,1); s.scale.set(1.35); s.texture.source.scaleMode='nearest'; player.addChild(s); }
+    const body = new Sprite();
+    const head = new Sprite();
+    const mail = new Sprite();
+    for (const s of [body, head, mail]) {
+      s.anchor.set(.5,1);
+      s.scale.set(1.35);
+      s.texture.source.scaleMode='nearest';
+      player.addChild(s);
+    }
     const playerName = new Text({ text:'Herói', style:{fill:0xffffff,fontSize:14,fontWeight:'bold',stroke:{color:0,width:4}} }); playerName.anchor.set(.5); playerName.y=-92; player.addChild(playerName);
     player.position.set(970,900); world.addChild(player);
 
@@ -68,7 +80,9 @@ async function startGame() {
     }
     function renderHero(moving=false) {
       const f = moving ? animFrame : 0;
-      body.texture=frameTexture(bodySheet,facing,f); mail.texture=frameTexture(mailSheet,facing,f);
+      body.texture=frameTexture(bodySheet,facing,f);
+      head.texture=frameTexture(headSheet,facing,f);
+      mail.texture=frameTexture(mailSheet,facing,f);
     }
     renderHero();
 
