@@ -1,16 +1,14 @@
 import './skillBar.css';
-import { WARRIOR_SKILLS, type SkillId } from './skillCatalog';
+import type { SkillDefinition, SkillId } from './skillCatalog';
 import type { SkillSnapshot } from './skillController';
 
-type SkillBarCallbacks = {
-  onUse: (skillId: SkillId) => void;
-};
+type SkillBarCallbacks = { onUse: (skillId: SkillId) => void };
 
-export function createSkillBar(callbacks: SkillBarCallbacks) {
+export function createSkillBar(skills: SkillDefinition[], callbacks: SkillBarCallbacks) {
   const root = document.createElement('div');
   root.id = 'skill-bar';
   root.innerHTML = `
-    <div class="skill-energy" title="Energia">
+    <div class="skill-energy" title="Recurso da classe">
       <div class="skill-energy-track"><span id="skill-energy-fill"></span></div>
       <strong id="skill-energy-text"></strong>
     </div>
@@ -25,12 +23,12 @@ export function createSkillBar(callbacks: SkillBarCallbacks) {
   const buff = root.querySelector<HTMLElement>('#skill-buff')!;
   const buttons = new Map<SkillId, HTMLButtonElement>();
 
-  for (const skill of WARRIOR_SKILLS) {
+  for (const skill of skills) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'skill-button';
     button.dataset.skillId = skill.id;
-    button.title = `${skill.slot}. ${skill.name} — ${skill.description} Energia ${skill.energyCost}. Recarga ${Math.round(skill.cooldownMs / 1000)}s.`;
+    button.title = `${skill.slot}. ${skill.name} — ${skill.description} Custo ${skill.energyCost}. Recarga ${Math.round(skill.cooldownMs / 1000)}s.`;
     button.innerHTML = `<span class="skill-key">${skill.slot}</span><span class="skill-icon">${skill.icon}</span><span class="skill-name">${skill.shortName}</span><span class="skill-cost">${skill.energyCost}</span><span class="skill-cooldown"></span>`;
     button.addEventListener('pointerdown', (event) => { event.preventDefault(); callbacks.onUse(skill.id); });
     buttonsHost.appendChild(button);
@@ -40,11 +38,11 @@ export function createSkillBar(callbacks: SkillBarCallbacks) {
   const refresh = (snapshot: SkillSnapshot, disabled = false) => {
     const energyPercent = snapshot.maxEnergy > 0 ? Math.max(0, Math.min(100, snapshot.energy / snapshot.maxEnergy * 100)) : 0;
     energyFill.style.width = `${energyPercent}%`;
-    energyText.textContent = `${Math.floor(snapshot.energy)} / ${snapshot.maxEnergy}`;
+    energyText.textContent = `${snapshot.resourceLabel} ${Math.floor(snapshot.energy)}/${snapshot.maxEnergy}`;
 
-    for (const skill of WARRIOR_SKILLS) {
+    for (const skill of skills) {
       const button = buttons.get(skill.id)!;
-      const remaining = snapshot.cooldowns[skill.id];
+      const remaining = snapshot.cooldowns[skill.id] ?? 0;
       const cooldown = button.querySelector<HTMLElement>('.skill-cooldown')!;
       const cooling = remaining > 0;
       button.classList.toggle('cooling', cooling);
@@ -56,7 +54,7 @@ export function createSkillBar(callbacks: SkillBarCallbacks) {
 
     if (snapshot.buffRemainingMs > 0 && snapshot.buffAttackPercent > 0) {
       buff.classList.remove('skill-buff-hidden');
-      buff.textContent = `🔥 ATQ +${snapshot.buffAttackPercent}% · ${Math.ceil(snapshot.buffRemainingMs / 1000)}s`;
+      buff.textContent = `${snapshot.buffIcon || '✦'} ${snapshot.buffName || 'Buff'} · ATQ +${snapshot.buffAttackPercent}% · ${Math.ceil(snapshot.buffRemainingMs / 1000)}s`;
     } else {
       buff.classList.add('skill-buff-hidden');
       buff.textContent = '';
