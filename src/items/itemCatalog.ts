@@ -58,13 +58,13 @@ export function ensureInventoryState(progress: CharacterProgress): InventoryProg
   if (!Array.isArray(state.inventory)) state.inventory = [];
   state.inventory = state.inventory.filter((stack) => stack && getItem(stack.itemId) && Number(stack.quantity) > 0).map((stack) => ({ itemId: stack.itemId, quantity: Math.max(1, Math.floor(Number(stack.quantity))) }));
   const equipment = (state.equipment ?? {}) as InventoryProgress['equipment'];
-  if (!('weapon' in equipment)) equipment.weapon = 'basic_sword';
-  if (!('armor' in equipment)) equipment.armor = 'chainmail';
-  if (!('boots' in equipment)) equipment.boots = 'basic_boots';
-  if (!('head' in equipment)) equipment.head = null;
-  if (!('legs' in equipment)) equipment.legs = null;
-  if (!('accessory1' in equipment)) equipment.accessory1 = null;
-  if (!('accessory2' in equipment)) equipment.accessory2 = null;
+  equipment.weapon ??= 'basic_sword';
+  equipment.armor ??= 'chainmail';
+  equipment.boots ??= 'basic_boots';
+  equipment.head ??= null;
+  equipment.legs ??= null;
+  equipment.accessory1 ??= null;
+  equipment.accessory2 ??= null;
   state.equipment = equipment;
   return state;
 }
