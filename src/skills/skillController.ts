@@ -1,12 +1,18 @@
 import type { CharacterProgress } from '../character/characterCreator';
-import { WARRIOR_SKILLS, getSkill, type SkillId } from './skillCatalog';
+import { WARRIOR_SKILLS, getSkill, type SkillDefinition, type SkillId } from './skillCatalog';
 
 type SkillProgress = CharacterProgress & {
   energy?: number;
   maxEnergy?: number;
 };
 
-type SkillAvailability = { ok: true } | { ok: false; reason: string };
+type SkillAvailability =
+  | { ok: true; reason?: undefined }
+  | { ok: false; reason: string };
+
+type SkillActivation =
+  | { ok: true; skill: SkillDefinition; reason?: undefined }
+  | { ok: false; reason: string; skill?: undefined };
 
 export type SkillSnapshot = {
   energy: number;
@@ -37,9 +43,9 @@ export function createSkillController(progress: CharacterProgress) {
     return { ok: true };
   };
 
-  const activate = (skillId: SkillId) => {
+  const activate = (skillId: SkillId): SkillActivation => {
     const check = canUse(skillId);
-    if (!check.ok) return check;
+    if ('reason' in check && check.reason) return { ok: false, reason: check.reason };
     const skill = getSkill(skillId);
     state.energy = Math.max(0, state.energy - skill.energyCost);
     cooldowns[skillId] = skill.cooldownMs;
@@ -47,7 +53,7 @@ export function createSkillController(progress: CharacterProgress) {
       buffAttackPercent = skill.buffAttackPercent ?? 0;
       buffRemainingMs = skill.buffDurationMs ?? 0;
     }
-    return { ok: true as const, skill };
+    return { ok: true, skill };
   };
 
   const tick = (deltaMs: number, paused = false) => {
