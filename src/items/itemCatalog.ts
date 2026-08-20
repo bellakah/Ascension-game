@@ -23,6 +23,7 @@ export type ItemDefinition = {
   equipSlot?: EquipSlot;
   stats?: ItemStats;
   heal?: number;
+  capacityBonus?: number;
 };
 
 export const ITEM_CATEGORY_LABELS: Record<ItemCategory | 'all', string> = {
@@ -32,6 +33,10 @@ export const ITEM_RARITY_LABELS: Record<ItemRarity, string> = { common: 'Comum',
 
 const ITEMS: ItemDefinition[] = [
   { id: 'small_health_potion', name: 'Poção Pequena de Vida', description: 'Uma poção simples preparada para aventureiros. Recupera 40 HP.', icon: '🧪', category: 'consumable', rarity: 'common', stackMax: 20, value: 8, heal: 40 },
+  { id: 'medium_health_potion', name: 'Poção Média de Vida', description: 'Uma mistura alquímica concentrada. Recupera 90 HP.', icon: '🧴', category: 'consumable', rarity: 'uncommon', stackMax: 20, value: 18, heal: 90 },
+  { id: 'large_health_potion', name: 'Poção Grande de Vida', description: 'Poção potente reservada para aventureiros experientes. Recupera 180 HP.', icon: '⚗️', category: 'consumable', rarity: 'rare', stackMax: 15, value: 36, heal: 180 },
+  { id: 'adventurer_bag', name: 'Bolsa de Aventureiro', description: 'Bolsa reforçada com compartimentos extras. Ao usar, aumenta permanentemente o inventário em 6 slots, até o limite de 48.', icon: '🎒', category: 'consumable', rarity: 'uncommon', stackMax: 1, value: 55, capacityBonus: 6 },
+  { id: 'reinforced_bag', name: 'Bolsa Reforçada', description: 'Uma bolsa grande usada por mercadores de estrada. Ao usar, aumenta permanentemente o inventário em 12 slots, até o limite de 48.', icon: '🧳', category: 'consumable', rarity: 'rare', stackMax: 1, value: 105, capacityBonus: 12 },
   { id: 'wolf_pelt', name: 'Pele de Lobo', description: 'Pele resistente retirada de um Lobo Sombrio. Útil para artesanato e missões.', icon: '🐺', category: 'material', rarity: 'common', stackMax: 50, value: 6 },
   { id: 'wolf_fang', name: 'Presa Sombria', description: 'Uma presa afiada impregnada pela energia escura da floresta.', icon: '🦷', category: 'material', rarity: 'uncommon', stackMax: 30, value: 12 },
   { id: 'toxic_sludge', name: 'Gosma Tóxica', description: 'Substância viscosa deixada pelos Lodos Tóxicos. Ainda borbulha levemente.', icon: '🟢', category: 'material', rarity: 'common', stackMax: 50, value: 5 },
@@ -101,6 +106,10 @@ export function removeItem(progress: CharacterProgress, itemId: string, quantity
     if (stack.quantity <= 0) state.inventory.splice(i, 1);
   }
   return quantity - remaining;
+}
+
+export function itemQuantity(progress: CharacterProgress, itemId: string) {
+  return ensureInventoryState(progress).inventory.reduce((total, stack) => total + (stack.itemId === itemId ? stack.quantity : 0), 0);
 }
 
 const rarityOrder: Record<ItemRarity, number> = { epic: 0, rare: 1, uncommon: 2, common: 3 };
