@@ -1,15 +1,17 @@
 import { Application, Container, Graphics, Text } from 'pixi.js';
 import './style.css';
 import { LpcCharacter, type Facing } from './character/lpcCharacter';
-import { showCharacterCreator } from './character/characterCreator';
+import { persistSelectedCharacter, showCharacterCreator } from './character/characterCreator';
 
 const bootStatus = document.querySelector<HTMLDivElement>('#boot-status');
 const setBootMessage = (message: string) => { if (bootStatus) bootStatus.textContent = message; };
 
 async function startGame() {
   try {
-    setBootMessage('Abrindo criação de personagem...');
-    const characterConfig = await showCharacterCreator();
+    setBootMessage('Abrindo seleção de personagem...');
+    const selectedCharacter = await showCharacterCreator();
+    const characterConfig = selectedCharacter.config;
+    const progress = selectedCharacter.progress;
     if (bootStatus) bootStatus.style.display = 'grid';
     setBootMessage(`Preparando ${characterConfig.name}...`);
 
@@ -26,6 +28,7 @@ async function startGame() {
     const WORLD_W = 2200;
     const WORLD_H = 1600;
     const PLAYER_RADIUS = 20;
+    const SPAWN = { x: 970, y: 900 };
     world.addChild(new Graphics().rect(0, 0, WORLD_W, WORLD_H).fill(0x527b45));
     world.addChild(new Graphics().roundRect(760, 0, 420, WORLD_H, 100).fill({ color: 0xa58458, alpha: 0.88 }));
 
@@ -81,7 +84,10 @@ async function startGame() {
     const playerName = new Text({ text: characterConfig.name, style: { fill: 0xffffff, fontSize: 14, fontWeight: 'bold', stroke: { color: 0, width: 4 } } });
     playerName.anchor.set(0.5); playerName.y = -94;
     player.addChild(playerName);
-    player.position.set(970, 900);
+    player.position.set(
+      Math.max(40, Math.min(WORLD_W - 40, progress.position.x || SPAWN.x)),
+      Math.max(80, Math.min(WORLD_H - 40, progress.position.y || SPAWN.y)),
+    );
     world.addChild(player);
 
     const enemy = new Container();
@@ -108,18 +114,23 @@ async function startGame() {
     loot.visible = false;
     world.addChild(loot);
 
-    let playerHp = 100;
+    const questState = progress.quests['forest.wolf'];
+    let playerHp = Math.max(1, Math.min(progress.maxHp, progress.hp));
     let enemyHp = 100;
-    let enemyAlive = true;
-    let questAccepted = false;
-    let questCompleted = false;
-    let coins = 0;
+    let questAccepted = questState.status !== 'not_started';
+    let questCompleted = questState.status === 'completed';
+    let enemyAlive = questState.status !== 'ready' && questState.status !== 'completed';
+    let coins = progress.coins;
     let attackCooldown = 0;
     let enemyAttackCooldown = 0;
+    let autosaveMs = 0;
+    enemy.visible = enemyAlive;
+    if (questState.status === 'ready') { npcMark.text = '?'; npcMark.style.fill = 0x8fd3ff; }
+    if (questCompleted) { npcMark.text = '✓'; npcMark.style.fill = 0x9cf28f; }
 
     const hud = document.createElement('div');
     hud.id = 'hud';
-    hud.innerHTML = `<div class="topbar"><div class="brand">ASCENSION <span>• Floresta Inicial</span></div><div class="hp-shell"><div id="hp-fill"></div><span id="hp-text">HP 100/100</span></div><div class="coins">🪙 <span id="coins">0</span></div></div><div id="quest-box"><strong>Missão</strong><div id="quest-text">Fale com Elandra.</div></div><div id="dialog-box" class="hidden"></div><div id="stick"><div id="knob"></div></div><button id="attack-btn">⚔</button><button id="interact-btn">💬</button>`;
+    hud.innerHTML = `<div class="topbar"><div class="brand">ASCENSION <span>• ${progress.map}</span></div><div class="player-progression"><strong id="level-text">Nv. ${progress.level}</strong><span id="exp-text">EXP ${progress.exp}/${progress.expToNext}</span></div><div class="hp-shell"><div id="hp-fill"></div><span id="hp-text"></span></div><div class="coins">🪙 <span id="coins">${coins}</span></div></div><div id="quest-box"><strong>Missão</strong><div id="quest-text">Fale com Elandra.</div></div><div id="dialog-box" class="hidden"></div><div id="stick"><div id="knob"></div></div><button id="attack-btn">⚔</button><button id="interact-btn">💬</button>`;
     document.body.appendChild(hud);
 
     const hpFill = document.querySelector<HTMLDivElement>('#hp-fill');
@@ -131,16 +142,23 @@ async function startGame() {
     const knob = document.querySelector<HTMLDivElement>('#knob');
     const attackBtn = document.querySelector<HTMLButtonElement>('#attack-btn');
     const interactBtn = document.querySelector<HTMLButtonElement>('#interact-btn');
-    if (!hpFill || !hpText || !coinText || !questText || !dialogBox || !stick || !knob || !attackBtn || !interactBtn) {
-      throw new Error('HUD não foi criado corretamente.');
-    }
+    if (!hpFill || !hpText || !coinText || !questText || !dialogBox || !stick || !knob || !attackBtn || !interactBtn) throw new Error('HUD não foi criado corretamente.');
 
     const distance = (ax: number, ay: number, bx: number, by: number) => Math.hypot(ax - bx, ay - by);
     const collides = (x: number, y: number) => obstacles.some((o) => distance(x, y, o.x, o.y) < PLAYER_RADIUS + o.radius);
 
+    function saveProgress() {
+      progress.hp = Math.max(1, Math.ceil(playerHp));
+      progress.coins = coins;
+      progress.map = 'Floresta Inicial';
+      progress.position = { x: Math.round(player.x), y: Math.round(player.y) };
+      progress.lastPlayedAt = Date.now();
+      persistSelectedCharacter(selectedCharacter);
+    }
+
     function updateHud() {
-      hpFill.style.width = `${Math.max(0, playerHp)}%`;
-      hpText.textContent = `HP ${Math.max(0, Math.ceil(playerHp))}/100`;
+      hpFill.style.width = `${Math.max(0, Math.min(100, playerHp / progress.maxHp * 100))}%`;
+      hpText.textContent = `HP ${Math.max(0, Math.ceil(playerHp))}/${progress.maxHp}`;
       coinText.textContent = String(coins);
       questText.textContent = !questAccepted ? 'Fale com Elandra.' : !questCompleted ? (enemyAlive ? 'Derrote o Lobo Sombrio.' : 'Volte e fale com Elandra.') : 'Concluída: A ameaça na floresta.';
     }
@@ -155,9 +173,14 @@ async function startGame() {
       if (distance(player.x, player.y, npc.x, npc.y) < 115) {
         if (!questAccepted) {
           questAccepted = true;
+          questState.status = enemyAlive ? 'active' : 'ready';
+          questState.progress = enemyAlive ? 0 : 1;
+          if (!enemyAlive) { npcMark.text = '?'; npcMark.style.fill = 0x8fd3ff; }
           showDialog('Elandra: Um Lobo Sombrio está rondando a trilha. Pode derrotá-lo para mim?');
         } else if (!enemyAlive && !questCompleted) {
           questCompleted = true;
+          questState.status = 'completed';
+          questState.progress = questState.target;
           coins += 25;
           npcMark.text = '✓';
           npcMark.style.fill = 0x9cf28f;
@@ -166,12 +189,14 @@ async function startGame() {
           showDialog(questCompleted ? 'Elandra: Obrigada, aventureiro!' : 'Elandra: O lobo está mais adiante.');
         }
         updateHud();
+        saveProgress();
       }
       if (loot.visible && distance(player.x, player.y, loot.x, loot.y) < 70) {
         loot.visible = false;
         coins += 5;
         showDialog('Você coletou 5 moedas.');
         updateHud();
+        saveProgress();
       }
     }
 
@@ -180,15 +205,22 @@ async function startGame() {
       if (!hero.attack()) return;
       attackCooldown = 30;
       if (distance(player.x, player.y, enemy.x, enemy.y) <= 100) {
-        enemyHp = Math.max(0, enemyHp - 34);
+        enemyHp = Math.max(0, enemyHp - progress.attack);
         enemyHpBar.scale.x = enemyHp / 100;
         if (enemyHp <= 0) {
           enemyAlive = false;
           enemy.visible = false;
           loot.position.copyFrom(enemy.position);
           loot.visible = true;
+          if (questAccepted && !questCompleted) {
+            questState.status = 'ready';
+            questState.progress = questState.target;
+            npcMark.text = '?';
+            npcMark.style.fill = 0x8fd3ff;
+          }
           showDialog('Lobo Sombrio derrotado!');
           updateHud();
+          saveProgress();
         }
       }
     }
@@ -224,8 +256,13 @@ async function startGame() {
     stick.addEventListener('pointerup', resetStick);
     stick.addEventListener('pointercancel', resetStick);
 
+    document.addEventListener('visibilitychange', () => { if (document.hidden) saveProgress(); });
+    window.addEventListener('pagehide', saveProgress);
+
     app.ticker.add((ticker) => {
       const dt = ticker.deltaTime;
+      autosaveMs += ticker.deltaMS;
+      if (autosaveMs >= 3000) { autosaveMs = 0; saveProgress(); }
       attackCooldown = Math.max(0, attackCooldown - dt);
       enemyAttackCooldown = Math.max(0, enemyAttackCooldown - dt);
 
@@ -258,11 +295,13 @@ async function startGame() {
         }
         if (d <= 72 && enemyAttackCooldown <= 0) {
           enemyAttackCooldown = 58;
-          playerHp = Math.max(0, playerHp - 12);
+          const damage = Math.max(1, 12 - Math.floor(progress.defense / 3));
+          playerHp = Math.max(0, playerHp - damage);
           if (playerHp <= 0) {
-            playerHp = 100;
-            player.position.set(970, 900);
+            playerHp = progress.maxHp;
+            player.position.set(SPAWN.x, SPAWN.y);
             showDialog('Você foi derrotado e retornou ao ponto inicial.');
+            saveProgress();
           }
           updateHud();
         }
@@ -275,6 +314,7 @@ async function startGame() {
     });
 
     updateHud();
+    saveProgress();
     if (bootStatus) bootStatus.remove();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
