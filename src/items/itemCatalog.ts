@@ -57,15 +57,17 @@ export function ensureInventoryState(progress: CharacterProgress): InventoryProg
   if (!Number.isFinite(state.inventoryCapacity) || state.inventoryCapacity < 1) state.inventoryCapacity = 24;
   if (!Array.isArray(state.inventory)) state.inventory = [];
   state.inventory = state.inventory.filter((stack) => stack && getItem(stack.itemId) && Number(stack.quantity) > 0).map((stack) => ({ itemId: stack.itemId, quantity: Math.max(1, Math.floor(Number(stack.quantity))) }));
-  const equipment = (state.equipment ?? {}) as InventoryProgress['equipment'];
-  equipment.weapon ??= 'basic_sword';
-  equipment.armor ??= 'chainmail';
-  equipment.boots ??= 'basic_boots';
-  equipment.head ??= null;
-  equipment.legs ??= null;
-  equipment.accessory1 ??= null;
-  equipment.accessory2 ??= null;
-  state.equipment = equipment;
+
+  const rawEquipment = (state.equipment ?? {}) as Partial<Record<EquipmentSlot, string | null>>;
+  const has = (slot: EquipmentSlot) => Object.prototype.hasOwnProperty.call(rawEquipment, slot);
+  if (!has('weapon')) rawEquipment.weapon = 'basic_sword';
+  if (!has('armor')) rawEquipment.armor = 'chainmail';
+  if (!has('boots')) rawEquipment.boots = 'basic_boots';
+  if (!has('head')) rawEquipment.head = null;
+  if (!has('legs')) rawEquipment.legs = null;
+  if (!has('accessory1')) rawEquipment.accessory1 = null;
+  if (!has('accessory2')) rawEquipment.accessory2 = null;
+  state.equipment = rawEquipment as InventoryProgress['equipment'];
   return state;
 }
 
