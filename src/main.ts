@@ -61,17 +61,30 @@ async function startGame() {
       Assets.load<Texture>(MAIL_WALK),
     ]);
     const player = new Container();
-    const shadow = new Graphics().ellipse(0, 5, 25, 10).fill({ color:0, alpha:.25 }); player.addChild(shadow);
+    player.sortableChildren = true;
+    const shadow = new Graphics().ellipse(0, 5, 25, 10).fill({ color:0, alpha:.25 });
+    shadow.zIndex = 0;
+    player.addChild(shadow);
+
     const body = new Sprite();
-    const head = new Sprite();
     const mail = new Sprite();
-    for (const s of [body, head, mail]) {
+    const head = new Sprite();
+    body.zIndex = 10;
+    mail.zIndex = 20;
+    head.zIndex = 30;
+    for (const s of [body, mail, head]) {
       s.anchor.set(.5,1);
       s.scale.set(1.35);
-      s.texture.source.scaleMode='nearest';
+      s.visible = true;
+      s.alpha = 1;
       player.addChild(s);
     }
-    const playerName = new Text({ text:'Herói', style:{fill:0xffffff,fontSize:14,fontWeight:'bold',stroke:{color:0,width:4}} }); playerName.anchor.set(.5); playerName.y=-92; player.addChild(playerName);
+    body.texture.source.scaleMode='nearest';
+    mail.texture.source.scaleMode='nearest';
+    head.texture.source.scaleMode='nearest';
+
+    const playerName = new Text({ text:'Herói', style:{fill:0xffffff,fontSize:14,fontWeight:'bold',stroke:{color:0,width:4}} });
+    playerName.anchor.set(.5); playerName.y=-92; playerName.zIndex = 40; player.addChild(playerName);
     player.position.set(970,900); world.addChild(player);
 
     let facing: Facing='down', animFrame=0, animClock=0;
@@ -81,8 +94,11 @@ async function startGame() {
     function renderHero(moving=false) {
       const f = moving ? animFrame : 0;
       body.texture=frameTexture(bodySheet,facing,f);
-      head.texture=frameTexture(headSheet,facing,f);
       mail.texture=frameTexture(mailSheet,facing,f);
+      head.texture=frameTexture(headSheet,facing,f);
+      body.texture.source.scaleMode='nearest';
+      mail.texture.source.scaleMode='nearest';
+      head.texture.source.scaleMode='nearest';
     }
     renderHero();
 
