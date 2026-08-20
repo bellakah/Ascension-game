@@ -24,8 +24,8 @@ export type CharacterEquipmentVisuals = {
   accessory2?: string | null;
 };
 
-type Animation = 'idle' | 'walk' | 'slash';
-type LayerName = 'body' | 'pants' | 'boots' | 'mail' | 'head' | 'eyes' | 'hair' | 'hood' | 'swordBg' | 'swordFg';
+type Animation = 'idle' | 'walk' | 'slash' | 'spellcast';
+type LayerName = 'body' | 'pants' | 'boots' | 'mail' | 'head' | 'eyes' | 'hair' | 'hood' | 'weaponBg' | 'weaponFg';
 
 export const DEFAULT_CHARACTER: CharacterConfig = {
   name: 'Herói',
@@ -89,8 +89,8 @@ export class LpcCharacter {
     this.equipment = normalizeEquipment(equipment);
     this.view.sortableChildren = true;
     const order: Array<[LayerName, number]> = [
-      ['swordBg', 5], ['body', 10], ['pants', 14], ['boots', 16],
-      ['mail', 20], ['head', 30], ['eyes', 35], ['hair', 40], ['hood', 46], ['swordFg', 50],
+      ['weaponBg', 5], ['body', 10], ['pants', 14], ['boots', 16],
+      ['mail', 20], ['head', 30], ['eyes', 35], ['hair', 40], ['hood', 46], ['weaponFg', 50],
     ];
     for (const [name, zIndex] of order) {
       const sprite = new Sprite();
@@ -132,12 +132,20 @@ export class LpcCharacter {
     if (this.equipment.weapon === 'basic_sword') return 'bronze';
     if (this.equipment.weapon === 'iron_sword') return 'iron';
     if (this.equipment.weapon === 'shadow_fang_blade') return 'silver';
+    if (this.equipment.weapon === 'apprentice_staff') return null;
     return this.equipment.weapon ? 'steel' : null;
   }
 
-  private swordPath(animation: Animation, side: 'bg' | 'fg') {
+  private weaponPath(animation: Animation, side: 'bg' | 'fg') {
+    if (this.equipment.weapon === 'apprentice_staff') {
+      const staffAnimation = animation === 'idle' ? 'walk' : animation === 'slash' ? 'spellcast' : animation;
+      if (staffAnimation !== 'walk' && staffAnimation !== 'spellcast') return null;
+      const layer = side === 'bg' ? 'background' : 'foreground';
+      return url(`weapon/magic/simple/${layer}/${staffAnimation}/simple.png`);
+    }
     const material = this.swordMaterial();
     if (!material) return null;
+    if (animation === 'spellcast') return null;
     if (animation === 'slash') return url(`weapon/sword/arming/attack_slash/${side}/${material}.png`);
     return url(`weapon/sword/arming/universal/${side}/${animation}/${material}.png`);
   }
@@ -153,7 +161,7 @@ export class LpcCharacter {
   }
 
   private async loadBaseSheets() {
-    const animations: Animation[] = ['idle', 'walk', 'slash'];
+    const animations: Animation[] = ['idle', 'walk', 'slash', 'spellcast'];
     const names: Array<'body' | 'pants' | 'boots' | 'head' | 'eyes' | 'hair'> = ['body', 'pants', 'boots', 'head', 'eyes', 'hair'];
     const jobs: Promise<void>[] = [];
     for (const animation of animations) {
@@ -163,12 +171,12 @@ export class LpcCharacter {
   }
 
   private async loadEquipmentSheets() {
-    const animations: Animation[] = ['idle', 'walk', 'slash'];
+    const animations: Animation[] = ['idle', 'walk', 'slash', 'spellcast'];
     for (const animation of animations) {
       this.sheets.delete(`mail:${animation}`);
       this.sheets.delete(`hood:${animation}`);
-      this.sheets.delete(`swordBg:${animation}`);
-      this.sheets.delete(`swordFg:${animation}`);
+      this.sheets.delete(`weaponBg:${animation}`);
+      this.sheets.delete(`weaponFg:${animation}`);
     }
 
     const jobs: Promise<void>[] = [];
@@ -178,10 +186,10 @@ export class LpcCharacter {
       if (armor) jobs.push(this.tryLoad(`mail:${animation}`, armor));
       if (hood) jobs.push(this.tryLoad(`hood:${animation}`, hood));
       for (const side of ['bg', 'fg'] as const) {
-        const sword = this.swordPath(animation, side);
-        if (!sword) continue;
-        const name: LayerName = side === 'bg' ? 'swordBg' : 'swordFg';
-        jobs.push(this.tryLoad(`${name}:${animation}`, sword));
+        const weapon = this.weaponPath(animation, side);
+        if (!weapon) continue;
+        const name: LayerName = side === 'bg' ? 'weaponBg' : 'weaponFg';
+        jobs.push(this.tryLoad(`${name}:${animation}`, weapon));
       }
     }
     await Promise.all(jobs);
@@ -205,23 +213,27 @@ export class LpcCharacter {
     this.render();
   }
 
-  attack() {
+  private startAction(animation: 'slash' | 'spellcast') {
     if (this.isAttacking) return false;
     this.isAttacking = true;
-    this.animation = 'slash';
+    this.animation = animation;
     this.frame = 0;
     this.clock = 0;
     this.render();
     return true;
   }
 
+  attack() { return this.startAction('slash'); }
+  cast() { return this.startAction('spellcast'); }
+
   update(moving: boolean, dt: number) {
     if (this.isAttacking) {
       this.clock += dt;
-      if (this.clock >= 4.2) {
+      const actionSpeed = this.animation === 'spellcast' ? 5.2 : 4.2;
+      if (this.clock >= actionSpeed) {
         this.clock = 0;
         this.frame += 1;
-        if (this.frame >= this.frameCount('body', 'slash')) {
+        if (this.frame >= this.frameCount('body', this.animation)) {
           this.isAttacking = false;
           this.animation = moving ? 'walk' : 'idle';
           this.frame = 0;
@@ -258,10 +270,7 @@ export class LpcCharacter {
     const size = sheet.height / 4;
     const count = Math.max(1, Math.floor(sheet.width / size));
     const safeFrame = Math.min(frame, count - 1);
-    return new Texture({
-      source: sheet.source,
-      frame: new Rectangle(safeFrame * size, row[this.facing] * size, size, size),
-    });
+    return new Texture({ source: sheet.source, frame: new Rectangle(safeFrame * size, row[this.facing] * size, size, size) });
   }
 
   private tintFor(name: LayerName) {
@@ -275,29 +284,23 @@ export class LpcCharacter {
 
   private shouldShow(name: LayerName) {
     if (name === 'mail') return Boolean(this.equipment.armor);
-    if (name === 'hood') return Boolean(this.equipment.head && this.sheets.has(`hood:${this.animation}`) || this.equipment.head && this.sheets.has('hood:idle'));
+    if (name === 'hood') return Boolean(this.equipment.head && (this.sheets.has(`hood:${this.animation}`) || this.sheets.has('hood:idle')));
     if (name === 'boots') return Boolean(this.equipment.boots);
-    if (name === 'swordBg' || name === 'swordFg') return Boolean(this.equipment.weapon);
+    if (name === 'weaponBg' || name === 'weaponFg') return Boolean(this.equipment.weapon);
     return true;
   }
 
   private render() {
     for (const [name, sprite] of this.layers) {
-      if (!this.shouldShow(name)) {
-        sprite.visible = false;
-        continue;
-      }
+      if (!this.shouldShow(name)) { sprite.visible = false; continue; }
       const exact = this.sheets.get(`${name}:${this.animation}`);
       const fallback = this.sheets.get(`${name}:idle`);
       const sheet = exact ?? fallback;
-      if (!sheet) {
-        sprite.visible = false;
-        continue;
-      }
+      if (!sheet) { sprite.visible = false; continue; }
 
       sprite.visible = true;
-      const usingAttackFrame = this.animation === 'slash' && Boolean(exact);
-      sprite.anchor.set(0.5, usingAttackFrame ? 2 / 3 : 1);
+      const usingSlashFrame = this.animation === 'slash' && Boolean(exact);
+      sprite.anchor.set(0.5, usingSlashFrame ? 2 / 3 : 1);
       sprite.scale.set(this.scale * bodyWidth[this.config.bodyType], this.scale);
       sprite.tint = this.tintFor(name);
       sprite.texture = this.crop(sheet, exact ? this.frame : 0);
