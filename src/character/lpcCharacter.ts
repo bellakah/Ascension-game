@@ -1,7 +1,7 @@
 import { Assets, Container, Rectangle, Sprite, Texture } from 'pixi.js';
 
 export type Facing = 'up' | 'left' | 'down' | 'right';
-type Animation = 'idle' | 'walk' | 'halfslash';
+type Animation = 'idle' | 'walk' | 'slash';
 type LayerName = 'body' | 'pants' | 'boots' | 'mail' | 'head' | 'hair' | 'swordBg' | 'swordFg';
 
 const LPC = 'https://raw.githubusercontent.com/LiberatedPixelCup/Universal-LPC-Spritesheet-Character-Generator/master/spritesheets';
@@ -19,8 +19,8 @@ const basePaths: Record<Exclude<LayerName, 'swordBg' | 'swordFg'>, (animation: A
 };
 
 function swordPath(animation: Animation, side: 'bg' | 'fg') {
-  if (animation === 'halfslash') {
-    return url(`weapon/sword/arming/attack_halfslash/${side}/steel.png`);
+  if (animation === 'slash') {
+    return url(`weapon/sword/arming/attack_slash/${side}/steel.png`);
   }
   return url(`weapon/sword/arming/universal/${side}/${animation}/steel.png`);
 }
@@ -61,7 +61,7 @@ export class LpcCharacter {
   }
 
   private async load() {
-    const animations: Animation[] = ['idle', 'walk', 'halfslash'];
+    const animations: Animation[] = ['idle', 'walk', 'slash'];
     const jobs: Promise<void>[] = [];
     for (const animation of animations) {
       for (const [name, makePath] of Object.entries(basePaths) as Array<[Exclude<LayerName, 'swordBg' | 'swordFg'>, (a: Animation) => string]>) {
@@ -90,7 +90,7 @@ export class LpcCharacter {
   attack() {
     if (this.isAttacking) return false;
     this.isAttacking = true;
-    this.animation = 'halfslash';
+    this.animation = 'slash';
     this.frame = 0;
     this.clock = 0;
     this.render();
@@ -103,7 +103,7 @@ export class LpcCharacter {
       if (this.clock >= 4.2) {
         this.clock = 0;
         this.frame += 1;
-        if (this.frame >= this.frameCount('body', 'halfslash')) {
+        if (this.frame >= this.frameCount('body', 'slash')) {
           this.isAttacking = false;
           this.animation = moving ? 'walk' : 'idle';
           this.frame = 0;
