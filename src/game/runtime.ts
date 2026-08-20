@@ -5,8 +5,11 @@ import { createCharacterSheet } from '../character/characterSheet';
 import { createInventory } from '../items/inventory';
 import { ensureInventoryState, getItem } from '../items/itemCatalog';
 import { spawnMonsterLoot, updateGroundLoot, type GroundLoot } from '../items/lootSystem';
+import { createSkillBar } from '../skills/skillBar';
+import { createSkillController } from '../skills/skillController';
+import { WARRIOR_SKILLS, getSkill, type SkillId } from '../skills/skillCatalog';
 import { createHud, showDialog, updateHud } from './hud';
-import { createMonsters, damageMonster, findAttackTarget, killMonster, updateMonsters } from './monsterSystem';
+import { createMonsters, damageMonster, findAttackTarget, killMonster, updateMonsters, type Monster } from './monsterSystem';
 import { currentQuest, ensureQuestStates, interactQuest, registerQuestKill } from './quests';
 import { createRespawnScreen } from './respawn';
 import { createShop } from './shopSystem';
@@ -24,6 +27,7 @@ export async function startGame() {
     const progress = selected.progress;
     ensureQuestStates(progress);
     const inventoryState = ensureInventoryState(progress);
+    const skillController = createSkillController(progress);
     if (bootStatus) bootStatus.style.display = 'grid';
     setBootMessage(`Preparando ${config.name}...`);
 
@@ -57,6 +61,7 @@ export async function startGame() {
     let coins = progress.coins;
     let attackCooldown = 0;
     let autosaveMs = 0;
+    let skillUiMs = 0;
     let isDead = playerHp <= 0;
     let deathPosition = { x: player.x, y: player.y };
     let wasSafe = isInSafeZone(player.x, player.y);
@@ -110,6 +115,9 @@ export async function startGame() {
       notify: (message) => showDialog(hud, message),
     });
 
+    let useSkill: (skillId: SkillId) => void = () => {};
+    const skillBar = createSkillBar({ onUse: (skillId) => useSkill(skillId) });
+
     const respawnScreen = createRespawnScreen({
       onRespawn: () => {
         const village = nearestVillage(deathPosition.x, deathPosition.y, progress.map || 'Floresta Inicial');
@@ -117,6 +125,7 @@ export async function startGame() {
         isDead = false;
         playerHp = progress.maxHp;
         progress.hp = playerHp;
+        skillController.refill();
         player.alpha = 1;
         player.position.set(village.respawn.x, village.respawn.y);
         progress.position = { x: village.respawn.x, y: village.respawn.y };
@@ -126,6 +135,7 @@ export async function startGame() {
         respawnScreen.hide();
         refresh();
         characterSheet.refresh();
+        skillBar.refresh(skillController.snapshot());
         save();
         showDialog(hud, `Você renasceu em ${village.name}. Esta é uma área segura.`);
       },
@@ -147,6 +157,7 @@ export async function startGame() {
       inventory.close();
       characterSheet.close();
       shop.close();
+      skillBar.refresh(skillController.snapshot(), true);
       const village = nearestVillage(deathPosition.x, deathPosition.y, progress.map || 'Floresta Inicial');
       if (village) respawnScreen.show(village);
       refresh();
@@ -160,6 +171,21 @@ export async function startGame() {
       const tick = (ticker: Ticker) => {
         life -= ticker.deltaTime; node.y -= .55 * ticker.deltaTime; node.alpha = Math.max(0, life / 55);
         if (life <= 0) { app.ticker.remove(tick); world.removeChild(node); node.destroy(); }
+      };
+      app.ticker.add(tick);
+    };
+
+    const pulse = (radius: number, color: number, durationMs = 420) => {
+      const effect = new Graphics().circle(0, 0, radius).stroke({ width: 5, color, alpha: .8 });
+      effect.position.set(player.x, player.y);
+      world.addChild(effect);
+      let remaining = durationMs;
+      const tick = (ticker: Ticker) => {
+        remaining -= ticker.deltaMS;
+        const t = Math.max(0, remaining / durationMs);
+        effect.alpha = t;
+        effect.scale.set(1 + (1 - t) * .35);
+        if (remaining <= 0) { app.ticker.remove(tick); world.removeChild(effect); effect.destroy(); }
       };
       app.ticker.add(tick);
     };
@@ -181,7 +207,7 @@ export async function startGame() {
       characterSheet.refresh();
     };
 
-    const onKill = (monster: typeof monsters[number]) => {
+    const onKill = (monster: Monster) => {
       grantExp(monster.expReward);
       coins += monster.coinReward;
       spawnMonsterLoot(world, monster.kind, monster.view.x, monster.view.y, groundLoot);
@@ -189,6 +215,94 @@ export async function startGame() {
       const result = registerQuestKill(progress, monster.kind);
       if (result?.becameReady) showDialog(hud, `${result.quest.title}: objetivo concluído! Volte para Elandra.`);
       inventory.refresh(); refresh(); save(); characterSheet.refresh();
+    };
+
+    const attackPower = () => Math.max(1, Math.round(progress.attack * skillController.attackMultiplier()));
+
+    const faceTarget = (target: Monster) => {
+      const dx = target.view.x - player.x;
+      const dy = target.view.y - player.y;
+      const facing: Facing = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down');
+      hero.setFacing(facing);
+    };
+
+    const hitMonster = (monster: Monster, amount: number, color = 0xffc2b8) => {
+      const damage = Math.max(1, Math.round(amount));
+      const died = damageMonster(monster, damage);
+      floating(monster.view.x, monster.view.y - 25, `-${damage}`, color);
+      if (died) { killMonster(monster); onKill(monster); }
+    };
+
+    const nearbyMonsters = (radius: number) => monsters.filter((monster) => monster.alive && distance(player.x, player.y, monster.view.x, monster.view.y) <= radius);
+
+    const dashToward = (target: Monster) => {
+      const dx = target.view.x - player.x;
+      const dy = target.view.y - player.y;
+      const d = Math.max(1, Math.hypot(dx, dy));
+      const travel = Math.max(0, d - 66);
+      const steps = Math.max(1, Math.ceil(travel / 12));
+      let bestX = player.x, bestY = player.y;
+      for (let i = 1; i <= steps; i++) {
+        const step = Math.min(travel, i * 12);
+        const x = Math.max(40, Math.min(WORLD_W - 40, player.x + dx / d * step));
+        const y = Math.max(80, Math.min(WORLD_H - 40, player.y + dy / d * step));
+        if (collides(obstacles, x, y) || isInSafeZone(x, y)) break;
+        bestX = x; bestY = y;
+      }
+      player.position.set(bestX, bestY);
+    };
+
+    useSkill = (skillId: SkillId) => {
+      if (uiOpen() || hero.isAttacking) return;
+      if (isInSafeZone(player.x, player.y)) {
+        showDialog(hud, 'Área segura: habilidades de combate não podem ser usadas aqui.');
+        return;
+      }
+
+      const skill = getSkill(skillId);
+      let target: Monster | null = null;
+      let targets: Monster[] = [];
+      if (skill.kind === 'melee' || skill.kind === 'charge') {
+        target = findAttackTarget(monsters, player.x, player.y, skill.range ?? 120);
+        if (!target) { showDialog(hud, `${skill.name}: nenhum alvo no alcance.`); return; }
+      }
+      if (skill.kind === 'aoe') {
+        targets = nearbyMonsters(skill.radius ?? 150);
+        if (!targets.length) { showDialog(hud, `${skill.name}: nenhum inimigo por perto.`); return; }
+      }
+
+      const check = skillController.canUse(skillId);
+      if (!check.ok) { showDialog(hud, check.reason ?? 'Habilidade indisponível.'); return; }
+      const activated = skillController.activate(skillId);
+      if (!activated.ok) { showDialog(hud, activated.reason ?? 'Habilidade indisponível.'); return; }
+
+      const baseAttack = attackPower();
+      if (skill.kind === 'melee' && target) {
+        faceTarget(target);
+        hero.attack();
+        attackCooldown = 30;
+        pulse(82, 0xf0b85d, 280);
+        hitMonster(target, baseAttack * (skill.damageMultiplier ?? 1), 0xffd08b);
+      } else if (skill.kind === 'charge' && target) {
+        faceTarget(target);
+        dashToward(target);
+        hero.attack();
+        attackCooldown = 34;
+        pulse(58, 0x79c9ff, 300);
+        hitMonster(target, baseAttack * (skill.damageMultiplier ?? 1), 0x9ddcff);
+      } else if (skill.kind === 'aoe') {
+        hero.attack();
+        attackCooldown = 38;
+        pulse(skill.radius ?? 165, 0xe9c760, 480);
+        for (const monster of targets) hitMonster(monster, baseAttack * (skill.damageMultiplier ?? 1), 0xffe191);
+      } else if (skill.kind === 'buff') {
+        pulse(105, 0xf39a45, 650);
+        floating(player.x, player.y - 105, `ATQ +${skill.buffAttackPercent ?? 0}%`, 0xffc66f);
+        showDialog(hud, `${skill.name}: Ataque +${skill.buffAttackPercent ?? 0}% por ${Math.round((skill.buffDurationMs ?? 0) / 1000)}s.`);
+      }
+
+      skillBar.refresh(skillController.snapshot());
+      save();
     };
 
     const interact = () => {
@@ -226,9 +340,7 @@ export async function startGame() {
       attackCooldown = 30;
       const target = findAttackTarget(monsters, player.x, player.y);
       if (!target) return;
-      const died = damageMonster(target, progress.attack);
-      floating(target.view.x, target.view.y - 25, `-${progress.attack}`, 0xffc2b8);
-      if (died) { killMonster(target); onKill(target); }
+      hitMonster(target, attackPower());
     };
 
     hud.attack.addEventListener('pointerdown', attack);
@@ -244,6 +356,8 @@ export async function startGame() {
       keys.add(key);
       if (event.code === 'Space') attack();
       if (key === 'e') interact();
+      const skill = WARRIOR_SKILLS.find((entry) => String(entry.slot) === key);
+      if (skill) { event.preventDefault(); useSkill(skill.id); }
     }, true);
     window.addEventListener('keyup', (event) => keys.delete(event.key.toLowerCase()));
 
@@ -268,6 +382,12 @@ export async function startGame() {
       autosaveMs += ticker.deltaMS;
       if (autosaveMs >= 3000) { autosaveMs = 0; save(); }
       attackCooldown = Math.max(0, attackCooldown - ticker.deltaTime);
+      skillController.tick(ticker.deltaMS, uiOpen());
+      skillUiMs += ticker.deltaMS;
+      if (skillUiMs >= 100) {
+        skillUiMs = 0;
+        skillBar.refresh(skillController.snapshot(), uiOpen());
+      }
 
       let dx = uiOpen() ? 0 : stickX, dy = uiOpen() ? 0 : stickY;
       if (!uiOpen()) {
@@ -323,7 +443,7 @@ export async function startGame() {
       world.y = Math.max(Math.min(0, app.screen.height - WORLD_H), Math.min(0, app.screen.height / 2 - player.y));
     });
 
-    refresh(); inventory.refresh(); characterSheet.refresh(); save();
+    refresh(); inventory.refresh(); characterSheet.refresh(); skillBar.refresh(skillController.snapshot(), isDead); save();
     if (bootStatus) bootStatus.remove();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
