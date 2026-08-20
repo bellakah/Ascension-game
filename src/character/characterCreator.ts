@@ -1,348 +1,342 @@
-import { Application } from 'pixi.js';
-import { DEFAULT_CHARACTER, LpcCharacter, type BodyType, type CharacterConfig, type Sex } from './lpcCharacter';
+import './account.css';
+import { DEFAULT_CHARACTER, type CharacterConfig } from './lpcCharacter';
+import { showAppearanceCreator } from './appearanceCreator';
 
 const LPC = 'https://raw.githubusercontent.com/LiberatedPixelCup/Universal-LPC-Spritesheet-Character-Generator/master/spritesheets';
-const STORAGE_KEY = 'ascension.character.v1';
+const ACCOUNTS_KEY = 'ascension.accounts.v1';
+const SESSION_KEY = 'ascension.session.v1';
+const MAX_CHARACTERS = 6;
 
-type Option = { id: string; label: string };
-
-const hairBySex: Record<Sex, Option[]> = {
-  male: [
-    { id: 'bedhead', label: 'Despojado' },
-    { id: 'afro', label: 'Afro' },
-    { id: 'bangsshort', label: 'Franja curta' },
-    { id: 'balding', label: 'Clássico' },
-    { id: 'bob_side_part', label: 'Lateral' },
-  ],
-  female: [
-    { id: 'bob', label: 'Bob' },
-    { id: 'bob_side_part', label: 'Lateral' },
-    { id: 'bangs_bun', label: 'Coque' },
-    { id: 'bangsshort', label: 'Franja curta' },
-    { id: 'bedhead', label: 'Despojado' },
-  ],
+type CharacterRecord = {
+  id: string;
+  createdAt: number;
+  config: CharacterConfig;
 };
 
-const eyesBySex: Record<Sex, Option[]> = {
-  male: [
-    { id: 'neutral', label: 'Clássico' },
-    { id: 'anger', label: 'Intenso' },
-    { id: 'sad', label: 'Suave' },
-    { id: 'eyeroll', label: 'Arqueado' },
-    { id: 'look_l', label: 'Lateral' },
-  ],
-  female: [
-    { id: 'neutral', label: 'Clássico' },
-    { id: 'anger', label: 'Intenso' },
-    { id: 'sad', label: 'Suave' },
-    { id: 'eyeroll', label: 'Arqueado' },
-    { id: 'look_l', label: 'Lateral' },
-  ],
+type AccountRecord = {
+  username: string;
+  displayName: string;
+  passwordHash: string;
+  characters: Array<CharacterRecord | null>;
 };
 
-const skinColors = [0xffe0c2, 0xf3c39d, 0xd99b72, 0xad704f, 0x75462f];
-const hairColors = [0x30231f, 0x6b432c, 0xb6783b, 0xe2c083, 0x9b3434, 0x394861];
-const eyeColors = [0x6d93b8, 0x5f8f63, 0x8a653e, 0x5a4a73, 0x444444];
-const bodyTypes: Array<{ id: BodyType; label: string; width: number }> = [
-  { id: 'light', label: 'Leve', width: .82 },
-  { id: 'normal', label: 'Normal', width: 1 },
-  { id: 'robust', label: 'Robusto', width: 1.17 },
-];
+type AccountStore = Record<string, AccountRecord>;
 
-function cloneDefault(): CharacterConfig {
-  return { ...DEFAULT_CHARACTER };
-}
-
-function sanitizeConfig(value: CharacterConfig): CharacterConfig {
-  const sex: Sex = value.sex === 'female' ? 'female' : 'male';
-  const validHair = hairBySex[sex].some((item) => item.id === value.hairStyle);
-  const validEyes = eyesBySex[sex].some((item) => item.id === value.eyeStyle);
-  const validEyeColor = eyeColors.includes(value.eyeColor);
-
-  return {
-    ...cloneDefault(),
-    ...value,
-    sex,
-    hairStyle: validHair ? value.hairStyle : hairBySex[sex][0].id,
-    eyeStyle: validEyes ? value.eyeStyle : eyesBySex[sex][0].id,
-    eyeColor: validEyeColor ? value.eyeColor : eyeColors[0],
-  };
-}
-
-function loadSaved(): CharacterConfig {
+function loadAccounts(): AccountStore {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return cloneDefault();
-    return sanitizeConfig({ ...cloneDefault(), ...JSON.parse(raw) } as CharacterConfig);
+    const raw = localStorage.getItem(ACCOUNTS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as AccountStore;
+    for (const account of Object.values(parsed)) {
+      if (!Array.isArray(account.characters)) account.characters = [];
+      account.characters = [...account.characters.slice(0, MAX_CHARACTERS)];
+      while (account.characters.length < MAX_CHARACTERS) account.characters.push(null);
+    }
+    return parsed;
   } catch {
-    return cloneDefault();
+    return {};
   }
 }
 
-function optionButton(label: string, selected: boolean, onClick: () => void) {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = `creator-option${selected ? ' selected' : ''}`;
-  button.textContent = label;
-  button.addEventListener('click', onClick);
-  return button;
+function saveAccounts(store: AccountStore) {
+  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(store));
 }
 
-function colorButton(color: number, selected: boolean, onClick: () => void) {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = `color-dot${selected ? ' selected' : ''}`;
-  button.style.backgroundColor = `#${color.toString(16).padStart(6, '0')}`;
-  button.addEventListener('click', onClick);
-  return button;
+function normalizeUsername(value: string) {
+  return value.trim().toLowerCase();
 }
 
-function addThumbLayer(host: HTMLElement, path: string, z: number) {
+async function hashPassword(value: string) {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function makeId() {
+  if ('randomUUID' in crypto) return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function addAvatarLayer(host: HTMLElement, path: string, z: number) {
   const layer = document.createElement('span');
-  layer.className = 'lpc-thumb-layer';
+  layer.className = 'slot-avatar-layer';
   layer.style.zIndex = String(z);
   layer.style.backgroundImage = `url(${LPC}/${path})`;
   host.appendChild(layer);
 }
 
-function createHairThumb(sex: Sex, style: string) {
-  const thumb = document.createElement('span');
-  thumb.className = 'lpc-thumb';
-  addThumbLayer(thumb, `body/bodies/${sex}/idle.png`, 1);
-  addThumbLayer(thumb, `head/heads/human/${sex}/idle.png`, 2);
-  addThumbLayer(thumb, `hair/${style}/adult/idle.png`, 3);
-  return thumb;
+function eyeColorName(color: number) {
+  const map = new Map<number, string>([
+    [0x6d93b8, 'blue'],
+    [0x5f8f63, 'green'],
+    [0x8a653e, 'brown'],
+    [0x5a4a73, 'purple'],
+    [0x444444, 'gray'],
+  ]);
+  return map.get(color) ?? 'blue';
 }
 
-function createEyeThumb(sex: Sex, eyeStyle: string) {
-  const thumb = document.createElement('span');
-  thumb.className = 'lpc-thumb face-thumb';
-  addThumbLayer(thumb, `body/bodies/${sex}/idle.png`, 1);
-  addThumbLayer(thumb, `head/heads/human/${sex}/idle.png`, 2);
-  addThumbLayer(thumb, `eyes/human/adult/${eyeStyle}/idle/blue.png`, 3);
-  return thumb;
+function createSlotAvatar(config: CharacterConfig) {
+  const avatar = document.createElement('span');
+  avatar.className = 'slot-avatar';
+  addAvatarLayer(avatar, `body/bodies/${config.sex}/idle.png`, 1);
+  addAvatarLayer(avatar, `head/heads/human/${config.sex}/idle.png`, 2);
+  addAvatarLayer(avatar, `eyes/human/adult/${config.eyeStyle}/idle/${eyeColorName(config.eyeColor)}.png`, 3);
+  addAvatarLayer(avatar, `hair/${config.hairStyle}/adult/idle.png`, 4);
+  return avatar;
 }
 
-function makeSection(title: string) {
-  const section = document.createElement('section');
-  section.className = 'creator-section';
-  const heading = document.createElement('h3');
-  heading.textContent = title;
-  section.appendChild(heading);
-  return section;
+async function showAccountGate(): Promise<string> {
+  const existingSession = localStorage.getItem(SESSION_KEY);
+  const store = loadAccounts();
+  if (existingSession && store[existingSession]) return existingSession;
+  if (existingSession) localStorage.removeItem(SESSION_KEY);
+
+  const boot = document.querySelector<HTMLElement>('#boot-status');
+  if (boot) boot.style.display = 'none';
+
+  return new Promise<string>((resolve) => {
+    let mode: 'login' | 'register' = Object.keys(store).length ? 'login' : 'register';
+    const root = document.createElement('div');
+    root.id = 'account-gate';
+    root.innerHTML = `
+      <div class="account-shell">
+        <div class="auth-card">
+          <div class="auth-brand"><span class="creator-kicker">ASCENSION</span><h1>Conta do jogador</h1><p>Entre na sua conta ou crie uma para começar.</p></div>
+          <div class="auth-tabs"><button id="tab-login" class="auth-tab" type="button">Entrar</button><button id="tab-register" class="auth-tab" type="button">Criar conta</button></div>
+          <form class="auth-form" id="auth-form">
+            <label>Usuário<input id="auth-user" maxlength="18" autocomplete="username" placeholder="Seu usuário" /></label>
+            <label>Senha<input id="auth-password" type="password" maxlength="40" autocomplete="current-password" placeholder="Sua senha" /></label>
+            <label id="confirm-wrap">Confirmar senha<input id="auth-confirm" type="password" maxlength="40" autocomplete="new-password" placeholder="Repita a senha" /></label>
+            <button class="auth-submit" id="auth-submit" type="submit"></button>
+            <div class="account-error" id="auth-error"></div>
+          </form>
+          <p class="account-note">Protótipo atual: a conta fica salva somente neste navegador. Quando adicionarmos servidor e banco de dados, ela passará a ser uma conta online real.</p>
+        </div>
+      </div>`;
+    document.body.appendChild(root);
+
+    const loginTab = root.querySelector<HTMLButtonElement>('#tab-login')!;
+    const registerTab = root.querySelector<HTMLButtonElement>('#tab-register')!;
+    const form = root.querySelector<HTMLFormElement>('#auth-form')!;
+    const userInput = root.querySelector<HTMLInputElement>('#auth-user')!;
+    const passInput = root.querySelector<HTMLInputElement>('#auth-password')!;
+    const confirmInput = root.querySelector<HTMLInputElement>('#auth-confirm')!;
+    const confirmWrap = root.querySelector<HTMLElement>('#confirm-wrap')!;
+    const submit = root.querySelector<HTMLButtonElement>('#auth-submit')!;
+    const errorBox = root.querySelector<HTMLDivElement>('#auth-error')!;
+
+    const renderMode = () => {
+      const registering = mode === 'register';
+      loginTab.classList.toggle('active', !registering);
+      registerTab.classList.toggle('active', registering);
+      confirmWrap.style.display = registering ? 'grid' : 'none';
+      submit.textContent = registering ? 'Criar conta' : 'Entrar';
+      passInput.autocomplete = registering ? 'new-password' : 'current-password';
+      errorBox.textContent = '';
+    };
+
+    loginTab.addEventListener('click', () => { mode = 'login'; renderMode(); });
+    registerTab.addEventListener('click', () => { mode = 'register'; renderMode(); });
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      errorBox.textContent = '';
+      const displayName = userInput.value.trim();
+      const username = normalizeUsername(displayName);
+      const password = passInput.value;
+
+      if (!/^[a-zA-Z0-9_]{3,18}$/.test(displayName)) {
+        errorBox.textContent = 'Use 3 a 18 caracteres: letras, números ou _.';
+        return;
+      }
+      if (password.length < 4) {
+        errorBox.textContent = 'A senha precisa ter pelo menos 4 caracteres.';
+        return;
+      }
+
+      const accounts = loadAccounts();
+      submit.disabled = true;
+      try {
+        const passwordHash = await hashPassword(password);
+        if (mode === 'register') {
+          if (password !== confirmInput.value) {
+            errorBox.textContent = 'As duas senhas não são iguais.';
+            return;
+          }
+          if (accounts[username]) {
+            errorBox.textContent = 'Esse usuário já existe.';
+            return;
+          }
+          accounts[username] = {
+            username,
+            displayName,
+            passwordHash,
+            characters: Array.from({ length: MAX_CHARACTERS }, () => null),
+          };
+          saveAccounts(accounts);
+        } else {
+          const account = accounts[username];
+          if (!account || account.passwordHash !== passwordHash) {
+            errorBox.textContent = 'Usuário ou senha incorretos.';
+            return;
+          }
+        }
+        localStorage.setItem(SESSION_KEY, username);
+        root.remove();
+        resolve(username);
+      } finally {
+        submit.disabled = false;
+      }
+    });
+
+    renderMode();
+  });
+}
+
+function confirmDeletion(characterName: string) {
+  return new Promise<boolean>((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    overlay.innerHTML = `
+      <div class="confirm-card">
+        <h2>Excluir personagem?</h2>
+        <p>Você está prestes a excluir <strong>${characterName}</strong>. Essa ação remove o personagem deste navegador e não poderá ser desfeita.</p>
+        <div class="confirm-actions"><button class="confirm-cancel" type="button">Cancelar</button><button class="confirm-delete" type="button">Excluir</button></div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const finish = (value: boolean) => { overlay.remove(); resolve(value); };
+    overlay.querySelector<HTMLButtonElement>('.confirm-cancel')!.addEventListener('click', () => finish(false));
+    overlay.querySelector<HTMLButtonElement>('.confirm-delete')!.addEventListener('click', () => finish(true));
+  });
+}
+
+async function showCharacterSelection(accountKey: string): Promise<CharacterConfig | null> {
+  const accounts = loadAccounts();
+  const account = accounts[accountKey];
+  if (!account) return null;
+
+  return new Promise<CharacterConfig | null>((resolve) => {
+    const root = document.createElement('div');
+    root.id = 'character-select';
+    root.innerHTML = `
+      <div class="select-shell">
+        <header class="select-header">
+          <div><span class="creator-kicker">ASCENSION</span><h1>Seus personagens</h1></div>
+          <div class="select-account"><span>Conta: <strong>${account.displayName}</strong></span><button class="logout-button" id="logout-account" type="button">Sair da conta</button></div>
+        </header>
+        <div class="character-grid" id="character-grid"></div>
+        <div class="selection-panel">
+          <div class="selection-info" id="selection-info"></div>
+          <div class="selection-actions"><button class="action-delete" id="delete-character" type="button">Excluir</button><button class="action-create" id="create-character" type="button">Criar</button><button class="action-enter" id="enter-character" type="button">Entrar</button></div>
+        </div>
+        <div class="select-error" id="select-error"></div>
+      </div>`;
+    document.body.appendChild(root);
+
+    const grid = root.querySelector<HTMLDivElement>('#character-grid')!;
+    const info = root.querySelector<HTMLDivElement>('#selection-info')!;
+    const errorBox = root.querySelector<HTMLDivElement>('#select-error')!;
+    const enterButton = root.querySelector<HTMLButtonElement>('#enter-character')!;
+    const createButton = root.querySelector<HTMLButtonElement>('#create-character')!;
+    const deleteButton = root.querySelector<HTMLButtonElement>('#delete-character')!;
+    let selected = account.characters.findIndex(Boolean);
+    if (selected < 0) selected = 0;
+
+    const persistAccount = () => {
+      const current = loadAccounts();
+      current[accountKey] = account;
+      saveAccounts(current);
+    };
+
+    const render = () => {
+      grid.replaceChildren();
+      errorBox.textContent = '';
+      account.characters.forEach((record, index) => {
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = `character-slot${selected === index ? ' selected' : ''}${record ? '' : ' empty-slot'}`;
+        const number = document.createElement('span');
+        number.className = 'slot-number';
+        number.textContent = `Slot ${index + 1}`;
+        card.appendChild(number);
+
+        if (record) {
+          card.appendChild(createSlotAvatar(record.config));
+          const name = document.createElement('span'); name.className = 'slot-name'; name.textContent = record.config.name; card.appendChild(name);
+          const meta = document.createElement('span'); meta.className = 'slot-meta'; meta.textContent = `${record.config.sex === 'male' ? 'Masculino' : 'Feminino'} · Corpo ${record.config.bodyType === 'light' ? 'leve' : record.config.bodyType === 'robust' ? 'robusto' : 'normal'}`; card.appendChild(meta);
+        } else {
+          const plus = document.createElement('span'); plus.className = 'empty-plus'; plus.textContent = '+'; card.appendChild(plus);
+          const label = document.createElement('strong'); label.textContent = 'Slot vazio'; card.appendChild(label);
+          const hint = document.createElement('span'); hint.className = 'slot-meta'; hint.textContent = 'Selecione para criar'; card.appendChild(hint);
+        }
+        card.addEventListener('click', () => { selected = index; render(); });
+        grid.appendChild(card);
+      });
+
+      const current = account.characters[selected];
+      if (current) {
+        info.innerHTML = `<strong>${current.config.name}</strong><span>Slot ${selected + 1} · ${current.config.sex === 'male' ? 'Masculino' : 'Feminino'} · Pronto para entrar na Floresta Inicial.</span>`;
+      } else {
+        info.innerHTML = `<strong>Slot ${selected + 1} vazio</strong><span>Crie um novo personagem neste espaço. Você pode ter até ${MAX_CHARACTERS} personagens.</span>`;
+      }
+      enterButton.disabled = !current;
+      deleteButton.disabled = !current;
+      createButton.disabled = Boolean(current);
+    };
+
+    root.querySelector<HTMLButtonElement>('#logout-account')!.addEventListener('click', () => {
+      localStorage.removeItem(SESSION_KEY);
+      root.remove();
+      resolve(null);
+    });
+
+    enterButton.addEventListener('click', () => {
+      const current = account.characters[selected];
+      if (!current) return;
+      root.remove();
+      resolve({ ...current.config });
+    });
+
+    createButton.addEventListener('click', async () => {
+      if (account.characters[selected]) return;
+      root.style.display = 'none';
+      const created = await showAppearanceCreator({ ...DEFAULT_CHARACTER, name: '' });
+      root.style.display = 'block';
+      if (!created) return;
+      const duplicate = account.characters.some((item) => item?.config.name.toLowerCase() === created.name.toLowerCase());
+      if (duplicate) {
+        errorBox.textContent = 'Já existe um personagem com esse nome nesta conta.';
+        return;
+      }
+      account.characters[selected] = { id: makeId(), createdAt: Date.now(), config: created };
+      persistAccount();
+      render();
+    });
+
+    deleteButton.addEventListener('click', async () => {
+      const current = account.characters[selected];
+      if (!current) return;
+      const confirmed = await confirmDeletion(current.config.name);
+      if (!confirmed) return;
+      account.characters[selected] = null;
+      persistAccount();
+      const nextExisting = account.characters.findIndex(Boolean);
+      selected = nextExisting >= 0 ? nextExisting : selected;
+      render();
+    });
+
+    render();
+  });
 }
 
 export async function showCharacterCreator(): Promise<CharacterConfig> {
   const boot = document.querySelector<HTMLElement>('#boot-status');
   if (boot) boot.style.display = 'none';
 
-  let config = loadSaved();
-  let facingIndex = 2;
-  const facings = ['up', 'left', 'down', 'right'] as const;
-
-  const root = document.createElement('div');
-  root.id = 'character-creator';
-  root.innerHTML = `
-    <div class="creator-shell">
-      <header class="creator-header">
-        <div><span class="creator-kicker">ASCENSION</span><h1>Criação de personagem</h1></div>
-        <p>Monte seu personagem e veja todas as mudanças antes de entrar no mundo.</p>
-      </header>
-      <div class="creator-layout">
-        <aside class="creator-preview-panel">
-          <div id="creator-preview"></div>
-          <div class="preview-rotate"><button id="rotate-left" type="button">◀</button><span id="facing-label">Frente</span><button id="rotate-right" type="button">▶</button></div>
-          <div class="preview-summary" id="preview-summary"></div>
-        </aside>
-        <main class="creator-controls">
-          <section class="creator-section"><h3>Nome</h3><input id="character-name" maxlength="16" autocomplete="off" placeholder="Nome do personagem" /></section>
-          <section class="creator-section"><h3>Sexo</h3><div id="sex-options" class="sex-options"></div></section>
-          <div id="dynamic-options"></div>
-          <button id="confirm-character" class="confirm-character" type="button">Criar personagem e entrar</button>
-          <div id="creator-error" class="creator-error"></div>
-        </main>
-      </div>
-    </div>`;
-  document.body.appendChild(root);
-
-  const previewHost = root.querySelector<HTMLDivElement>('#creator-preview')!;
-  const previewSummary = root.querySelector<HTMLDivElement>('#preview-summary')!;
-  const sexOptions = root.querySelector<HTMLDivElement>('#sex-options')!;
-  const dynamicOptions = root.querySelector<HTMLDivElement>('#dynamic-options')!;
-  const nameInput = root.querySelector<HTMLInputElement>('#character-name')!;
-  const errorBox = root.querySelector<HTMLDivElement>('#creator-error')!;
-  const facingLabel = root.querySelector<HTMLSpanElement>('#facing-label')!;
-  nameInput.value = config.name;
-
-  const previewApp = new Application();
-  await previewApp.init({ width: 270, height: 310, backgroundColor: 0x16251f, antialias: false, preference: 'webgl' });
-  previewHost.appendChild(previewApp.canvas);
-  let previewCharacter: LpcCharacter | null = null;
-  let previewToken = 0;
-
-  async function refreshPreview() {
-    const token = ++previewToken;
-    try {
-      const next = await LpcCharacter.create(config);
-      if (token !== previewToken) return;
-      if (previewCharacter) previewApp.stage.removeChild(previewCharacter.view);
-      previewCharacter = next;
-      next.view.position.set(135, 248);
-      next.view.scale.set(2.05);
-      next.setFacing(facings[facingIndex]);
-      previewApp.stage.addChild(next.view);
-      updateSummary();
-    } catch (error) {
-      console.warn('[Creator] preview parcial', error);
-    }
+  while (true) {
+    const accountKey = await showAccountGate();
+    const character = await showCharacterSelection(accountKey);
+    if (character) return character;
   }
-
-  function updateSummary() {
-    const hair = hairBySex[config.sex].find((item) => item.id === config.hairStyle)?.label ?? config.hairStyle;
-    const eyes = eyesBySex[config.sex].find((item) => item.id === config.eyeStyle)?.label ?? config.eyeStyle;
-    const body = bodyTypes.find((item) => item.id === config.bodyType)?.label ?? config.bodyType;
-    previewSummary.innerHTML = `<strong>${config.name || 'Sem nome'}</strong><span>${config.sex === 'male' ? 'Masculino' : 'Feminino'} · ${body}</span><span>${hair} · Olhos ${eyes}</span>`;
-  }
-
-  function renderSexOptions() {
-    sexOptions.replaceChildren();
-    const male = optionButton('♂ Masculino', config.sex === 'male', () => changeSex('male'));
-    male.classList.add('sex-card');
-    const female = optionButton('♀ Feminino', config.sex === 'female', () => changeSex('female'));
-    female.classList.add('sex-card');
-    sexOptions.append(male, female);
-  }
-
-  function changeSex(sex: Sex) {
-    if (config.sex === sex) return;
-    config = {
-      ...config,
-      sex,
-      hairStyle: hairBySex[sex][0].id,
-      eyeStyle: eyesBySex[sex][0].id,
-    };
-    renderAll();
-  }
-
-  function renderDynamic() {
-    dynamicOptions.replaceChildren();
-
-    const bodySection = makeSection(`Tipo de corpo — ${config.sex === 'male' ? 'Masculino' : 'Feminino'}`);
-    const bodyGrid = document.createElement('div');
-    bodyGrid.className = 'body-grid';
-    for (const body of bodyTypes) {
-      const card = optionButton(body.label, config.bodyType === body.id, () => {
-        config.bodyType = body.id;
-        renderAll();
-      });
-      card.classList.add('body-card');
-      const silhouette = document.createElement('span');
-      silhouette.className = 'body-silhouette';
-      silhouette.style.setProperty('--body-width', String(body.width));
-      card.prepend(silhouette);
-      bodyGrid.appendChild(card);
-    }
-    bodySection.appendChild(bodyGrid);
-
-    const skinSection = makeSection('Cor da pele');
-    const skinPalette = document.createElement('div');
-    skinPalette.className = 'color-palette';
-    skinColors.forEach((color) => skinPalette.appendChild(colorButton(color, config.skinColor === color, () => {
-      config.skinColor = color;
-      renderAll();
-    })));
-    skinSection.appendChild(skinPalette);
-
-    const hairSection = makeSection(`Cabelo — 5 opções ${config.sex === 'male' ? 'masculinas' : 'femininas'}`);
-    const hairGrid = document.createElement('div');
-    hairGrid.className = 'visual-option-grid';
-    for (const hair of hairBySex[config.sex]) {
-      const card = optionButton(hair.label, config.hairStyle === hair.id, () => {
-        config.hairStyle = hair.id;
-        renderAll();
-      });
-      card.classList.add('visual-card');
-      card.prepend(createHairThumb(config.sex, hair.id));
-      hairGrid.appendChild(card);
-    }
-    hairSection.appendChild(hairGrid);
-    const hairColorTitle = document.createElement('h4');
-    hairColorTitle.textContent = 'Cor do cabelo';
-    hairSection.appendChild(hairColorTitle);
-    const hairPalette = document.createElement('div');
-    hairPalette.className = 'color-palette';
-    hairColors.forEach((color) => hairPalette.appendChild(colorButton(color, config.hairColor === color, () => {
-      config.hairColor = color;
-      renderAll();
-    })));
-    hairSection.appendChild(hairPalette);
-
-    const eyeSection = makeSection(`Olhos — 5 opções ${config.sex === 'male' ? 'masculinas' : 'femininas'}`);
-    const eyeGrid = document.createElement('div');
-    eyeGrid.className = 'visual-option-grid';
-    for (const eye of eyesBySex[config.sex]) {
-      const card = optionButton(eye.label, config.eyeStyle === eye.id, () => {
-        config.eyeStyle = eye.id;
-        renderAll();
-      });
-      card.classList.add('visual-card');
-      card.prepend(createEyeThumb(config.sex, eye.id));
-      eyeGrid.appendChild(card);
-    }
-    eyeSection.appendChild(eyeGrid);
-    const eyeColorTitle = document.createElement('h4');
-    eyeColorTitle.textContent = 'Cor dos olhos';
-    eyeSection.appendChild(eyeColorTitle);
-    const eyePalette = document.createElement('div');
-    eyePalette.className = 'color-palette';
-    eyeColors.forEach((color) => eyePalette.appendChild(colorButton(color, config.eyeColor === color, () => {
-      config.eyeColor = color;
-      renderAll();
-    })));
-    eyeSection.appendChild(eyePalette);
-
-    dynamicOptions.append(bodySection, skinSection, hairSection, eyeSection);
-  }
-
-  function renderAll() {
-    renderSexOptions();
-    renderDynamic();
-    updateSummary();
-    void refreshPreview();
-  }
-
-  nameInput.addEventListener('input', () => {
-    config.name = nameInput.value.trimStart().slice(0, 16);
-    updateSummary();
-  });
-
-  root.querySelector<HTMLButtonElement>('#rotate-left')!.addEventListener('click', () => {
-    facingIndex = (facingIndex + facings.length - 1) % facings.length;
-    previewCharacter?.setFacing(facings[facingIndex]);
-    facingLabel.textContent = ['Costas', 'Esquerda', 'Frente', 'Direita'][facingIndex];
-  });
-  root.querySelector<HTMLButtonElement>('#rotate-right')!.addEventListener('click', () => {
-    facingIndex = (facingIndex + 1) % facings.length;
-    previewCharacter?.setFacing(facings[facingIndex]);
-    facingLabel.textContent = ['Costas', 'Esquerda', 'Frente', 'Direita'][facingIndex];
-  });
-
-  previewApp.ticker.add((ticker) => previewCharacter?.update(false, ticker.deltaTime));
-  renderAll();
-
-  return await new Promise<CharacterConfig>((resolve) => {
-    root.querySelector<HTMLButtonElement>('#confirm-character')!.addEventListener('click', () => {
-      const name = nameInput.value.trim();
-      if (name.length < 2) {
-        errorBox.textContent = 'Digite um nome com pelo menos 2 caracteres.';
-        nameInput.focus();
-        return;
-      }
-      config.name = name.slice(0, 16);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-      previewApp.destroy(true, { children: true, texture: false });
-      root.remove();
-      resolve({ ...config });
-    });
-  });
 }
