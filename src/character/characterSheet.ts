@@ -26,6 +26,7 @@ function swordMaterial(itemId: string | null) {
   if (itemId === 'basic_sword') return 'bronze';
   if (itemId === 'iron_sword') return 'iron';
   if (itemId === 'shadow_fang_blade') return 'silver';
+  if (itemId === 'apprentice_staff') return null;
   return itemId ? 'steel' : null;
 }
 
@@ -41,6 +42,7 @@ function addPreviewLayer(host: HTMLElement, path: string, z: number, tint?: stri
 function renderAvatar(host: HTMLElement, config: CharacterConfig, progress: CharacterProgress) {
   const state = ensureInventoryState(progress);
   host.replaceChildren();
+  if (state.equipment.weapon === 'apprentice_staff') addPreviewLayer(host, 'weapon/magic/simple/background/walk/simple.png', 5);
   addPreviewLayer(host, `body/bodies/${config.sex}/idle.png`, 10);
   addPreviewLayer(host, `legs/pants/${config.sex}/idle.png`, 14);
   if (state.equipment.boots) addPreviewLayer(host, `feet/boots/basic/${config.sex}/idle.png`, 16);
@@ -50,10 +52,14 @@ function renderAvatar(host: HTMLElement, config: CharacterConfig, progress: Char
   addPreviewLayer(host, `eyes/human/adult/${config.eyeStyle}/idle/${eyeColorName(config.eyeColor)}.png`, 35);
   addPreviewLayer(host, `hair/${config.hairStyle}/adult/idle.png`, 40);
   if (state.equipment.head === 'wolf_hood') addPreviewLayer(host, 'hat/cloth/hood/adult/idle.png', 46);
-  const material = swordMaterial(state.equipment.weapon);
-  if (material) {
-    addPreviewLayer(host, `weapon/sword/arming/universal/bg/idle/${material}.png`, 5);
-    addPreviewLayer(host, `weapon/sword/arming/universal/fg/idle/${material}.png`, 50);
+  if (state.equipment.weapon === 'apprentice_staff') {
+    addPreviewLayer(host, 'weapon/magic/simple/foreground/walk/simple.png', 50);
+  } else {
+    const material = swordMaterial(state.equipment.weapon);
+    if (material) {
+      addPreviewLayer(host, `weapon/sword/arming/universal/bg/idle/${material}.png`, 5);
+      addPreviewLayer(host, `weapon/sword/arming/universal/fg/idle/${material}.png`, 50);
+    }
   }
 }
 
