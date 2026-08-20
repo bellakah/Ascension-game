@@ -60,27 +60,36 @@ export class LpcCharacter {
     }
   }
 
+  private async tryLoad(key: string, assetUrl: string) {
+    try {
+      const texture = await Assets.load<Texture>(assetUrl);
+      texture.source.scaleMode = 'nearest';
+      this.sheets.set(key, texture);
+    } catch (error) {
+      console.warn(`[LPC] asset opcional ignorado: ${key}`, assetUrl, error);
+    }
+  }
+
   private async load() {
     const animations: Animation[] = ['idle', 'walk', 'slash'];
     const jobs: Promise<void>[] = [];
+
     for (const animation of animations) {
       for (const [name, makePath] of Object.entries(basePaths) as Array<[Exclude<LayerName, 'swordBg' | 'swordFg'>, (a: Animation) => string]>) {
-        const key = `${name}:${animation}`;
-        jobs.push(Assets.load<Texture>(makePath(animation)).then((texture) => {
-          texture.source.scaleMode = 'nearest';
-          this.sheets.set(key, texture);
-        }));
+        jobs.push(this.tryLoad(`${name}:${animation}`, makePath(animation)));
       }
+
       for (const side of ['bg', 'fg'] as const) {
         const name: LayerName = side === 'bg' ? 'swordBg' : 'swordFg';
-        const key = `${name}:${animation}`;
-        jobs.push(Assets.load<Texture>(swordPath(animation, side)).then((texture) => {
-          texture.source.scaleMode = 'nearest';
-          this.sheets.set(key, texture);
-        }));
+        jobs.push(this.tryLoad(`${name}:${animation}`, swordPath(animation, side)));
       }
     }
+
     await Promise.all(jobs);
+
+    if (!this.sheets.has('body:idle')) {
+      throw new Error('Não foi possível carregar o corpo LPC básico (body:idle).');
+    }
   }
 
   setFacing(facing: Facing) {
@@ -119,19 +128,18 @@ export class LpcCharacter {
       this.frame = 0;
       this.clock = 0;
     }
+
     this.clock += dt;
     const speed = moving ? 6 : 16;
     if (this.clock >= speed) {
       this.clock = 0;
       this.frame = (this.frame + 1) % this.frameCount('body', this.animation);
-      this.render();
-    } else {
-      this.render();
     }
+    this.render();
   }
 
   private frameCount(layer: LayerName, animation: Animation) {
-    const sheet = this.sheets.get(`${layer}:${animation}`);
+    const sheet = this.sheets.get(`${layer}:${animation}`) ?? this.sheets.get(`${layer}:idle`);
     if (!sheet) return 1;
     const size = sheet.height / 4;
     return Math.max(1, Math.floor(sheet.width / size));
@@ -149,13 +157,17 @@ export class LpcCharacter {
 
   private render() {
     for (const [name, sprite] of this.layers) {
-      const sheet = this.sheets.get(`${name}:${this.animation}`);
+      const exact = this.sheets.get(`${name}:${this.animation}`);
+      const fallback = this.sheets.get(`${name}:idle`);
+      const sheet = exact ?? fallback;
+
       if (!sheet) {
         sprite.visible = false;
         continue;
       }
+
       sprite.visible = true;
-      sprite.texture = this.crop(sheet, this.frame);
+      sprite.texture = this.crop(sheet, exact ? this.frame : 0);
       sprite.texture.source.scaleMode = 'nearest';
     }
   }
