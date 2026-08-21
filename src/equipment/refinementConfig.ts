@@ -27,10 +27,10 @@ export const REFINEMENT_CONFIG = {
   ] satisfies RefinementLevelRule[],
   refineBonusBySlot: {
     weapon: { stat: 'attack' as const, values: [0,2,4,7,10,14,19,25,32,40,50,62,76] },
-    armor: { stat: 'defense' as const, values: [0,1,1,2,2,3,4,5,6,7,9,11,14] },
-    head: { stat: 'defense' as const, values: [0,1,1,1,2,2,3,4,5,6,7,9,11] },
-    legs: { stat: 'defense' as const, values: [0,1,1,1,2,2,3,4,5,6,7,9,11] },
-    boots: { stat: 'defense' as const, values: [0,0,1,1,1,2,2,3,4,5,6,7,9] },
+    armor: { stat: 'maxHp' as const, values: [0,5,10,16,23,31,40,50,62,75,90,108,130] },
+    head: { stat: 'maxHp' as const, values: [0,4,8,13,19,26,34,43,53,64,77,92,110] },
+    legs: { stat: 'maxHp' as const, values: [0,4,8,13,19,26,34,43,53,64,77,92,110] },
+    boots: { stat: 'maxHp' as const, values: [0,3,6,10,15,21,28,36,45,55,66,79,94] },
     accessory1: { stat: 'defense' as const, values: [0,1,1,2,2,3,4,5,6,7,8,10,12] },
     accessory2: { stat: 'defense' as const, values: [0,1,1,2,2,3,4,5,6,7,8,10,12] },
   },
@@ -38,8 +38,8 @@ export const REFINEMENT_CONFIG = {
 
 export const GEM_CATALOG: GemDefinition[] = [
   { id: 'ruby_shard', name: 'Pedra Rubi', icon: '🔴', description: 'Pedra ofensiva para armas.', bonus: { attack: 3 }, allowedOn: ['weapon'] },
-  { id: 'sapphire_shard', name: 'Pedra Safira', icon: '🔵', description: 'Pedra defensiva de alta resistência para armaduras.', bonus: { defense: 2 }, allowedOn: ['equipment'] },
-  { id: 'citrine_shard', name: 'Pedra Citrina', icon: '🟡', description: 'Pedra de resistência equilibrada para armaduras.', bonus: { defense: 1 }, allowedOn: ['equipment'] },
+  { id: 'sapphire_shard', name: 'Pedra Safira', icon: '🔵', description: 'Pedra defensiva para armaduras.', bonus: { defense: 2 }, allowedOn: ['equipment'] },
+  { id: 'citrine_shard', name: 'Pedra Citrina', icon: '🟡', description: 'Pedra vital que aumenta o HP máximo.', bonus: { maxHp: 15 }, allowedOn: ['equipment'] },
 ];
 
 export const GEM_BY_ID = Object.fromEntries(GEM_CATALOG.map((gem) => [gem.id, gem])) as Record<string, GemDefinition>;
