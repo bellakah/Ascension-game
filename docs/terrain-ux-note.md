@@ -1,1 +1,1 @@
-Terrain UX update: supplied terrain atlases, organic transition masks, docked editor panels, responsive map workspace, and selectable circular/square terrain brush shapes. Both brush shapes use the same terrain blending after painting.
+Terrain UX update: supplied terrain atlases, organic transition masks, docked editor panels, responsive map workspace, and selectable circular/square terrain brush shapes. Circular and square only change brush shape; both use identical terrain blending.
