@@ -24,6 +24,8 @@ const FUNCTIONAL_ASSETS = new Set([
   'wolf', 'sludge',
 ]);
 
+let preparedRuntime: PublishedWorldRuntime | null = null;
+
 function waitForImage(entry: MapPaletteEntry) {
   return new Promise<void>((resolve) => {
     const image = getMapAssetImage(entry);
@@ -186,9 +188,22 @@ export async function loadPublishedWorldRuntime(): Promise<PublishedWorldRuntime
   };
 }
 
+export async function preparePublishedWorldRuntime() {
+  preparedRuntime = await loadPublishedWorldRuntime();
+  return preparedRuntime;
+}
+
+export function getPreparedPublishedWorldRuntime() {
+  return preparedRuntime;
+}
+
 export function publishedObjectPositions(map: AscensionMapDocument, assetId: string) {
   return map.objects.filter((object) => object.assetId === assetId).map((object) => ({
     x: (object.x + .5) * map.tileSize,
     y: (object.y + 1) * map.tileSize,
   }));
+}
+
+export function getPublishedObjectPositions(assetId: string) {
+  return preparedRuntime ? publishedObjectPositions(preparedRuntime.document, assetId) : [];
 }
