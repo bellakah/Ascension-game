@@ -1,1 +1,47 @@
 .mep .hidden{display:none!important}
+
+/* O mapa é a área principal: os painéis ocupam espaço próprio em vez de cobrir o canvas. */
+.mep{--rail:54px;--panel:232px;--inspector:270px}
+.mep-rail{padding:10px 7px 8px;gap:7px}
+.mep-rail button{width:38px;height:38px}
+.mep-context{padding-left:14px}
+
+.mep-panel{left:0;width:var(--panel);box-shadow:8px 0 18px rgba(0,0,0,.14)}
+.mep-inspector{width:var(--inspector);box-shadow:-8px 0 18px rgba(0,0,0,.14)}
+
+.mep-stage{top:8px;right:8px;bottom:8px;left:8px;border:1px solid #173141;border-radius:8px;background:#050a0f;transition:left .16s ease,right .16s ease}
+.mep-stage-wrap:has(.mep-panel:not(.hidden)) .mep-stage{left:calc(var(--panel) + 8px)}
+.mep-stage-wrap:has(.mep-inspector:not(.hidden)) .mep-stage{right:calc(var(--inspector) + 8px)}
+
+.mep-stage-wrap:has(.mep-panel:not(.hidden)) .mep-chip{left:calc(var(--panel) + 18px)}
+.mep-stage-wrap:has(.mep-inspector:not(.hidden)) .mep-minimap-float{right:calc(var(--inspector) + 18px)}
+
+.mep-minimap-float{width:178px;height:122px;right:18px;bottom:18px;opacity:.92}
+.mep-selection-bar{bottom:22px}
+
+/* Menos informação na biblioteca e mais espaço útil. */
+.mep-panel-head{height:40px}
+.mep-search{padding:7px}
+.mep-filter-row{padding:0 7px 7px}
+.mep-asset-grid{padding:5px 7px 12px;gap:6px}
+.mep-card{padding:3px}
+.mep-card strong{font-size:8px}
+.mep-card small{display:none}
+
+/* Notebook: painel fica temporariamente sobre o mapa, mas menor. */
+@media (max-width:1100px){
+  .mep{--panel:208px;--inspector:245px}
+  .mep-stage-wrap:has(.mep-panel:not(.hidden)) .mep-stage{left:8px}
+  .mep-stage-wrap:has(.mep-inspector:not(.hidden)) .mep-stage{right:8px}
+  .mep-stage-wrap:has(.mep-panel:not(.hidden)) .mep-chip{left:18px}
+  .mep-stage-wrap:has(.mep-inspector:not(.hidden)) .mep-minimap-float{right:18px}
+  .mep-panel,.mep-inspector{background:rgba(7,18,27,.965);backdrop-filter:blur(8px)}
+}
+
+@media (max-width:760px){
+  .mep{--rail:46px;--panel:min(208px,72vw);--inspector:min(250px,78vw)}
+  .mep-rail{padding-left:4px;padding-right:4px}
+  .mep-rail button{width:36px;height:36px}
+  .mep-brand div,.mep-map-select span,.mep-top .publish{display:none}
+  .mep-minimap-float{width:145px;height:98px}
+}

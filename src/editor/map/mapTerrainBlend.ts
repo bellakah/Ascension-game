@@ -23,9 +23,72 @@ function terrainId(map: AscensionMapDocument, x: number, y: number, layer: 'grou
   return tile?.ground ?? 'grass';
 }
 
-function drawNeighborStrip(
+function hash01(a: number, b: number, c: number) {
+  let value = Math.imul(a + 374761393, 668265263) ^ Math.imul(b + 1442695041, 2246822519) ^ Math.imul(c + 17, 3266489917);
+  value = Math.imul(value ^ (value >>> 13), 1274126177);
+  return ((value ^ (value >>> 16)) >>> 0) / 4294967295;
+}
+
+function edgeSeed(tileX: number, tileY: number, side: 'left' | 'right' | 'top' | 'bottom') {
+  if (side === 'left') return { a: tileX, b: tileY, orientation: 1 };
+  if (side === 'right') return { a: tileX + 1, b: tileY, orientation: 1 };
+  if (side === 'top') return { a: tileX, b: tileY, orientation: 2 };
+  return { a: tileX, b: tileY + 1, orientation: 2 };
+}
+
+function edgeDepths(tileX: number, tileY: number, side: 'left' | 'right' | 'top' | 'bottom', size: number, band: number) {
+  const seed = edgeSeed(tileX, tileY, side);
+  const samples = 7;
+  const base = size * (0.42 - band * 0.075);
+  const wobble = size * (0.12 - band * 0.012);
+  return Array.from({ length: samples }, (_, index) => {
+    const n1 = hash01(seed.a, seed.b, seed.orientation * 100 + index);
+    const n2 = hash01(seed.a + index, seed.b - index, seed.orientation * 200 + band);
+    const wave = Math.sin((index / (samples - 1)) * Math.PI * 2 + n2 * 2.2) * wobble * 0.45;
+    return Math.max(size * 0.05, base + (n1 - 0.5) * wobble + wave);
+  });
+}
+
+function clipOrganicEdge(
+  ctx: CanvasRenderingContext2D,
+  tileX: number,
+  tileY: number,
+  x: number,
+  y: number,
+  size: number,
+  side: 'left' | 'right' | 'top' | 'bottom',
+  band: number,
+) {
+  const depths = edgeDepths(tileX, tileY, side, size, band);
+  const step = size / (depths.length - 1);
+  ctx.beginPath();
+
+  if (side === 'left') {
+    ctx.moveTo(x, y);
+    for (let i = 0; i < depths.length; i++) ctx.lineTo(x + depths[i], y + i * step);
+    ctx.lineTo(x, y + size);
+  } else if (side === 'right') {
+    ctx.moveTo(x + size, y);
+    for (let i = 0; i < depths.length; i++) ctx.lineTo(x + size - depths[i], y + i * step);
+    ctx.lineTo(x + size, y + size);
+  } else if (side === 'top') {
+    ctx.moveTo(x, y);
+    for (let i = 0; i < depths.length; i++) ctx.lineTo(x + i * step, y + depths[i]);
+    ctx.lineTo(x + size, y);
+  } else {
+    ctx.moveTo(x, y + size);
+    for (let i = 0; i < depths.length; i++) ctx.lineTo(x + i * step, y + size - depths[i]);
+    ctx.lineTo(x + size, y + size);
+  }
+  ctx.closePath();
+  ctx.clip();
+}
+
+function drawOrganicNeighbor(
   ctx: CanvasRenderingContext2D,
   entry: MapPaletteEntry,
+  tileX: number,
+  tileY: number,
   x: number,
   y: number,
   size: number,
@@ -34,26 +97,20 @@ function drawNeighborStrip(
   onReady?: () => void,
   now?: number,
 ) {
-  const steps = size < 18 ? 2 : size < 36 ? 3 : 4;
-  const depth = Math.max(2, size * .23);
-  for (let step = 0; step < steps; step++) {
-    const start = step / steps;
-    const end = (step + 1) / steps;
-    const stripAlpha = alpha * (.34 - step * (.24 / Math.max(1, steps - 1)));
+  const bandAlpha = [0.32, 0.21, 0.13, 0.07];
+  for (let band = 0; band < bandAlpha.length; band++) {
     ctx.save();
-    if (side === 'left') ctx.beginPath(), ctx.rect(x, y, depth * end, size), ctx.clip();
-    if (side === 'right') ctx.beginPath(), ctx.rect(x + size - depth * end, y, depth * end, size), ctx.clip();
-    if (side === 'top') ctx.beginPath(), ctx.rect(x, y, size, depth * end), ctx.clip();
-    if (side === 'bottom') ctx.beginPath(), ctx.rect(x, y + size - depth * end, size, depth * end), ctx.clip();
-    drawTerrainAsset(ctx, entry, x, y, size, stripAlpha, onReady, now);
+    clipOrganicEdge(ctx, tileX, tileY, x, y, size, side, band);
+    drawTerrainAsset(ctx, entry, x, y, size, alpha * bandAlpha[band], onReady, now);
     ctx.restore();
-    if (start > .95) break;
   }
 }
 
-function drawCorner(
+function drawOrganicCorner(
   ctx: CanvasRenderingContext2D,
   entry: MapPaletteEntry,
+  tileX: number,
+  tileY: number,
   x: number,
   y: number,
   size: number,
@@ -62,14 +119,15 @@ function drawCorner(
   onReady?: () => void,
   now?: number,
 ) {
-  const radius = Math.max(2, size * .22);
+  const seed = hash01(tileX, tileY, corner === 'tl' ? 11 : corner === 'tr' ? 17 : corner === 'bl' ? 23 : 29);
+  const radius = size * (0.28 + seed * 0.12);
   const cx = corner.endsWith('l') ? x : x + size;
   const cy = corner.startsWith('t') ? y : y + size;
   ctx.save();
   ctx.beginPath();
   ctx.arc(cx, cy, radius, 0, Math.PI * 2);
   ctx.clip();
-  drawTerrainAsset(ctx, entry, x, y, size, alpha * .16, onReady, now);
+  drawTerrainAsset(ctx, entry, x, y, size, alpha * 0.16, onReady, now);
   ctx.restore();
 }
 
@@ -79,8 +137,9 @@ export function drawBlendedTerrainTile(ctx: CanvasRenderingContext2D, map: Ascen
   if (!id) return;
   const current = getPaletteEntry(id);
   const alpha = options.alpha ?? 1;
+
   drawTerrainAsset(ctx, current, options.screenX, options.screenY, options.tilePixels, alpha, options.onReady, options.now);
-  if (options.blend === false) return;
+  if (options.blend === false || options.tilePixels < 5) return;
 
   const neighbors = [
     { side: 'left' as const, dx: -1, dy: 0 },
@@ -88,10 +147,23 @@ export function drawBlendedTerrainTile(ctx: CanvasRenderingContext2D, map: Ascen
     { side: 'top' as const, dx: 0, dy: -1 },
     { side: 'bottom' as const, dx: 0, dy: 1 },
   ];
+
   for (const neighbor of neighbors) {
     const neighborId = terrainId(map, options.x + neighbor.dx, options.y + neighbor.dy, layer);
     if (!neighborId || neighborId === id) continue;
-    drawNeighborStrip(ctx, getPaletteEntry(neighborId), options.screenX, options.screenY, options.tilePixels, neighbor.side, alpha, options.onReady, options.now);
+    drawOrganicNeighbor(
+      ctx,
+      getPaletteEntry(neighborId),
+      options.x,
+      options.y,
+      options.screenX,
+      options.screenY,
+      options.tilePixels,
+      neighbor.side,
+      alpha,
+      options.onReady,
+      options.now,
+    );
   }
 
   const corners = [
@@ -100,9 +172,22 @@ export function drawBlendedTerrainTile(ctx: CanvasRenderingContext2D, map: Ascen
     { corner: 'bl' as const, dx: -1, dy: 1 },
     { corner: 'br' as const, dx: 1, dy: 1 },
   ];
+
   for (const corner of corners) {
-    const neighborId = terrainId(map, options.x + corner.dx, options.y + corner.dy, layer);
-    if (!neighborId || neighborId === id) continue;
-    drawCorner(ctx, getPaletteEntry(neighborId), options.screenX, options.screenY, options.tilePixels, corner.corner, alpha, options.onReady, options.now);
+    const diagonal = terrainId(map, options.x + corner.dx, options.y + corner.dy, layer);
+    if (!diagonal || diagonal === id) continue;
+    drawOrganicCorner(
+      ctx,
+      getPaletteEntry(diagonal),
+      options.x,
+      options.y,
+      options.screenX,
+      options.screenY,
+      options.tilePixels,
+      corner.corner,
+      alpha,
+      options.onReady,
+      options.now,
+    );
   }
 }
