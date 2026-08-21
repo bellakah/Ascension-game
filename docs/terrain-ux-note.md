@@ -1,1 +1,1 @@
-Terrain UX update: supplied terrain atlases, organic transition masks, docked editor panels and responsive map workspace.
+Terrain UX update: supplied terrain atlases, organic transition masks, docked editor panels, responsive map workspace, and selectable circular/square terrain brush shapes.
