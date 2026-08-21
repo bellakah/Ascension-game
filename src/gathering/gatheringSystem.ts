@@ -1,6 +1,7 @@
 import { Container, Graphics, Text } from 'pixi.js';
 import type { CharacterProgress } from '../character/characterCreator';
 import { addItem, getItem } from '../items/itemCatalog';
+import { getPublishedObjectPositions } from '../map/publishedMapRuntime';
 import { GATHERING_NODES, type GatheringKind, type GatheringNodeDefinition } from './gatheringCatalog';
 
 type GatheringSave = CharacterProgress & {
@@ -111,8 +112,17 @@ function createNodeView(definition: GatheringNodeDefinition): RuntimeNode {
 }
 
 export function createGatheringSystem(world: Container, progress: CharacterProgress) {
+  const positions: Record<GatheringKind, Array<{ x: number; y: number }>> = {
+    mining: getPublishedObjectPositions('iron_vein'),
+    herbalism: getPublishedObjectPositions('herb'),
+    woodcutting: getPublishedObjectPositions('wood_node'),
+  };
+  const counters: Record<GatheringKind, number> = { mining: 0, herbalism: 0, woodcutting: 0 };
   const nodes = GATHERING_NODES.map((definition) => {
-    const runtime = createNodeView(definition);
+    const index = counters[definition.kind]++;
+    const published = positions[definition.kind][index];
+    const runtimeDefinition = published ? { ...definition, x: published.x, y: published.y } : definition;
+    const runtime = createNodeView(runtimeDefinition);
     world.addChild(runtime.view);
     return runtime;
   });
