@@ -27,8 +27,8 @@ export function installMapEditorPublishUi() {
   const publishButton = document.createElement('button');
   publishButton.id = 'me2-publish';
   publishButton.className = 'me2-publish';
-  publishButton.textContent = 'PUBLICAR';
-  publishButton.title = 'Salvar este Draft e torná-lo o mapa ativo do jogo';
+  publishButton.textContent = 'SALVAR E PUBLICAR';
+  publishButton.title = 'Salvar este Draft e torná-lo imediatamente o mapa ativo do jogo';
   saveButton.insertAdjacentElement('afterend', publishButton);
 
   const statusBadge = document.createElement('span');
@@ -43,7 +43,7 @@ export function installMapEditorPublishUi() {
     const current = id ? loadMapDocument(id) : null;
     const isPublished = Boolean(current && published?.document.id === current.id && published.document.updatedAt >= current.updatedAt);
     publishButton.classList.toggle('published', isPublished);
-    publishButton.textContent = isPublished ? '✓ PUBLICADO' : 'PUBLICAR';
+    publishButton.textContent = isPublished ? '✓ PUBLICADO' : 'SALVAR E PUBLICAR';
     statusBadge.hidden = !isPublished;
     statusBadge.textContent = isPublished ? '● VERSÃO ATIVA NO JOGO' : '';
   };
@@ -54,8 +54,8 @@ export function installMapEditorPublishUi() {
     const previous = loadPublishedMap();
     const isFirst = !previous;
     const question = isFirst
-      ? 'Publicar este mapa como mapa ativo do jogo?\n\nSalvar continuará mantendo o Draft separado. O jogo aberto em outra aba será atualizado automaticamente.'
-      : `Substituir a versão publicada de “${previous.document.name}” por este Draft?\n\nO jogo aberto em outra aba será recarregado automaticamente.`;
+      ? 'Salvar e publicar este mapa como mapa ativo do jogo?\n\nO Draft continuará separado. Se o jogo estiver aberto em outra aba, ele será atualizado automaticamente.'
+      : `Salvar e substituir a versão publicada de “${previous.document.name}” por este Draft?\n\nO jogo aberto em outra aba será atualizado automaticamente.`;
     if (!window.confirm(question)) return;
 
     publishButton.classList.add('busy');
