@@ -53,10 +53,32 @@ export type AscensionMapDocument = {
   };
 };
 
+export type MapSpriteRect = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export type MapAnimationFrame = MapSpriteRect & {
+  /** Duração opcional deste frame. Quando omitida, usa o FPS da animação. */
+  durationMs?: number;
+};
+
+export type MapAnimationDefinition = {
+  frames: MapAnimationFrame[];
+  fps: number;
+  loop: boolean;
+};
+
 export type MapSpriteDefinition = {
   src: string;
   nativeWidth: number;
   nativeHeight: number;
+  /** Recorte estático dentro do PNG/spritesheet. */
+  sourceRect?: MapSpriteRect;
+  /** Sequência visual usada pelo Editor, Playtest e futuramente pelo jogo. */
+  animation?: MapAnimationDefinition;
   /** Tamanho visual em tiles. Se omitido, usa 1x1. */
   widthTiles?: number;
   heightTiles?: number;
@@ -73,6 +95,24 @@ export type MapFootprintDefinition = {
   collision?: Array<{ x: number; y: number }>;
 };
 
+export type MapAssetSource = 'ascension' | 'pixel-crawler' | 'custom';
+export type MapAssetFolder =
+  | 'terrain'
+  | 'nature'
+  | 'buildings'
+  | 'walls'
+  | 'roofs'
+  | 'furniture'
+  | 'props'
+  | 'crafting'
+  | 'npc'
+  | 'monster'
+  | 'resource'
+  | 'portal'
+  | 'effects'
+  | 'zones'
+  | 'raw';
+
 export type MapPaletteEntry = {
   id: string;
   palette: MapPaletteId;
@@ -84,9 +124,10 @@ export type MapPaletteEntry = {
   objectKind?: MapObject['kind'];
   zoneKind?: MapZone['kind'];
   tags?: string[];
+  folder?: MapAssetFolder;
   sprite?: MapSpriteDefinition;
   footprint?: MapFootprintDefinition;
-  source?: 'ascension' | 'pixel-crawler' | 'custom';
+  source?: MapAssetSource;
 };
 
 export type EditorSnapshot = {
