@@ -5,50 +5,45 @@ import type { QuestDefinition, QuestEvent, QuestObjective, QuestRuntimeState, Qu
 
 type QuestProgress = CharacterProgress & {
   trackedQuestId?: string | null;
-  quests: Record<string, CharacterProgress['quests'][string] & Partial<QuestRuntimeState>>;
+  questData?: Record<string, QuestRuntimeState>;
 };
 
 export const NPC_NAMES: Record<string, string> = {
-  elandra: 'Elandra',
-  rowan: 'Rowan',
-  mira: 'Mira',
-  theo: 'Theo',
+  elandra: 'Elandra', rowan: 'Rowan', mira: 'Mira', theo: 'Theo',
 };
-
-function stateFor(progress: CharacterProgress, quest: QuestDefinition): QuestRuntimeState {
-  const extended = progress as QuestProgress;
-  const raw = extended.quests[quest.id] as Partial<QuestRuntimeState> | undefined;
-  if (!raw) {
-    const created: QuestRuntimeState = { status: 'not_started', objectives: {}, progress: 0, target: totalTarget(quest) };
-    extended.quests[quest.id] = created as CharacterProgress['quests'][string] & QuestRuntimeState;
-    return created;
-  }
-  if (!raw.objectives || typeof raw.objectives !== 'object') raw.objectives = {};
-  // Migração: as três quests antigas guardavam um único contador em progress/target.
-  if (quest.objectives.length === 1 && raw.objectives[quest.objectives[0].id] == null) {
-    raw.objectives[quest.objectives[0].id] = Math.max(0, Number(raw.progress ?? 0));
-  }
-  raw.progress = Math.max(0, Number(raw.progress ?? 0));
-  raw.target = totalTarget(quest);
-  raw.status = raw.status ?? 'not_started';
-  return raw as QuestRuntimeState;
-}
 
 function totalTarget(quest: QuestDefinition) {
   return quest.objectives.reduce((total, objective) => total + Math.max(1, objective.amount ?? 1), 0);
 }
+function objectiveAmount(objective: QuestObjective) { return Math.max(1, objective.amount ?? 1); }
 
-function objectiveAmount(objective: QuestObjective) {
-  return Math.max(1, objective.amount ?? 1);
+function stateFor(progress: CharacterProgress, quest: QuestDefinition): QuestRuntimeState {
+  const extended = progress as QuestProgress;
+  extended.questData ??= {};
+  let raw = extended.questData[quest.id];
+  if (!raw) {
+    const legacy = progress.quests?.[quest.id];
+    raw = {
+      status: legacy?.status ?? 'not_started',
+      objectives: {},
+      progress: Math.max(0, Number(legacy?.progress ?? 0)),
+      target: totalTarget(quest),
+    };
+    if (quest.objectives.length === 1 && legacy) raw.objectives[quest.objectives[0].id] = Math.max(0, Number(legacy.progress ?? 0));
+    extended.questData[quest.id] = raw;
+  }
+  raw.objectives ??= {};
+  raw.progress = Math.max(0, Number(raw.progress ?? 0));
+  raw.target = totalTarget(quest);
+  raw.status ??= 'not_started';
+  return raw;
 }
 
 function objectiveCount(progress: CharacterProgress, quest: QuestDefinition, objective: QuestObjective) {
   const state = stateFor(progress, quest);
   const stored = Math.max(0, Number(state.objectives[objective.id] ?? 0));
   if (objective.type === 'collect' && objective.itemId) return Math.min(objectiveAmount(objective), itemQuantity(progress, objective.itemId));
-  if (objective.type === 'deliver' && objective.itemId && stored < objectiveAmount(objective)) {
-    return Math.min(objectiveAmount(objective), Math.max(stored, itemQuantity(progress, objective.itemId)));
-  }
+  if (objective.type === 'deliver' && objective.itemId && stored < objectiveAmount(objective)) return Math.min(objectiveAmount(objective), Math.max(stored, itemQuantity(progress, objective.itemId)));
   return Math.min(objectiveAmount(objective), stored);
 }
 
@@ -72,10 +67,7 @@ function updateAggregate(progress: CharacterProgress, quest: QuestDefinition) {
 }
 
 export function ensureQuestStates(progress: CharacterProgress) {
-  for (const quest of QUEST_CATALOG) {
-    stateFor(progress, quest);
-    updateAggregate(progress, quest);
-  }
+  for (const quest of QUEST_CATALOG) { stateFor(progress, quest); updateAggregate(progress, quest); }
   const extended = progress as QuestProgress;
   if (extended.trackedQuestId && !getQuestDefinition(extended.trackedQuestId)) extended.trackedQuestId = null;
   if (!extended.trackedQuestId) {
@@ -120,9 +112,7 @@ export function getNpcQuestMarker(progress: CharacterProgress, npcId: string) {
 
 function matchesEvent(objective: QuestObjective, event: QuestEvent) {
   if (objective.type === 'kill' && event.type === 'kill') return objective.monsterKind === 'any' || objective.monsterKind === event.monsterKind;
-  if (objective.type === 'boss' && (event.type === 'boss' || event.type === 'kill')) {
-    return objective.target === event.monsterId || objective.monsterKind === event.monsterKind;
-  }
+  if (objective.type === 'boss' && (event.type === 'boss' || event.type === 'kill')) return objective.target === event.monsterId || objective.monsterKind === event.monsterKind;
   if (objective.type === 'talk' && event.type === 'talk') return objective.npcId === event.npcId;
   if (objective.type === 'visit' && event.type === 'visit') return objective.target === event.zoneId;
   if (objective.type === 'interact' && event.type === 'interact') return objective.target === event.targetId;
@@ -201,42 +191,33 @@ export type QuestNpcInteraction =
 
 export function interactQuestNpc(progress: CharacterProgress, npcId: string): QuestNpcInteraction {
   ensureQuestStates(progress);
-
   const ready = QUEST_CATALOG.find((quest) => quest.endNpcId === npcId && stateFor(progress, quest).status === 'ready');
   if (ready) {
     const state = stateFor(progress, ready);
-    state.status = 'completed';
-    state.completedAt = Date.now();
+    state.status = 'completed'; state.completedAt = Date.now();
     const extended = progress as QuestProgress;
     if (extended.trackedQuestId === ready.id) extended.trackedQuestId = null;
     return { type: 'completed', quest: ready };
   }
-
   const updates = processNpcObjectives(progress, npcId);
   if (updates.length) {
     const last = updates[updates.length - 1];
     return { type: 'updated', quest: last.quest, becameReady: updates.some((update) => update.becameReady) };
   }
-
-  const available = QUEST_CATALOG.filter((quest) => quest.startNpcId === npcId && isQuestAvailable(progress, quest))
-    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))[0];
+  const available = QUEST_CATALOG.filter((quest) => quest.startNpcId === npcId && isQuestAvailable(progress, quest)).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))[0];
   if (available) {
     const state = stateFor(progress, available);
-    state.status = 'active';
-    state.acceptedAt = Date.now();
-    state.objectives = {};
+    state.status = 'active'; state.acceptedAt = Date.now(); state.objectives = {};
     updateAggregate(progress, available);
     (progress as QuestProgress).trackedQuestId = available.id;
     return { type: 'accepted', quest: available };
   }
-
   const related = QUEST_CATALOG.find((quest) => stateFor(progress, quest).status === 'active' && (quest.startNpcId === npcId || quest.endNpcId === npcId));
   return related ? { type: 'progress', quest: related } : { type: 'none' };
 }
 
 export function grantQuestItemRewards(progress: CharacterProgress, quest: QuestDefinition) {
-  const granted: string[] = [];
-  const missed: string[] = [];
+  const granted: string[] = [], missed: string[] = [];
   for (const reward of quest.rewards.items ?? []) {
     const item = getItem(reward.itemId);
     const result = addItem(progress, reward.itemId, reward.quantity);
