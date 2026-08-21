@@ -5,6 +5,7 @@ import './crafting/craftingUi.css';
 import './settings/gameMenuHud.css';
 import './chat/chatPauseProxy.css';
 import './guild/guildPauseProxy.css';
+import './guild/guildHud.css';
 import { prepareChatBootstrap } from './chat/chatBootstrap';
 import { prepareGuildBootstrap } from './guild/guildBootstrap';
 import { startGame } from './game/runtime';
