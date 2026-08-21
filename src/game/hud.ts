@@ -18,6 +18,7 @@ export function createHud(progress: CharacterProgress) {
     <div id="dialog-box" class="hidden"></div>
     <div id="stick"><div id="knob"></div></div>
     <div class="utility-dock">
+      <button id="map-button" title="Mapa Mundial" aria-label="Mapa Mundial" style="pointer-events:auto;width:42px;height:42px;border:2px solid rgba(121,190,216,.35);border-radius:12px;background:rgba(37,77,91,.94);color:#fff;font-size:18px;box-shadow:0 4px 12px rgba(0,0,0,.25);-webkit-tap-highlight-color:transparent">🗺️</button>
       <button id="quest-journal-button" title="Diário de Missões" aria-label="Diário de Missões">📖</button>
       <button id="pet-button" title="Mascote" aria-label="Mascote">🐾</button>
       <button id="character-button" title="Personagem" aria-label="Personagem">👤</button>
@@ -28,7 +29,7 @@ export function createHud(progress: CharacterProgress) {
       <button id="attack-btn" aria-label="Atacar">⚔</button>
     </div>
     <div class="desktop-shortcuts" aria-hidden="true">
-      <span><kbd>WASD</kbd>Mover</span><span><kbd>Espaço</kbd>Atacar</span><span><kbd>E</kbd>Interagir</span><span><kbd>J</kbd>Missões</span><span><kbd>P</kbd>Mascote</span><span><kbd>I</kbd>Inventário</span><span><kbd>C</kbd>Personagem</span>
+      <span><kbd>WASD</kbd>Mover</span><span><kbd>Espaço</kbd>Atacar</span><span><kbd>E</kbd>Interagir</span><span><kbd>M</kbd>Mapa</span><span><kbd>J</kbd>Missões</span><span><kbd>P</kbd>Mascote</span><span><kbd>I</kbd>Inventário</span><span><kbd>C</kbd>Personagem</span>
     </div>`;
   document.body.appendChild(root);
 
@@ -49,6 +50,7 @@ export function createHud(progress: CharacterProgress) {
     questTitle: root.querySelector<HTMLElement>('#quest-title')!,
     questText: root.querySelector<HTMLDivElement>('#quest-text')!,
     questToggle,
+    map: root.querySelector<HTMLButtonElement>('#map-button')!,
     questJournal: root.querySelector<HTMLButtonElement>('#quest-journal-button')!,
     pet: root.querySelector<HTMLButtonElement>('#pet-button')!,
     dialog: root.querySelector<HTMLDivElement>('#dialog-box')!,
