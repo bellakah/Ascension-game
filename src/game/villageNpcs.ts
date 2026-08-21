@@ -22,10 +22,10 @@ type MerchantVisual = {
 };
 
 const MERCHANTS: MerchantVisual[] = [
-  { shopId: 'rowan', name: 'Rowan', role: 'Ferreiro', icon: '⚒', x: 905, y: 1215, body: 0x7b4b37, trim: 0xd39a5d },
-  { shopId: 'mira', name: 'Mira', role: 'Alquimista', icon: '⚗', x: 1035, y: 1215, body: 0x526b8f, trim: 0xb7d0ef },
-  { shopId: 'silas', name: 'Silas', role: 'Banqueiro', icon: '🏦', x: 1110, y: 1390, body: 0x39495f, trim: 0xd6c27d },
-  { shopId: 'theo', name: 'Theo', role: 'Comerciante', icon: '🪙', x: 970, y: 1490, body: 0x667343, trim: 0xd8d183 },
+  { shopId: 'rowan', name: 'Rowan', role: 'Ferreiro', icon: '⚒', x: 760, y: 1245, body: 0x7b4b37, trim: 0xd39a5d },
+  { shopId: 'mira', name: 'Mira', role: 'Alquimista', icon: '⚗', x: 1180, y: 1245, body: 0x526b8f, trim: 0xb7d0ef },
+  { shopId: 'silas', name: 'Silas', role: 'Banqueiro', icon: '🏦', x: 740, y: 1455, body: 0x39495f, trim: 0xd6c27d },
+  { shopId: 'theo', name: 'Theo', role: 'Comerciante', icon: '🪙', x: 1200, y: 1455, body: 0x667343, trim: 0xd8d183 },
 ];
 
 function createMerchant(world: Container, data: MerchantVisual): VillageMerchant {
