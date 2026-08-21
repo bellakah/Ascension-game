@@ -19,7 +19,7 @@ export type QuestInteractable = {
 
 // Estes dados serão gerados pelo futuro Editor de Mapas/Quests.
 export const QUEST_VISIT_ZONES: QuestVisitZone[] = [
-  { id: 'village-well', name: 'Poço da Vila da Clareira', map: 'Floresta Inicial', x: 1090, y: 1450, radius: 86 },
+  { id: 'village-well', name: 'Poço da Vila da Clareira', map: 'Floresta Inicial', x: 1090, y: 1500, radius: 86 },
 ];
 
 export const QUEST_INTERACTABLES: QuestInteractable[] = [
