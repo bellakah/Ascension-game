@@ -94,6 +94,25 @@ export function createChatSystem(options: ChatSystemOptions) {
   const isTyping = () => document.activeElement === input || document.activeElement === recipient;
   const blocksGameplay = () => isTyping() || (isMobileMode() && isOpen());
 
+  // Usa o menu de pausa já existente como sinal invisível para o runtime interromper movimento/combate
+  // enquanto o jogador digita. Quando o runtime multiplayer for modularizado, isso vira um InputContext.
+  const setPauseProxy = (enabled: boolean) => {
+    const menu = document.querySelector<HTMLElement>('#game-menu-overlay');
+    if (!menu) return;
+    if (enabled) {
+      if (menu.classList.contains('game-menu-hidden')) {
+        menu.classList.remove('game-menu-hidden');
+        menu.classList.add('chat-pause-proxy');
+      }
+      return;
+    }
+    if (menu.classList.contains('chat-pause-proxy')) {
+      menu.classList.remove('chat-pause-proxy');
+      menu.classList.add('game-menu-hidden');
+    }
+  };
+  const syncPauseProxy = () => setPauseProxy(blocksGameplay());
+
   const context = (): ChatTransportContext => {
     const guild = options.getGuild?.() ?? null;
     return {
@@ -261,13 +280,24 @@ export function createChatSystem(options: ChatSystemOptions) {
     if (event.key === 'Escape') { event.preventDefault(); recipient.blur(); }
   });
 
-  const open = () => { root.classList.remove('chat-collapsed'); minimize.textContent = '−'; unread[activeChannel] = 0; renderTabs(); renderMessages(); };
-  const close = () => { root.classList.add('chat-collapsed'); minimize.textContent = '+'; input.blur(); recipient.blur(); };
+  const open = () => {
+    root.classList.remove('chat-collapsed');
+    minimize.textContent = '−';
+    unread[activeChannel] = 0;
+    renderTabs(); renderMessages(); syncPauseProxy();
+  };
+  const close = () => {
+    root.classList.add('chat-collapsed');
+    minimize.textContent = '+';
+    input.blur(); recipient.blur(); setPauseProxy(false);
+  };
   const toggle = () => isOpen() ? close() : open();
-  const focusInput = () => { open(); input.focus(); input.select(); };
+  const focusInput = () => { open(); input.focus(); input.select(); syncPauseProxy(); };
 
   minimize.onclick = toggle;
   root.addEventListener('pointerdown', (event) => event.stopPropagation());
+  root.addEventListener('focusin', () => syncPauseProxy());
+  root.addEventListener('focusout', () => window.setTimeout(syncPauseProxy, 0));
 
   const unsubscribe = transport.subscribe(receive);
   void transport.connect(context());
@@ -287,7 +317,7 @@ export function createChatSystem(options: ChatSystemOptions) {
     blocksGameplay,
     setChannel(channel: ChatChannelId) { activeChannel = channel; unread[channel] = 0; open(); renderTabs(); renderMessages(); },
     updateContext() { transport.updateContext(context()); },
-    destroy() { unsubscribe(); void transport.disconnect(); root.remove(); },
+    destroy() { setPauseProxy(false); unsubscribe(); void transport.disconnect(); root.remove(); },
   };
 }
 
