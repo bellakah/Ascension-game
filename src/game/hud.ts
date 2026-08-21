@@ -19,6 +19,7 @@ export function createHud(progress: CharacterProgress) {
     <div id="stick"><div id="knob"></div></div>
     <div class="utility-dock">
       <button id="quest-journal-button" title="Diário de Missões" aria-label="Diário de Missões">📖</button>
+      <button id="pet-button" title="Mascote" aria-label="Mascote">🐾</button>
       <button id="character-button" title="Personagem" aria-label="Personagem">👤</button>
       <button id="inventory-button" title="Inventário" aria-label="Inventário">🎒</button>
     </div>
@@ -27,7 +28,7 @@ export function createHud(progress: CharacterProgress) {
       <button id="attack-btn" aria-label="Atacar">⚔</button>
     </div>
     <div class="desktop-shortcuts" aria-hidden="true">
-      <span><kbd>WASD</kbd>Mover</span><span><kbd>Espaço</kbd>Atacar</span><span><kbd>E</kbd>Interagir</span><span><kbd>J</kbd>Missões</span><span><kbd>I</kbd>Inventário</span><span><kbd>C</kbd>Personagem</span>
+      <span><kbd>WASD</kbd>Mover</span><span><kbd>Espaço</kbd>Atacar</span><span><kbd>E</kbd>Interagir</span><span><kbd>J</kbd>Missões</span><span><kbd>P</kbd>Mascote</span><span><kbd>I</kbd>Inventário</span><span><kbd>C</kbd>Personagem</span>
     </div>`;
   document.body.appendChild(root);
 
@@ -49,6 +50,7 @@ export function createHud(progress: CharacterProgress) {
     questText: root.querySelector<HTMLDivElement>('#quest-text')!,
     questToggle,
     questJournal: root.querySelector<HTMLButtonElement>('#quest-journal-button')!,
+    pet: root.querySelector<HTMLButtonElement>('#pet-button')!,
     dialog: root.querySelector<HTMLDivElement>('#dialog-box')!,
     stick: root.querySelector<HTMLDivElement>('#stick')!,
     knob: root.querySelector<HTMLDivElement>('#knob')!,
