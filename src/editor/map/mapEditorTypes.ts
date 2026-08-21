@@ -1,4 +1,4 @@
-export type MapToolId = 'select' | 'brush' | 'eraser' | 'fill' | 'collision' | 'pan';
+export type MapToolId = 'select' | 'brush' | 'eraser' | 'fill' | 'collision' | 'pan' | 'line' | 'rect' | 'random';
 export type MapPaletteId = 'terrain' | 'doodad' | 'npc' | 'monster' | 'resource' | 'zone' | 'portal' | 'raw';
 export type MapLayerId = 'ground' | 'detail' | 'objects' | 'collision' | 'zones';
 
