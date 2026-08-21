@@ -15,6 +15,10 @@ import { createPetUi } from '../pets/petUi';
 import { createQuestJournal } from '../quests/questJournal';
 import { ensureQuestStates, getNpcQuestMarker, grantQuestItemRewards, interactQuestNpc, NPC_NAMES, registerQuestEvent, syncCollectObjectives } from '../quests/questEngine';
 import { nearestQuestInteractable, visitZonesAt } from '../quests/worldQuestTargets';
+import { createAudioManager } from '../settings/audioManager';
+import { createGameMenu } from '../settings/gameMenu';
+import { createInputManager } from '../settings/inputManager';
+import { createSettingsStore, graphicsBootstrap, type GameSettings } from '../settings/settingsState';
 import { createSkillBar } from '../skills/skillBar';
 import { createSkillController } from '../skills/skillController';
 import { getSkill, type SkillId } from '../skills/skillCatalog';
@@ -34,6 +38,9 @@ export async function startGame() {
     const selected = await showCharacterCreator();
     const config = selected.config;
     const progress = selected.progress;
+    const settingsStore = createSettingsStore(selected.accountKey);
+    const input = createInputManager(settingsStore);
+    const graphics = graphicsBootstrap(settingsStore.settings);
     ensureQuestStates(progress);
     ensurePetState(progress);
     const inventoryState = ensureInventoryState(progress);
@@ -44,7 +51,7 @@ export async function startGame() {
     setBootMessage(`Preparando ${config.name}...`);
 
     const app = new Application();
-    await app.init({ resizeTo: window, backgroundColor: 0x14231d, antialias: false, preference: 'webgl' });
+    await app.init({ resizeTo: window, backgroundColor: 0x14231d, antialias: graphics.antialias, resolution: graphics.resolution, preference: 'webgl' });
     const mount = document.querySelector<HTMLDivElement>('#app');
     if (!mount) throw new Error('Elemento #app não encontrado.');
     mount.appendChild(app.canvas);
@@ -164,6 +171,45 @@ export async function startGame() {
       onChanged: () => save(),
     });
 
+    const audioManager = createAudioManager(settingsStore);
+    const applySettings = (settings: GameSettings) => {
+      document.documentElement.dataset.hideMinimap = String(!settings.interface.showMinimap);
+      document.documentElement.dataset.hideQuestTracker = String(!settings.interface.showQuestTracker);
+      document.documentElement.dataset.hideDesktopShortcuts = String(!settings.interface.showDesktopShortcuts);
+      document.documentElement.dataset.graphicsPreset = settings.graphics.preset;
+      playerName.visible = settings.interface.showNames;
+      for (const monster of monsters) {
+        for (const child of monster.view.children) {
+          if (child instanceof Text && child.text === monster.name) child.visible = settings.interface.showNames;
+        }
+      }
+      app.ticker.maxFPS = settings.graphics.fpsLimit;
+      audioManager.refresh();
+    };
+
+    const gameMenu = createGameMenu(settingsStore, {
+      characterName: config.name,
+      input,
+      onSave: save,
+      onSettingsChanged: applySettings,
+      onCharacterSelect: () => window.location.reload(),
+      onLogout: () => { localStorage.removeItem('ascension.session.v1'); window.location.reload(); },
+      onExit: () => {},
+    });
+    settingsStore.onChange(applySettings);
+    applySettings(settingsStore.settings);
+
+    window.addEventListener('keydown', (event) => {
+      if (event.repeat) return;
+      if (!input.matches(event, 'menu') && event.code !== 'Escape') return;
+      event.preventDefault(); event.stopImmediatePropagation();
+      if (isDead) return;
+      if (gameMenu.isOpen()) { gameMenu.close(); return; }
+      inventory.close(); characterSheet.close(); shop.close(); questJournal.close(); craftingUi.close(); petUi.close(); mapSystem.close();
+      keys.clear(); resetStick(); gameMenu.open();
+    }, true);
+    input.installLegacyBridge();
+
     let useSkill: (skillId: SkillId) => void = () => {};
     const skillBar = createSkillBar(classSkills, { onUse: (skillId) => useSkill(skillId) });
 
@@ -185,18 +231,23 @@ export async function startGame() {
       },
     });
 
-    const uiOpen = () => isDead || respawnScreen.isOpen() || inventory.isOpen() || characterSheet.isOpen() || shop.isOpen() || questJournal.isOpen() || craftingUi.isOpen() || petUi.isOpen() || mapSystem.isOpen();
+    const uiOpen = () => isDead || respawnScreen.isOpen() || inventory.isOpen() || characterSheet.isOpen() || shop.isOpen() || questJournal.isOpen() || craftingUi.isOpen() || petUi.isOpen() || mapSystem.isOpen() || gameMenu.isOpen();
     hud.inventory.addEventListener('pointerdown', () => { if (isDead) return; shop.close(); craftingUi.close(); characterSheet.close(); questJournal.close(); petUi.close(); mapSystem.close(); inventory.toggle(); });
     hud.character.addEventListener('pointerdown', () => { if (isDead) return; shop.close(); craftingUi.close(); inventory.close(); questJournal.close(); petUi.close(); mapSystem.close(); characterSheet.toggle(); });
     hud.questJournal.addEventListener('pointerdown', () => { if (isDead) return; shop.close(); craftingUi.close(); inventory.close(); characterSheet.close(); petUi.close(); mapSystem.close(); questJournal.toggle(); });
     hud.pet.addEventListener('pointerdown', () => { if (isDead) return; shop.close(); craftingUi.close(); inventory.close(); characterSheet.close(); questJournal.close(); mapSystem.close(); petUi.toggle(); });
     hud.map.addEventListener('pointerdown', () => { if (isDead) return; shop.close(); craftingUi.close(); inventory.close(); characterSheet.close(); questJournal.close(); petUi.close(); keys.clear(); resetStick(); mapSystem.toggle(); });
+    hud.menu.addEventListener('pointerdown', () => {
+      if (isDead) return;
+      if (!gameMenu.isOpen()) { shop.close(); craftingUi.close(); inventory.close(); characterSheet.close(); questJournal.close(); petUi.close(); mapSystem.close(); keys.clear(); resetStick(); }
+      gameMenu.toggle();
+    });
 
     const enterDeathState = () => {
       if (respawnScreen.isOpen()) return;
       isDead = true; playerHp = 0; progress.hp = 0;
       deathPosition = { x: player.x, y: player.y }; player.alpha = .42;
-      keys.clear(); resetStick(); inventory.close(); characterSheet.close(); shop.close(); questJournal.close(); craftingUi.close(); petUi.close(); mapSystem.close();
+      keys.clear(); resetStick(); inventory.close(); characterSheet.close(); shop.close(); questJournal.close(); craftingUi.close(); petUi.close(); mapSystem.close(); gameMenu.close();
       skillBar.refresh(skillController.snapshot(), true);
       const village = nearestVillage(deathPosition.x, deathPosition.y, progress.map || 'Floresta Inicial');
       if (village) respawnScreen.show(village);
@@ -204,6 +255,7 @@ export async function startGame() {
     };
 
     const floating = (x: number, y: number, text: string, color: number) => {
+      if (!settingsStore.settings.interface.showFloatingDamage) return;
       const node = new Text({ text, style: { fill: color, fontSize: 14, fontWeight: 'bold', stroke: { color: 0, width: 4 } } });
       node.anchor.set(.5); node.position.set(x, y); world.addChild(node);
       let life = 55;
@@ -215,6 +267,7 @@ export async function startGame() {
     };
 
     const pulse = (radius: number, color: number, durationMs = 420) => {
+      if (!settingsStore.settings.graphics.effects) return;
       const effect = new Graphics().circle(0, 0, radius).stroke({ width: 5, color, alpha: .8 });
       effect.position.set(player.x, player.y); world.addChild(effect);
       let remaining = durationMs;
@@ -227,6 +280,7 @@ export async function startGame() {
     };
 
     const magicLink = (target: Monster, color: number) => {
+      if (!settingsStore.settings.graphics.effects) return;
       const effect = new Graphics().moveTo(player.x, player.y - 34).lineTo(target.view.x, target.view.y - 22).stroke({ width: 5, color, alpha: .85 });
       effect.circle(target.view.x, target.view.y - 22, 15).stroke({ width: 3, color, alpha: .75 }); world.addChild(effect);
       let remaining = 180;
