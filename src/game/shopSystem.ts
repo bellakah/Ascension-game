@@ -1,5 +1,6 @@
 import './shopSystem.css';
 import type { CharacterProgress } from '../character/characterCreator';
+import { createBankUi } from '../bank/bankUi';
 import {
   ITEM_CATEGORY_LABELS,
   ITEM_RARITY_LABELS,
@@ -14,11 +15,12 @@ import {
   type ItemStats,
 } from '../items/itemCatalog';
 
-export type ShopId = 'rowan' | 'mira' | 'theo';
+export type ShopId = 'rowan' | 'mira' | 'theo' | 'silas';
+type MerchantShopId = Exclude<ShopId, 'silas'>;
 
 type StockEntry = { itemId: string; price: number };
 type ShopDefinition = {
-  id: ShopId;
+  id: MerchantShopId;
   name: string;
   role: string;
   icon: string;
@@ -37,7 +39,7 @@ type ShopCallbacks = {
 
 type Mode = 'buy' | 'sell';
 
-export const SHOPS: Record<ShopId, ShopDefinition> = {
+export const SHOPS: Record<MerchantShopId, ShopDefinition> = {
   rowan: {
     id: 'rowan', name: 'Rowan', role: 'Ferreiro da Clareira', icon: '⚒️',
     greeting: 'Aço bom mantém aventureiro vivo. Veja o que preparei na forja.',
@@ -125,6 +127,7 @@ function statHtml(item: ItemDefinition) {
 
 export function createShop(progress: CharacterProgress, callbacks: ShopCallbacks) {
   const state = ensureInventoryState(progress);
+  const bankUi = createBankUi(progress, callbacks);
   let currentShop: ShopDefinition | null = null;
   let mode: Mode = 'buy';
   let selectedItemId: string | null = null;
@@ -184,13 +187,9 @@ export function createShop(progress: CharacterProgress, callbacks: ShopCallbacks
   };
 
   const visibleEntries = () => entries().filter((entry) => !search || entry.item.name.toLocaleLowerCase('pt-BR').includes(search));
-
   const selectFirstIfNeeded = () => {
     const available = visibleEntries();
-    if (!selectedItemId || !available.some((entry) => entry.item.id === selectedItemId)) {
-      selectedItemId = available[0]?.item.id ?? null;
-      quantity = 1;
-    }
+    if (!selectedItemId || !available.some((entry) => entry.item.id === selectedItemId)) { selectedItemId = available[0]?.item.id ?? null; quantity = 1; }
   };
 
   const renderList = () => {
@@ -210,30 +209,15 @@ export function createShop(progress: CharacterProgress, callbacks: ShopCallbacks
   };
 
   const renderDetail = () => {
-    if (!currentShop || !selectedItemId) {
-      detail.innerHTML = '<div class="shop-detail-empty"><span>◇</span><strong>Selecione um item</strong><p>Detalhes e transação aparecerão aqui.</p></div>';
-      return;
-    }
+    if (!currentShop || !selectedItemId) { detail.innerHTML = '<div class="shop-detail-empty"><span>◇</span><strong>Selecione um item</strong><p>Detalhes e transação aparecerão aqui.</p></div>'; return; }
     const entry = entries().find((candidate) => candidate.item.id === selectedItemId);
     if (!entry) { selectedItemId = null; renderDetail(); return; }
     const item = entry.item;
-    const maxByMode = mode === 'sell'
-      ? Math.max(1, entry.owned)
-      : item.stackMax === 1 ? 1 : Math.max(1, Math.min(99, Math.floor(callbacks.getCoins() / Math.max(1, entry.price)) || 1));
+    const maxByMode = mode === 'sell' ? Math.max(1, entry.owned) : item.stackMax === 1 ? 1 : Math.max(1, Math.min(99, Math.floor(callbacks.getCoins() / Math.max(1, entry.price)) || 1));
     quantity = Math.max(1, Math.min(quantity, maxByMode));
     const total = entry.price * quantity;
     const comparison = mode === 'buy' ? comparisonHtml(state, item) : '';
-    detail.innerHTML = `
-      <div class="shop-detail-top rarity-${item.rarity}"><span class="shop-detail-icon">${item.icon}</span><div><small>${ITEM_RARITY_LABELS[item.rarity]} · ${ITEM_CATEGORY_LABELS[item.category]}</small><h3>${item.name}</h3><p>${item.description}</p></div></div>
-      ${statHtml(item)}
-      ${comparison}
-      ${mode === 'sell' && currentShop.id === 'theo' && item.category === 'material' ? '<div class="shop-bonus-note">Theo paga +25% por materiais da floresta.</div>' : ''}
-      <div class="shop-transaction">
-        <div class="shop-price-row"><span>${mode === 'buy' ? 'Preço unitário' : 'Valor unitário'}</span><strong>🪙 ${entry.price}</strong></div>
-        <div class="shop-qty-row"><span>Quantidade</span><div><button id="shop-qty-minus" type="button">−</button><strong id="shop-qty-value">${quantity}</strong><button id="shop-qty-plus" type="button">+</button><button id="shop-qty-max" type="button">MAX</button></div></div>
-        <div class="shop-total"><span>Total</span><strong>🪙 ${total}</strong></div>
-        <button id="shop-confirm" class="shop-confirm ${mode}" type="button">${mode === 'buy' ? 'Comprar' : 'Vender'} ${quantity > 1 ? `${quantity}x` : ''}</button>
-      </div>`;
+    detail.innerHTML = `<div class="shop-detail-top rarity-${item.rarity}"><span class="shop-detail-icon">${item.icon}</span><div><small>${ITEM_RARITY_LABELS[item.rarity]} · ${ITEM_CATEGORY_LABELS[item.category]}</small><h3>${item.name}</h3><p>${item.description}</p></div></div>${statHtml(item)}${comparison}${mode === 'sell' && currentShop.id === 'theo' && item.category === 'material' ? '<div class="shop-bonus-note">Theo paga +25% por materiais da floresta.</div>' : ''}<div class="shop-transaction"><div class="shop-price-row"><span>${mode === 'buy' ? 'Preço unitário' : 'Valor unitário'}</span><strong>🪙 ${entry.price}</strong></div><div class="shop-qty-row"><span>Quantidade</span><div><button id="shop-qty-minus" type="button">−</button><strong id="shop-qty-value">${quantity}</strong><button id="shop-qty-plus" type="button">+</button><button id="shop-qty-max" type="button">MAX</button></div></div><div class="shop-total"><span>Total</span><strong>🪙 ${total}</strong></div><button id="shop-confirm" class="shop-confirm ${mode}" type="button">${mode === 'buy' ? 'Comprar' : 'Vender'} ${quantity > 1 ? `${quantity}x` : ''}</button></div>`;
 
     const changeQuantity = (delta: number) => { quantity = Math.max(1, Math.min(maxByMode, quantity + delta)); renderDetail(); };
     detail.querySelector<HTMLButtonElement>('#shop-qty-minus')?.addEventListener('click', () => changeQuantity(-1));
@@ -245,40 +229,24 @@ export function createShop(progress: CharacterProgress, callbacks: ShopCallbacks
         const cost = entry.price * quantity;
         if (callbacks.getCoins() < cost) { callbacks.notify('Moedas insuficientes para esta compra.'); return; }
         const result = addItem(state, item.id, quantity);
-        if (result.remaining > 0) {
-          if (result.added > 0) removeItem(state, item.id, result.added);
-          callbacks.notify('Inventário sem espaço suficiente para esta compra.');
-          return;
-        }
-        callbacks.setCoins(callbacks.getCoins() - cost);
-        callbacks.notify(`${quantity}x ${item.name} comprado por ${cost} moedas.`);
+        if (result.remaining > 0) { if (result.added > 0) removeItem(state, item.id, result.added); callbacks.notify('Inventário sem espaço suficiente para esta compra.'); return; }
+        callbacks.setCoins(callbacks.getCoins() - cost); callbacks.notify(`${quantity}x ${item.name} comprado por ${cost} moedas.`);
       } else {
         const removed = removeItem(state, item.id, quantity);
         if (!removed) { callbacks.notify('Item não encontrado no inventário.'); return; }
         const earned = removed * entry.price;
-        callbacks.setCoins(callbacks.getCoins() + earned);
-        callbacks.notify(`${removed}x ${item.name} vendido por ${earned} moedas.`);
+        callbacks.setCoins(callbacks.getCoins() + earned); callbacks.notify(`${removed}x ${item.name} vendido por ${earned} moedas.`);
         if (itemQuantity(state, item.id) <= 0) selectedItemId = null;
       }
-      callbacks.onChanged();
-      selectFirstIfNeeded();
-      render();
+      callbacks.onChanged(); selectFirstIfNeeded(); render();
     });
   };
 
   const render = () => {
     if (!currentShop) return;
-    merchantIcon.textContent = currentShop.icon;
-    merchantName.textContent = currentShop.name;
-    merchantRole.textContent = currentShop.role;
-    greeting.textContent = currentShop.greeting;
-    specialty.textContent = currentShop.specialty;
-    balance.textContent = String(callbacks.getCoins());
-    buyTab.classList.toggle('active', mode === 'buy');
-    sellTab.classList.toggle('active', mode === 'sell');
-    selectFirstIfNeeded();
-    renderList();
-    renderDetail();
+    merchantIcon.textContent = currentShop.icon; merchantName.textContent = currentShop.name; merchantRole.textContent = currentShop.role;
+    greeting.textContent = currentShop.greeting; specialty.textContent = currentShop.specialty; balance.textContent = String(callbacks.getCoins());
+    buyTab.classList.toggle('active', mode === 'buy'); sellTab.classList.toggle('active', mode === 'sell'); selectFirstIfNeeded(); renderList(); renderDetail();
   };
 
   const switchMode = (next: Mode) => { mode = next; selectedItemId = null; quantity = 1; render(); };
@@ -286,17 +254,18 @@ export function createShop(progress: CharacterProgress, callbacks: ShopCallbacks
   sellTab.addEventListener('click', () => switchMode('sell'));
   searchInput.addEventListener('input', () => { search = searchInput.value.trim().toLocaleLowerCase('pt-BR'); selectedItemId = null; render(); });
 
+  const closeShopWindow = () => { root.classList.add('shop-hidden'); root.classList.remove('shop-visible'); };
   const open = (shopId: ShopId) => {
-    currentShop = SHOPS[shopId];
+    if (shopId === 'silas') { closeShopWindow(); bankUi.open(); return; }
+    bankUi.close(); currentShop = SHOPS[shopId];
     mode = 'buy'; selectedItemId = null; quantity = 1; search = ''; searchInput.value = '';
-    root.classList.remove('shop-hidden'); root.classList.add('shop-visible');
-    render();
+    root.classList.remove('shop-hidden'); root.classList.add('shop-visible'); render();
   };
-  const close = () => { root.classList.add('shop-hidden'); root.classList.remove('shop-visible'); };
+  const close = () => { closeShopWindow(); bankUi.close(); };
 
   root.querySelector<HTMLButtonElement>('#shop-close')!.addEventListener('click', close);
   root.addEventListener('pointerdown', (event) => { if (event.target === root) close(); });
   window.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !root.classList.contains('shop-hidden')) close(); });
 
-  return { root, open, close, refresh: render, isOpen: () => !root.classList.contains('shop-hidden') };
+  return { root, open, close, refresh: () => { render(); bankUi.refresh(); }, isOpen: () => !root.classList.contains('shop-hidden') || bankUi.isOpen() };
 }
