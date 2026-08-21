@@ -24,7 +24,7 @@ export const REFINEMENT_CONFIG = {
     { targetLevel: 10, successChance: .15, stoneCost: 4, failureMode: 'downgrade', failureDrop: 1 },
     { targetLevel: 11, successChance: .1, stoneCost: 5, failureMode: 'downgrade', failureDrop: 1 },
     { targetLevel: 12, successChance: .05, stoneCost: 6, failureMode: 'downgrade', failureDrop: 1 },
-  ] satisfies RefinementLevelRule[],
+  ] as RefinementLevelRule[],
   refineBonusBySlot: {
     weapon: { stat: 'attack' as const, values: [0,2,4,7,10,14,19,25,32,40,50,62,76] },
     armor: { stat: 'maxHp' as const, values: [0,5,10,16,23,31,40,50,62,75,90,108,130] },
