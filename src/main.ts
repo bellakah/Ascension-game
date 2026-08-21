@@ -7,7 +7,15 @@ if (playtest === 'map') {
 } else if (editor === 'map-classic') {
   void import('./editor/map/mapEditor').then(({ startMapEditor }) => startMapEditor());
 } else if (editor === 'map') {
-  void import('./editor/map/mapEditorV2').then(({ startMapEditorV2 }) => startMapEditorV2());
+  void import('./editor/map/mapEditorV2').then(async ({ startMapEditorV2 }) => {
+    await startMapEditorV2();
+    const [{ installMapEditorPublishUi }, { installMapEditorAssetDeleteUi }] = await Promise.all([
+      import('./editor/map/mapEditorPublishUi'),
+      import('./editor/map/mapEditorAssetDeleteUi'),
+    ]);
+    installMapEditorPublishUi();
+    installMapEditorAssetDeleteUi();
+  });
 } else {
   void import('./gameBootstrap').then(({ startGameApp }) => startGameApp());
 }
