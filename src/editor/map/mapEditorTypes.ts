@@ -15,6 +15,7 @@ export type MapObject = {
   y: number;
   width?: number;
   height?: number;
+  scale?: number;
   rotation?: number;
   properties?: Record<string, string | number | boolean>;
 };
@@ -52,6 +53,26 @@ export type AscensionMapDocument = {
   };
 };
 
+export type MapSpriteDefinition = {
+  src: string;
+  nativeWidth: number;
+  nativeHeight: number;
+  /** Tamanho visual em tiles. Se omitido, usa 1x1. */
+  widthTiles?: number;
+  heightTiles?: number;
+  /** Ponto do sprite preso ao tile: 0 esquerda/topo, 0.5 centro, 1 direita/base. */
+  anchorX?: number;
+  anchorY?: number;
+  pixelated?: boolean;
+};
+
+export type MapFootprintDefinition = {
+  width: number;
+  height: number;
+  /** Tiles relativos ao ponto de colocação que contam como bloqueados. */
+  collision?: Array<{ x: number; y: number }>;
+};
+
 export type MapPaletteEntry = {
   id: string;
   palette: MapPaletteId;
@@ -63,6 +84,9 @@ export type MapPaletteEntry = {
   objectKind?: MapObject['kind'];
   zoneKind?: MapZone['kind'];
   tags?: string[];
+  sprite?: MapSpriteDefinition;
+  footprint?: MapFootprintDefinition;
+  source?: 'ascension' | 'pixel-crawler' | 'custom';
 };
 
 export type EditorSnapshot = {
