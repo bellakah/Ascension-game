@@ -1,5 +1,5 @@
 import { Container, Graphics, Text } from 'pixi.js';
-import { getPublishedObjectPositions } from '../map/publishedMapRuntime';
+import { getPreparedPublishedWorldRuntime, getPublishedObjectPositions } from '../map/publishedMapRuntime';
 import { CRAFTING_STATIONS, type CraftingStationDefinition } from './recipeCatalog';
 
 export type RuntimeCraftingStation = {
@@ -53,14 +53,17 @@ function createStation(definition: CraftingStationDefinition): RuntimeCraftingSt
 }
 
 export function createCraftingStations(world: Container) {
-  const stations = CRAFTING_STATIONS.map((definition) => {
+  const publishedRuntime = getPreparedPublishedWorldRuntime();
+  const stations: RuntimeCraftingStation[] = [];
+  for (const definition of CRAFTING_STATIONS) {
     const assetId = definition.type === 'forge' ? 'anvil_station' : 'alchemy_station';
     const published = getPublishedObjectPositions(assetId)[0];
+    if (publishedRuntime && !published) continue;
     const runtimeDefinition = published ? { ...definition, x: published.x, y: published.y } : definition;
     const station = createStation(runtimeDefinition);
     world.addChild(station.view);
-    return station;
-  });
+    stations.push(station);
+  }
   return stations;
 }
 
