@@ -4,8 +4,10 @@ const playtest = params.get('playtest');
 
 if (playtest === 'map') {
   void import('./editor/map/mapPlaytest').then(({ startMapPlaytest }) => startMapPlaytest());
-} else if (editor === 'map') {
+} else if (editor === 'map-classic') {
   void import('./editor/map/mapEditor').then(({ startMapEditor }) => startMapEditor());
+} else if (editor === 'map') {
+  void import('./editor/map/mapEditorV2').then(({ startMapEditorV2 }) => startMapEditorV2());
 } else {
   void import('./gameBootstrap').then(({ startGameApp }) => startGameApp());
 }
