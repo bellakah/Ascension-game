@@ -1,5 +1,6 @@
 import './mapPlaytest.css';
 import { drawObjectAsset, drawTerrainAsset, preloadMapAssets } from './mapAssetRenderer';
+import { hydrateAssetLibraryV2 } from './mapAssetLibraryV2';
 import { getPaletteEntry, MAP_PALETTE_ENTRIES } from './mapEditorCatalog';
 import { loadMapDocument, loadOrCreateActiveMap } from './mapEditorStorage';
 import { readPlaytestSnapshot, subscribeMapPreview } from './mapPreviewBridge';
@@ -8,7 +9,8 @@ import { parseTileKey, tileKey } from './mapEditorTypes';
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
-export function startMapPlaytest() {
+export async function startMapPlaytest() {
+  await hydrateAssetLibraryV2();
   document.body.className = 'map-playtest-mode';
   document.title = 'Ascension • Map Playtest';
   const mount = document.querySelector<HTMLElement>('#app') ?? document.body;
@@ -91,7 +93,7 @@ export function startMapPlaytest() {
     if (canStand(player.x, nextY)) player.y = nextY;
   };
 
-  const render = () => {
+  const render = (now = performance.now()) => {
     const width = canvas.clientWidth, height = canvas.clientHeight;
     ctx.clearRect(0, 0, width, height);
     ctx.fillStyle = '#070b0f'; ctx.fillRect(0, 0, width, height);
@@ -107,8 +109,8 @@ export function startMapPlaytest() {
     for (let y = startY; y <= endY; y++) for (let x = startX; x <= endX; x++) {
       const tile = mapDoc.tiles[tileKey(x, y)] ?? { ground: 'grass' };
       const sx = x * tilePx - cameraX, sy = y * tilePx - cameraY;
-      drawTerrainAsset(ctx, getPaletteEntry(tile.ground ?? 'grass'), sx, sy, tilePx, 1, render);
-      if (tile.detail) drawTerrainAsset(ctx, getPaletteEntry(tile.detail), sx, sy, tilePx, .72, render);
+      drawTerrainAsset(ctx, getPaletteEntry(tile.ground ?? 'grass'), sx, sy, tilePx, 1, render, now);
+      if (tile.detail) drawTerrainAsset(ctx, getPaletteEntry(tile.detail), sx, sy, tilePx, .72, render, now);
     }
 
     for (const zone of mapDoc.zones) {
@@ -121,7 +123,7 @@ export function startMapPlaytest() {
     for (const object of sortedObjects) {
       const anchorX = (object.x + .5) * tilePx - cameraX;
       const anchorY = (object.y + 1) * tilePx - cameraY;
-      drawObjectAsset(ctx, getPaletteEntry(object.assetId), { x: anchorX, y: anchorY, tilePixels: tilePx, scale: object.scale ?? 1, onReady: render });
+      drawObjectAsset(ctx, getPaletteEntry(object.assetId), { x: anchorX, y: anchorY, tilePixels: tilePx, scale: object.scale ?? 1, onReady: render, now });
     }
 
     if (showCollision) {
@@ -143,7 +145,7 @@ export function startMapPlaytest() {
       ctx.stroke();
     }
 
-    drawObjectAsset(ctx, getPaletteEntry('pc_knight_npc'), { x: width / 2, y: height / 2 + tilePx * .5, tilePixels: tilePx, selected: true, onReady: render });
+    drawObjectAsset(ctx, getPaletteEntry('pc_knight_npc'), { x: width / 2, y: height / 2 + tilePx * .5, tilePixels: tilePx, selected: true, onReady: render, now });
     nameNode.textContent = mapDoc.name;
     positionNode.textContent = `X ${player.x.toFixed(1)} • Y ${player.y.toFixed(1)}`;
   };
@@ -160,7 +162,7 @@ export function startMapPlaytest() {
       const length = Math.hypot(dx, dy) || 1;
       attemptMove(dx / length * 4.2 * dt, dy / length * 4.2 * dt);
     }
-    render();
+    render(time);
     requestAnimationFrame(update);
   };
 
