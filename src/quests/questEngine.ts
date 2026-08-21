@@ -35,7 +35,6 @@ function stateFor(progress: CharacterProgress, quest: QuestDefinition): QuestRun
   raw.objectives ??= {};
   raw.progress = Math.max(0, Number(raw.progress ?? 0));
   raw.target = totalTarget(quest);
-  raw.status ??= 'not_started';
   return raw;
 }
 
@@ -164,7 +163,12 @@ function processNpcObjectives(progress: CharacterProgress, npcId: string) {
     const objectives = activeObjectives(progress, quest).filter((objective) => objective.npcId === npcId);
     for (const objective of objectives) {
       if (objective.type === 'talk') {
-        updates.push(...registerQuestEvent(progress, { type: 'talk', npcId }));
+        const amount = objectiveAmount(objective);
+        const wasDone = objectiveDone(progress, quest, objective);
+        const beforeStatus = state.status;
+        state.objectives[objective.id] = amount;
+        updateAggregate(progress, quest);
+        updates.push({ quest, objective, objectiveCompleted: !wasDone, becameReady: beforeStatus === 'active' && state.status === 'ready' });
         if (quest.mode === 'sequential') break;
       } else if (objective.type === 'deliver' && objective.itemId) {
         const amount = objectiveAmount(objective);
@@ -212,8 +216,13 @@ export function interactQuestNpc(progress: CharacterProgress, npcId: string): Qu
     (progress as QuestProgress).trackedQuestId = available.id;
     return { type: 'accepted', quest: available };
   }
-  const related = QUEST_CATALOG.find((quest) => stateFor(progress, quest).status === 'active' && (quest.startNpcId === npcId || quest.endNpcId === npcId));
-  return related ? { type: 'progress', quest: related } : { type: 'none' };
+  // NPCs comerciantes continuam acessíveis mesmo enquanto uma quest deles está ativa.
+  // A Elandra não possui loja, então pode continuar fornecendo uma fala de progresso.
+  if (npcId === 'elandra') {
+    const related = QUEST_CATALOG.find((quest) => stateFor(progress, quest).status === 'active' && (quest.startNpcId === npcId || quest.endNpcId === npcId));
+    if (related) return { type: 'progress', quest: related };
+  }
+  return { type: 'none' };
 }
 
 export function grantQuestItemRewards(progress: CharacterProgress, quest: QuestDefinition) {
