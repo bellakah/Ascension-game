@@ -64,7 +64,8 @@ function currentChatCode() {
 function actualGameMenuOpen() {
   const menu = document.querySelector<HTMLElement>('#game-menu-overlay');
   if (!menu || menu.classList.contains('game-menu-hidden')) return false;
-  return !menu.classList.contains('chat-pause-proxy') && !menu.classList.contains('guild-pause-proxy');
+  // O proxy do próprio chat não conta como menu; o proxy da Guilda deve bloquear o Chat.
+  return !menu.classList.contains('chat-pause-proxy');
 }
 
 /**
