@@ -7,6 +7,7 @@ import { loadPublishedMap, publishMap } from '../../map/publishedMapStore';
 
 const FAVORITES_KEY = 'ascension.map-editor.favorites.v2';
 const RECENTS_KEY = 'ascension.map-editor.recents.v2';
+const ACTIVE_MAP_KEY = 'ascension.map-editor.active.v1';
 
 function countReferences(document: AscensionMapDocument, assetId: string) {
   let count = document.objects.filter((object) => object.assetId === assetId).length;
@@ -53,14 +54,13 @@ async function removeAsset(assetId: string) {
   const publishedWarning = publishedCount > 0 ? '\n\nEle também está na versão PUBLICADA. A publicação será corrigida automaticamente e o jogo aberto será atualizado.' : '';
   if (!window.confirm(`Excluir “${asset.label}” permanentemente da biblioteca?${warning}${publishedWarning}\n\nEsta ação não pode ser desfeita.`)) return;
 
-  const currentId = document.querySelector<HTMLSelectElement>('#me2-map-select')?.value ?? '';
+  const currentId = document.querySelector<HTMLSelectElement>('#me2-map-select')?.value ?? localStorage.getItem(ACTIVE_MAP_KEY) ?? '';
   const changed: AscensionMapDocument[] = [];
-  for (const document of documents) {
-    if (removeReferences(document, assetId)) changed.push(document);
+  for (const mapDocument of documents) {
+    if (removeReferences(mapDocument, assetId)) changed.push(mapDocument);
   }
-  for (const document of changed.filter((value) => value.id !== currentId)) saveMapDocument(document);
-  const current = changed.find((value) => value.id === currentId);
-  if (current) saveMapDocument(current);
+  for (const mapDocument of changed) saveMapDocument(mapDocument);
+  if (currentId) localStorage.setItem(ACTIVE_MAP_KEY, currentId);
 
   if (published && removeReferences(published.document, assetId)) publishMap(published.document);
   await deleteLibraryAsset(assetId);
