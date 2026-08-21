@@ -11,8 +11,10 @@ const FRIENDLY_CODES: Record<string, string> = {
 const LEGACY_KEY: Record<InputActionId, string> = {
   moveUp: 'w', moveDown: 's', moveLeft: 'a', moveRight: 'd',
   basicAttack: ' ', interact: 'e', skill1: '1', skill2: '2', skill3: '3', skill4: '4',
-  inventory: 'i', character: 'c', quests: 'j', pet: 'p', map: 'm', menu: 'Escape',
+  inventory: 'i', character: 'c', quests: 'j', pet: 'p', map: 'm', chat: 'Enter', menu: 'Escape',
 };
+
+const DIRECT_ACTIONS = new Set<InputActionId>(['menu', 'chat']);
 
 export function formatKeyCode(code: string) {
   if (FRIENDLY_CODES[code]) return FRIENDLY_CODES[code];
@@ -50,11 +52,11 @@ export function createInputManager(store: SettingsStore) {
 
   const installLegacyBridge = () => {
     const syntheticEvents = new WeakSet<KeyboardEvent>();
-    const defaultCodes = new Set(INPUT_ACTIONS.filter((action) => action.id !== 'menu').map((action) => action.defaultCode));
+    const defaultCodes = new Set(INPUT_ACTIONS.filter((action) => !DIRECT_ACTIONS.has(action.id)).map((action) => action.defaultCode));
 
     const forward = (event: KeyboardEvent) => {
       if (syntheticEvents.has(event)) return;
-      const action = INPUT_ACTIONS.find((candidate) => candidate.id !== 'menu' && codeFor(candidate.id) === event.code);
+      const action = INPUT_ACTIONS.find((candidate) => !DIRECT_ACTIONS.has(candidate.id) && codeFor(candidate.id) === event.code);
       const shouldBlockLegacy = defaultCodes.has(event.code);
       if (!action && !shouldBlockLegacy) return;
 
