@@ -18,7 +18,7 @@ export const VILLAGES: Village[] = [
     id: 'clearing-village',
     name: 'Vila da Clareira',
     map: 'Floresta Inicial',
-    safeZone: { x: 780, y: 1155, width: 380, height: 380 },
+    safeZone: { x: 600, y: 1000, width: 740, height: 550 },
     respawn: { x: 970, y: 1380 },
   },
 ];
@@ -53,6 +53,13 @@ function createVillage(world: Container, obstacles: Obstacle[], village: Village
       .stroke({ width: 5, color: 0xbfe6a3, alpha: .68 }),
   );
 
+  // Vias internas deixam a vila legível e reservam uma praça central para novos NPCs.
+  world.addChild(
+    new Graphics().roundRect(925, 1055, 90, 450, 28).fill({ color: 0xb89a6c, alpha: .3 }),
+    new Graphics().roundRect(645, 1318, 650, 86, 28).fill({ color: 0xb89a6c, alpha: .26 }),
+    new Graphics().circle(village.respawn.x, village.respawn.y, 88).fill({ color: 0xd7c392, alpha: .12 }).stroke({ width: 2, color: 0xe6d7a9, alpha: .25 }),
+  );
+
   const safeLabel = new Text({
     text: `🛡 ${village.name} • ÁREA SEGURA`,
     style: { fill: 0xe9ffd8, fontSize: 15, fontWeight: 'bold', stroke: { color: 0x17321f, width: 5 } },
@@ -76,8 +83,8 @@ function createVillage(world: Container, obstacles: Obstacle[], village: Village
     obstacles.push({ x, y: y + 10, radius: 48 });
   };
 
-  addHouse(845, 1285, 0x8d523b);
-  addHouse(1095, 1285, 0x5b6f91);
+  addHouse(700, 1160, 0x8d523b);
+  addHouse(1240, 1160, 0x5b6f91);
 
   const well = new Container();
   well.addChild(
@@ -88,9 +95,9 @@ function createVillage(world: Container, obstacles: Obstacle[], village: Village
     new Graphics().rect(22, -42, 6, 44).fill(0x704b30),
     new Graphics().rect(-31, -45, 62, 7).fill(0x704b30),
   );
-  well.position.set(1090, 1450);
+  well.position.set(1090, 1500);
   world.addChild(well);
-  obstacles.push({ x: 1090, y: 1450, radius: 25 });
+  obstacles.push({ x: 1090, y: 1500, radius: 25 });
 
   const fire = new Container();
   fire.addChild(
@@ -98,7 +105,7 @@ function createVillage(world: Container, obstacles: Obstacle[], village: Village
     new Graphics().poly([-10, 7, 0, -22, 10, 7]).fill(0xf28d42),
     new Graphics().poly([-6, 5, 0, -12, 6, 5]).fill(0xffdc67),
   );
-  fire.position.set(850, 1450);
+  fire.position.set(850, 1500);
   world.addChild(fire);
 
   const shrine = new Container();
@@ -125,7 +132,7 @@ function createVillage(world: Container, obstacles: Obstacle[], village: Village
   );
   const signText = new Text({ text: village.name, style: { fill: 0xffefc1, fontSize: 11, fontWeight: 'bold' } });
   signText.anchor.set(.5); signText.y = -11; sign.addChild(signText);
-  sign.position.set(970, 1178);
+  sign.position.set(970, 1040);
   world.addChild(sign);
 
   const fence = (x: number, y: number, width: number) => {
@@ -135,10 +142,10 @@ function createVillage(world: Container, obstacles: Obstacle[], village: Village
       new Graphics().rect(x + width - 14, y - 10, 6, 25).fill(0x735238),
     );
   };
-  fence(790, 1210, 95);
-  fence(1055, 1210, 95);
-  fence(790, 1510, 115);
-  fence(1035, 1510, 115);
+  fence(620, 1070, 190);
+  fence(1130, 1070, 190);
+  fence(620, 1530, 190);
+  fence(1130, 1530, 190);
 }
 
 export function createWorld() {
@@ -169,7 +176,7 @@ export function createWorld() {
   const trees = [
     [220,240],[420,410],[610,220],[300,720],[590,880],[250,1180],[540,1390],
     [1400,220],[1640,390],[1900,250],[1470,760],[1840,840],[1430,1200],[1740,1370],
-    [1060,280],[690,1280],[1260,1400],[710,570],[1310,540],
+    [1060,280],[520,1280],[1420,1420],[710,570],[1310,540],
   ];
   trees.forEach(([x, y], i) => addTree(x, y, i % 3 === 0 ? 1.15 : 1));
 
