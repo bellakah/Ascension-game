@@ -1,4 +1,5 @@
 import { Container, Graphics, Text } from 'pixi.js';
+import { getPreparedPublishedWorldRuntime, getPublishedObjectPositions } from '../map/publishedMapRuntime';
 import type { ShopId } from './shopSystem';
 
 export type VillageMerchant = {
@@ -44,11 +45,16 @@ function createMerchant(world: Container, data: MerchantVisual): VillageMerchant
   const role = new Text({ text: data.role, style: { fill: 0xd9c77d, fontSize: 9, fontWeight: 'bold', stroke: { color: 0, width: 3 } } });
   role.anchor.set(.5); role.y = -56;
   npc.addChild(shadow, body, apron, head, hair, questMark, icon, name, role);
-  npc.position.set(data.x, data.y);
+  const published = getPublishedObjectPositions(data.shopId)[0];
+  npc.position.set(published?.x ?? data.x, published?.y ?? data.y);
   world.addChild(npc);
   return { id: data.shopId, shopId: data.shopId, name: data.name, role: data.role, npc, questMark };
 }
 
 export function createVillageMerchants(world: Container) {
-  return MERCHANTS.map((data) => createMerchant(world, data));
+  const published = getPreparedPublishedWorldRuntime();
+  const definitions = published
+    ? MERCHANTS.filter((data) => getPublishedObjectPositions(data.shopId).length > 0)
+    : MERCHANTS;
+  return definitions.map((data) => createMerchant(world, data));
 }
