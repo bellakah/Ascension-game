@@ -63,7 +63,8 @@ function currentChatCode() {
 
 function actualGameMenuOpen() {
   const menu = document.querySelector<HTMLElement>('#game-menu-overlay');
-  return Boolean(menu && !menu.classList.contains('game-menu-hidden') && !menu.classList.contains('chat-pause-proxy'));
+  if (!menu || menu.classList.contains('game-menu-hidden')) return false;
+  return !menu.classList.contains('chat-pause-proxy') && !menu.classList.contains('guild-pause-proxy');
 }
 
 /**
