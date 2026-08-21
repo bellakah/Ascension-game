@@ -1,5 +1,5 @@
 import { Container, Graphics, Text } from 'pixi.js';
-import { getPublishedObjectPositions } from '../map/publishedMapRuntime';
+import { getPreparedPublishedWorldRuntime, getPublishedObjectPositions } from '../map/publishedMapRuntime';
 import type { ShopId } from './shopSystem';
 
 export type VillageMerchant = {
@@ -52,5 +52,9 @@ function createMerchant(world: Container, data: MerchantVisual): VillageMerchant
 }
 
 export function createVillageMerchants(world: Container) {
-  return MERCHANTS.map((data) => createMerchant(world, data));
+  const published = getPreparedPublishedWorldRuntime();
+  const definitions = published
+    ? MERCHANTS.filter((data) => getPublishedObjectPositions(data.shopId).length > 0)
+    : MERCHANTS;
+  return definitions.map((data) => createMerchant(world, data));
 }
