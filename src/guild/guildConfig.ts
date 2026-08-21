@@ -26,7 +26,8 @@ export const DEFAULT_GUILD_RANKS: GuildRankDefinition[] = [
 
 export const GUILD_CONFIG = {
   version: 1,
-  creationCost: 25,
+  // Gratuito durante o protótipo para facilitar os testes. O Editor/servidor poderá definir o custo depois.
+  creationCost: 0,
   maxLevel: 20,
   applicationLimitPerCharacter: 5,
   inviteExpirationMs: 7 * 24 * 60 * 60 * 1000,
