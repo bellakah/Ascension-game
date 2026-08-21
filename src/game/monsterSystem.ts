@@ -1,5 +1,5 @@
 import { Container, Graphics, Text, Ticker } from 'pixi.js';
-import { getPublishedObjectPositions } from '../map/publishedMapRuntime';
+import { getPreparedPublishedWorldRuntime, getPublishedObjectPositions } from '../map/publishedMapRuntime';
 import { ToxicSludgeView } from '../monsters/toxicSludge';
 import type { MonsterKind } from '../quests/questTypes';
 import { distance, isInSafeZone } from './world';
@@ -55,12 +55,13 @@ async function createSludge(world: Container, id: string, x: number, y: number):
 }
 
 export async function createMonsters(world: Container) {
+  const publishedRuntime = getPreparedPublishedWorldRuntime();
   const wolves = getPublishedObjectPositions('wolf');
   const sludges = getPublishedObjectPositions('sludge');
   const wolfDefaults = [{ x: 1320, y: 930 }, { x: 1510, y: 720 }, { x: 1740, y: 1030 }];
   const sludgeDefaults = [{ x: 430, y: 560 }, { x: 560, y: 1080 }, { x: 1520, y: 390 }, { x: 1880, y: 690 }, { x: 1680, y: 1320 }];
-  const wolfPositions = wolves.length ? wolves : wolfDefaults;
-  const sludgePositions = sludges.length ? sludges : sludgeDefaults;
+  const wolfPositions = publishedRuntime ? wolves : wolfDefaults;
+  const sludgePositions = publishedRuntime ? sludges : sludgeDefaults;
   const result: Monster[] = [];
   for (let index = 0; index < wolfPositions.length; index++) {
     const position = wolfPositions[index];
