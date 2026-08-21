@@ -1,6 +1,9 @@
 name: Validate Ascension Editor
 
 on:
+  push:
+    branches:
+      - feat/editor-rpgjs-workflow
   pull_request:
     branches:
       - main
