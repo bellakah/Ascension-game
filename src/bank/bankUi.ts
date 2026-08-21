@@ -59,7 +59,7 @@ export function createBankUi(progress: CharacterProgress, callbacks: BankCallbac
     </section>`;
 
     root.querySelector<HTMLButtonElement>('#bank-close')!.onclick = close;
-    root.querySelector<HTMLInputElement>('#bank-search')!.oninput = (e) => { search = (e.currentTarget as HTMLInputElement).value.trim().toLocaleLowerCase('pt-BR'); render(); };
+    root.querySelector<HTMLInputElement>('#bank-search')!.onchange = (e) => { search = (e.currentTarget as HTMLInputElement).value.trim().toLocaleLowerCase('pt-BR'); render(); };
     root.querySelectorAll<HTMLButtonElement>('[data-cat]').forEach((button)=>button.onclick=()=>{category=button.dataset.cat as ItemCategory|'all'; selection=null; render();});
     root.querySelectorAll<HTMLButtonElement>('[data-side]').forEach((button)=>button.onclick=()=>{selection={side:button.dataset.side as 'inventory'|'bank', index:Number(button.dataset.index)}; quantity=1; render();});
     root.querySelector<HTMLButtonElement>('#bank-sort')!.onclick=()=>{organizeBank(progress); callbacks.onChanged(); selection=null; render();};
@@ -76,10 +76,12 @@ export function createBankUi(progress: CharacterProgress, callbacks: BankCallbac
     root.querySelector<HTMLButtonElement>('#bank-transfer-btn')!.onclick=()=>{
       if(selection!.side==='inventory'){
         const result=depositInventoryStack(progress,selection!.index,quantity);
-        if(!result.ok){callbacks.notify(result.reason);return;} callbacks.notify(`${result.moved}x ${getItem(result.itemId!)?.name??'item'} depositado.`);
+        if('reason' in result){callbacks.notify(result.reason);return;}
+        callbacks.notify(`${result.moved}x ${item.name} depositado.`);
       }else{
         const result=withdrawBankStack(progress,selection!.index,quantity,(id,qty,enh)=>addItem(progress,id,qty,enh));
-        if(!result.ok){callbacks.notify(result.reason);return;} callbacks.notify(`${result.moved}x ${getItem(result.itemId!)?.name??'item'} retirado.`);
+        if('reason' in result){callbacks.notify(result.reason);return;}
+        callbacks.notify(`${result.moved}x ${item.name} retirado.`);
       }
       callbacks.onChanged(); selection=null; quantity=1; render();
     };
