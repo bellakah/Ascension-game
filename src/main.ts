@@ -9,12 +9,14 @@ if (playtest === 'map') {
 } else if (editor === 'map') {
   void import('./editor/map/mapEditorV2').then(async ({ startMapEditorV2 }) => {
     await startMapEditorV2();
-    const [{ installMapEditorPublishUi }, { installMapEditorAssetDeleteUi }] = await Promise.all([
+    const [{ installMapEditorPublishUi }, { installMapEditorAssetDeleteUi }, { installMapEditorAssetPreviewUi }] = await Promise.all([
       import('./editor/map/mapEditorPublishUi'),
       import('./editor/map/mapEditorAssetDeleteUi'),
+      import('./editor/map/mapEditorAssetPreviewUi'),
     ]);
     installMapEditorPublishUi();
     installMapEditorAssetDeleteUi();
+    installMapEditorAssetPreviewUi();
   });
 } else {
   void import('./gameBootstrap').then(({ startGameApp }) => startGameApp());
