@@ -1,0 +1,7 @@
+@media (max-width: 720px) and (orientation: portrait) {
+  html[data-ui-mode='mobile-portrait'] .utility-dock {
+    width: 138px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+}
