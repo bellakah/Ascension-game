@@ -36,8 +36,8 @@ export const CRAFTING_RECIPES: CraftingRecipe[] = [
 ];
 
 export const CRAFTING_STATIONS: CraftingStationDefinition[] = [
-  { id: 'clearing-forge', name: 'Forja da Clareira', type: 'forge', map: 'Floresta Inicial', x: 810, y: 1370, radius: 82, icon: '⚒', hint: 'Usar forja' },
-  { id: 'clearing-alchemy', name: 'Bancada de Alquimia', type: 'alchemy', map: 'Floresta Inicial', x: 1130, y: 1380, radius: 78, icon: '⚗', hint: 'Preparar alquimia' },
+  { id: 'clearing-forge', name: 'Forja da Clareira', type: 'forge', map: 'Floresta Inicial', x: 665, y: 1355, radius: 82, icon: '⚒', hint: 'Usar forja' },
+  { id: 'clearing-alchemy', name: 'Bancada de Alquimia', type: 'alchemy', map: 'Floresta Inicial', x: 1275, y: 1355, radius: 78, icon: '⚗', hint: 'Preparar alquimia' },
 ];
 
 export const CRAFTING_CATEGORY_LABELS: Record<CraftingRecipe['category'], string> = {
