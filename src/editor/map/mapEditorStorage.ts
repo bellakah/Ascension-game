@@ -49,8 +49,8 @@ export function createBlankMap(name = 'Novo Mapa', width = 69, height = 50, tile
   return document;
 }
 
-function object(assetId: string, kind: MapObject['kind'], x: number, y: number): MapObject {
-  return { id: makeId('object'), kind, assetId, x, y, rotation: 0, properties: {} };
+function object(assetId: string, kind: MapObject['kind'], x: number, y: number, width = 1, height = 1): MapObject {
+  return { id: makeId('object'), kind, assetId, x, y, width, height, scale: 1, rotation: 0, properties: {} };
 }
 
 function zone(kind: MapZone['kind'], x: number, y: number, width: number, height: number, name: string): MapZone {
@@ -61,12 +61,10 @@ export function createStarterMap(): AscensionMapDocument {
   const map = createBlankMap('Floresta Inicial', 69, 50, 32);
   map.id = 'floresta-inicial-editor';
 
-  // Estrada norte/sul equivalente à leitura visual do protótipo atual.
   for (let y = 0; y < map.height; y++) {
     for (let x = 24; x <= 36; x++) map.tiles[tileKey(x, y)] = { ground: 'road' };
   }
 
-  // Vila da Clareira aproximada no grid do documento. A integração runtime virá na etapa seguinte.
   for (let y = 31; y <= 48; y++) {
     for (let x = 18; x <= 41; x++) map.tiles[tileKey(x, y)] = { ground: 'forest_grass' };
   }
@@ -78,19 +76,23 @@ export function createStarterMap(): AscensionMapDocument {
   }
 
   map.objects.push(
-    object('house', 'doodad', 22, 36),
-    object('house', 'doodad', 38, 36),
+    object('house', 'doodad', 22, 36, 3, 2),
+    object('house', 'doodad', 38, 36, 3, 2),
     object('well', 'doodad', 34, 46),
     object('campfire', 'doodad', 26, 46),
+    object('anvil_station', 'doodad', 20, 41, 2, 1),
+    object('alchemy_station', 'doodad', 40, 41, 2, 1),
     object('rowan', 'npc', 22, 40),
     object('mira', 'npc', 38, 40),
     object('silas', 'npc', 23, 45),
     object('theo', 'npc', 38, 45),
     object('elandra', 'npc', 30, 16),
+    object('pc_knight_npc', 'npc', 31, 44),
     object('wolf', 'monster', 12, 14),
     object('wolf', 'monster', 50, 14),
     object('sludge', 'monster', 12, 27),
     object('sludge', 'monster', 52, 29),
+    object('pc_orc', 'monster', 57, 18),
     object('herb', 'resource', 8, 35),
     object('iron_vein', 'resource', 58, 37),
     object('wood_node', 'resource', 10, 43),
@@ -101,6 +103,7 @@ export function createStarterMap(): AscensionMapDocument {
 
   map.zones.push(zone('safe', 18, 31, 24, 18, 'Vila da Clareira'));
   map.zones.push(zone('respawn', 29, 42, 3, 3, 'Santuário de Renascimento'));
+  map.metadata.notes = 'Mapa de demonstração do Editor. Inclui assets Pixel Crawler usados apenas no fluxo Draft/Playtest.';
   map.updatedAt = Date.now();
   return map;
 }
