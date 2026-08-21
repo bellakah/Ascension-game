@@ -5,15 +5,17 @@ import { createCharacterSheet } from '../character/characterSheet';
 import { createInventory } from '../items/inventory';
 import { ensureInventoryState, getItem } from '../items/itemCatalog';
 import { spawnMonsterLoot, updateGroundLoot, type GroundLoot } from '../items/lootSystem';
+import { createQuestJournal } from '../quests/questJournal';
+import { ensureQuestStates, getNpcQuestMarker, grantQuestItemRewards, interactQuestNpc, NPC_NAMES, registerQuestEvent, syncCollectObjectives } from '../quests/questEngine';
+import { nearestQuestInteractable, visitZonesAt } from '../quests/worldQuestTargets';
 import { createSkillBar } from '../skills/skillBar';
 import { createSkillController } from '../skills/skillController';
 import { getSkill, type SkillId } from '../skills/skillCatalog';
 import { createHud, showDialog, updateHud } from './hud';
 import { createMonsters, damageMonster, findAttackTarget, killMonster, updateMonsters, type Monster } from './monsterSystem';
-import { currentQuest, ensureQuestStates, interactQuest, registerQuestKill } from './quests';
 import { createRespawnScreen } from './respawn';
 import { createShop } from './shopSystem';
-import { createVillageMerchants } from './villageNpcs';
+import { createVillageMerchants, type VillageMerchant } from './villageNpcs';
 import { collides, createElandra, createWorld, distance, isInSafeZone, nearestVillage, SPAWN, WORLD_H, WORLD_W } from './world';
 
 const bootStatus = document.querySelector<HTMLDivElement>('#boot-status');
@@ -81,18 +83,22 @@ export async function startGame() {
       persistSelectedCharacter(selected);
     };
 
-    const syncNpc = () => {
-      const quest = currentQuest(progress);
-      if (!quest) { npcMark.text = '✓'; npcMark.style.fill = 0x9cf28f; return; }
-      const state = progress.quests[quest.id];
-      if (state.status === 'ready') { npcMark.text = '?'; npcMark.style.fill = 0x8fd3ff; }
-      else if (state.status === 'not_started') { npcMark.text = '!'; npcMark.style.fill = 0xffdd57; }
-      else npcMark.text = '';
+    const syncNpcMarkers = () => {
+      const elandraMarker = getNpcQuestMarker(progress, 'elandra');
+      npcMark.text = elandraMarker.symbol;
+      npcMark.style.fill = elandraMarker.color;
+      for (const merchant of merchants) {
+        const marker = getNpcQuestMarker(progress, merchant.id);
+        merchant.questMark.text = marker.symbol;
+        merchant.questMark.style.fill = marker.color;
+      }
     };
 
-    const refresh = () => { updateHud(hud, progress, playerHp, coins); syncNpc(); };
+    const refresh = () => { updateHud(hud, progress, playerHp, coins); syncNpcMarkers(); };
+    const questJournal = createQuestJournal(progress, { onChanged: () => { refresh(); save(); } });
     const characterSheet = createCharacterSheet(config, progress);
 
+    const refreshQuestUi = () => { refresh(); questJournal.refresh(); };
     const syncEquipmentVisuals = () => {
       void hero.setEquipment(ensureInventoryState(progress).equipment);
       characterSheet.refresh();
@@ -106,14 +112,14 @@ export async function startGame() {
         progress.hp = playerHp;
         refresh();
       },
-      onChanged: () => { syncEquipmentVisuals(); refresh(); save(); },
+      onChanged: () => { syncCollectObjectives(progress); syncEquipmentVisuals(); refreshQuestUi(); save(); },
       notify: (message) => showDialog(hud, message),
     });
 
     const shop = createShop(progress, {
       getCoins: () => coins,
       setCoins: (value) => { coins = Math.max(0, Math.floor(value)); progress.coins = coins; },
-      onChanged: () => { inventory.refresh(); characterSheet.refresh(); refresh(); save(); },
+      onChanged: () => { syncCollectObjectives(progress); inventory.refresh(); characterSheet.refresh(); refreshQuestUi(); save(); },
       notify: (message) => showDialog(hud, message),
     });
 
@@ -131,39 +137,27 @@ export async function startGame() {
         player.alpha = 1;
         player.position.set(village.respawn.x, village.respawn.y);
         progress.position = { x: village.respawn.x, y: village.respawn.y };
-        keys.clear();
-        resetStick();
-        wasSafe = true;
-        respawnScreen.hide();
-        refresh();
-        characterSheet.refresh();
-        skillBar.refresh(skillController.snapshot());
-        save();
+        keys.clear(); resetStick(); wasSafe = true;
+        respawnScreen.hide(); refreshQuestUi(); characterSheet.refresh();
+        skillBar.refresh(skillController.snapshot()); save();
         showDialog(hud, `Você renasceu em ${village.name}. Esta é uma área segura.`);
       },
     });
 
-    const uiOpen = () => isDead || respawnScreen.isOpen() || inventory.isOpen() || characterSheet.isOpen() || shop.isOpen();
-    hud.inventory.addEventListener('pointerdown', () => { if (isDead) return; shop.close(); characterSheet.close(); inventory.toggle(); });
-    hud.character.addEventListener('pointerdown', () => { if (isDead) return; shop.close(); inventory.close(); characterSheet.toggle(); });
+    const uiOpen = () => isDead || respawnScreen.isOpen() || inventory.isOpen() || characterSheet.isOpen() || shop.isOpen() || questJournal.isOpen();
+    hud.inventory.addEventListener('pointerdown', () => { if (isDead) return; shop.close(); characterSheet.close(); questJournal.close(); inventory.toggle(); });
+    hud.character.addEventListener('pointerdown', () => { if (isDead) return; shop.close(); inventory.close(); questJournal.close(); characterSheet.toggle(); });
+    hud.questJournal.addEventListener('pointerdown', () => { if (isDead) return; shop.close(); inventory.close(); characterSheet.close(); questJournal.toggle(); });
 
     const enterDeathState = () => {
       if (respawnScreen.isOpen()) return;
-      isDead = true;
-      playerHp = 0;
-      progress.hp = 0;
-      deathPosition = { x: player.x, y: player.y };
-      player.alpha = .42;
-      keys.clear();
-      resetStick();
-      inventory.close();
-      characterSheet.close();
-      shop.close();
+      isDead = true; playerHp = 0; progress.hp = 0;
+      deathPosition = { x: player.x, y: player.y }; player.alpha = .42;
+      keys.clear(); resetStick(); inventory.close(); characterSheet.close(); shop.close(); questJournal.close();
       skillBar.refresh(skillController.snapshot(), true);
       const village = nearestVillage(deathPosition.x, deathPosition.y, progress.map || 'Floresta Inicial');
       if (village) respawnScreen.show(village);
-      refresh();
-      save();
+      refreshQuestUi(); save();
     };
 
     const floating = (x: number, y: number, text: string, color: number) => {
@@ -179,14 +173,11 @@ export async function startGame() {
 
     const pulse = (radius: number, color: number, durationMs = 420) => {
       const effect = new Graphics().circle(0, 0, radius).stroke({ width: 5, color, alpha: .8 });
-      effect.position.set(player.x, player.y);
-      world.addChild(effect);
+      effect.position.set(player.x, player.y); world.addChild(effect);
       let remaining = durationMs;
       const tick = (ticker: Ticker) => {
         remaining -= ticker.deltaMS;
-        const t = Math.max(0, remaining / durationMs);
-        effect.alpha = t;
-        effect.scale.set(1 + (1 - t) * .35);
+        const t = Math.max(0, remaining / durationMs); effect.alpha = t; effect.scale.set(1 + (1 - t) * .35);
         if (remaining <= 0) { app.ticker.remove(tick); world.removeChild(effect); effect.destroy(); }
       };
       app.ticker.add(tick);
@@ -194,12 +185,10 @@ export async function startGame() {
 
     const magicLink = (target: Monster, color: number) => {
       const effect = new Graphics().moveTo(player.x, player.y - 34).lineTo(target.view.x, target.view.y - 22).stroke({ width: 5, color, alpha: .85 });
-      effect.circle(target.view.x, target.view.y - 22, 15).stroke({ width: 3, color, alpha: .75 });
-      world.addChild(effect);
+      effect.circle(target.view.x, target.view.y - 22, 15).stroke({ width: 3, color, alpha: .75 }); world.addChild(effect);
       let remaining = 180;
       const tick = (ticker: Ticker) => {
-        remaining -= ticker.deltaMS;
-        effect.alpha = Math.max(0, remaining / 180);
+        remaining -= ticker.deltaMS; effect.alpha = Math.max(0, remaining / 180);
         if (remaining <= 0) { app.ticker.remove(tick); world.removeChild(effect); effect.destroy(); }
       };
       app.ticker.add(tick);
@@ -209,53 +198,50 @@ export async function startGame() {
       progress.exp += amount;
       let leveled = false;
       while (progress.exp >= progress.expToNext) {
-        progress.exp -= progress.expToNext;
-        progress.level += 1;
+        progress.exp -= progress.expToNext; progress.level += 1;
         progress.expToNext = Math.round(progress.expToNext * 1.35);
         progress.maxHp += classDef.id === 'mage' ? 8 : 12;
         progress.attack += classDef.id === 'mage' ? 5 : 4;
-        progress.defense += classDef.id === 'mage' ? 1 : 1;
-        playerHp = progress.maxHp;
-        leveled = true;
+        progress.defense += 1; playerHp = progress.maxHp; leveled = true;
       }
       if (leveled) showDialog(hud, `Nível ${progress.level}! HP, ataque e defesa aumentaram.`);
       characterSheet.refresh();
     };
 
+    const announceQuestUpdates = (updates: ReturnType<typeof registerQuestEvent>) => {
+      const ready = updates.find((update) => update.becameReady);
+      if (ready) showDialog(hud, `${ready.quest.title}: objetivos concluídos! Volte para ${NPC_NAMES[ready.quest.endNpcId] ?? ready.quest.endNpcId}.`);
+      else {
+        const completed = updates.find((update) => update.objectiveCompleted);
+        if (completed) showDialog(hud, `${completed.quest.title}: ${completed.objective.label} concluído.`);
+      }
+      if (updates.length) { refreshQuestUi(); save(); }
+    };
+
     const onKill = (monster: Monster) => {
-      grantExp(monster.expReward);
-      coins += monster.coinReward;
+      grantExp(monster.expReward); coins += monster.coinReward;
       spawnMonsterLoot(world, monster.kind, monster.view.x, monster.view.y, groundLoot);
       floating(monster.view.x, monster.view.y - 45, `+${monster.expReward} EXP`, 0xaee8ff);
-      const result = registerQuestKill(progress, monster.kind);
-      if (result?.becameReady) showDialog(hud, `${result.quest.title}: objetivo concluído! Volte para Elandra.`);
-      inventory.refresh(); refresh(); save(); characterSheet.refresh();
+      announceQuestUpdates(registerQuestEvent(progress, { type: 'kill', monsterKind: monster.kind, monsterId: monster.id }));
+      inventory.refresh(); refreshQuestUi(); save(); characterSheet.refresh();
     };
 
     const attackPower = () => Math.max(1, Math.round(progress.attack * skillController.attackMultiplier()));
-
     const faceTarget = (target: Monster) => {
-      const dx = target.view.x - player.x;
-      const dy = target.view.y - player.y;
+      const dx = target.view.x - player.x, dy = target.view.y - player.y;
       const facing: Facing = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down');
       hero.setFacing(facing);
     };
-
     const hitMonster = (monster: Monster, amount: number, color = 0xffc2b8) => {
       const damage = Math.max(1, Math.round(amount));
-      const died = damageMonster(monster, damage);
-      floating(monster.view.x, monster.view.y - 25, `-${damage}`, color);
+      const died = damageMonster(monster, damage); floating(monster.view.x, monster.view.y - 25, `-${damage}`, color);
       if (died) { killMonster(monster); onKill(monster); }
     };
-
     const nearbyMonsters = (radius: number) => monsters.filter((monster) => monster.alive && distance(player.x, player.y, monster.view.x, monster.view.y) <= radius);
 
     const dashToward = (target: Monster) => {
-      const dx = target.view.x - player.x;
-      const dy = target.view.y - player.y;
-      const d = Math.max(1, Math.hypot(dx, dy));
-      const travel = Math.max(0, d - 66);
-      const steps = Math.max(1, Math.ceil(travel / 12));
+      const dx = target.view.x - player.x, dy = target.view.y - player.y, d = Math.max(1, Math.hypot(dx, dy));
+      const travel = Math.max(0, d - 66), steps = Math.max(1, Math.ceil(travel / 12));
       let bestX = player.x, bestY = player.y;
       for (let i = 1; i <= steps; i++) {
         const step = Math.min(travel, i * 12);
@@ -271,82 +257,70 @@ export async function startGame() {
 
     useSkill = (skillId: SkillId) => {
       if (uiOpen() || hero.isAttacking) return;
-      if (isInSafeZone(player.x, player.y)) {
-        showDialog(hud, 'Área segura: habilidades de combate não podem ser usadas aqui.');
-        return;
-      }
-
-      const skill = getSkill(skillId);
-      if (!skill || skill.classId !== classDef.id) return;
-      let target: Monster | null = null;
-      let targets: Monster[] = [];
+      if (isInSafeZone(player.x, player.y)) { showDialog(hud, 'Área segura: habilidades de combate não podem ser usadas aqui.'); return; }
+      const skill = getSkill(skillId); if (!skill || skill.classId !== classDef.id) return;
+      let target: Monster | null = null; let targets: Monster[] = [];
       if (skill.kind === 'melee' || skill.kind === 'charge' || skill.kind === 'target') {
         target = findAttackTarget(monsters, player.x, player.y, skill.range ?? 120);
         if (!target) { showDialog(hud, `${skill.name}: nenhum alvo no alcance.`); return; }
       }
-      if (skill.kind === 'aoe') {
-        targets = nearbyMonsters(skill.radius ?? 150);
-        if (!targets.length) { showDialog(hud, `${skill.name}: nenhum inimigo por perto.`); return; }
+      if (skill.kind === 'aoe') { targets = nearbyMonsters(skill.radius ?? 150); if (!targets.length) { showDialog(hud, `${skill.name}: nenhum inimigo por perto.`); return; } }
+      const check = skillController.canUse(skillId); if ('reason' in check && check.reason) { showDialog(hud, check.reason); return; }
+      const activated = skillController.activate(skillId); if ('reason' in activated && activated.reason) { showDialog(hud, activated.reason); return; }
+      const baseAttack = attackPower(), color = skill.effectColor ?? 0xf0b85d;
+      if (skill.kind === 'melee' && target) { faceTarget(target); hero.attack(); attackCooldown = 30; pulse(82, color, 280); hitMonster(target, baseAttack * (skill.damageMultiplier ?? 1), color); }
+      else if (skill.kind === 'charge' && target) { faceTarget(target); dashToward(target); hero.attack(); attackCooldown = 34; pulse(58, color, 300); hitMonster(target, baseAttack * (skill.damageMultiplier ?? 1), color); }
+      else if (skill.kind === 'target' && target) { faceTarget(target); hero.cast(); attackCooldown = 32; magicLink(target, color); hitMonster(target, baseAttack * (skill.damageMultiplier ?? 1), color); }
+      else if (skill.kind === 'aoe') { if (classDef.id === 'mage') hero.cast(); else hero.attack(); attackCooldown = 38; pulse(skill.radius ?? 165, color, 480); for (const monster of targets) hitMonster(monster, baseAttack * (skill.damageMultiplier ?? 1), color); }
+      else if (skill.kind === 'buff') { if (classDef.id === 'mage') hero.cast(); pulse(105, color, 650); floating(player.x, player.y - 105, `ATQ +${skill.buffAttackPercent ?? 0}%`, color); showDialog(hud, `${skill.name}: Ataque +${skill.buffAttackPercent ?? 0}% por ${Math.round((skill.buffDurationMs ?? 0) / 1000)}s.`); }
+      skillBar.refresh(skillController.snapshot()); save();
+    };
+
+    const applyQuestInteraction = (result: ReturnType<typeof interactQuestNpc>, npcName: string) => {
+      if (result.type === 'none') return false;
+      if (result.type === 'accepted') showDialog(hud, `${npcName}: ${result.quest.dialog?.accepted ?? result.quest.summary}`);
+      else if (result.type === 'progress') showDialog(hud, `${npcName}: ${result.quest.dialog?.progress ?? 'Continue os objetivos da missão.'}`);
+      else if (result.type === 'updated') {
+        showDialog(hud, result.becameReady ? `${result.quest.title}: pronta para entregar.` : `${result.quest.title}: objetivo atualizado.`);
+      } else if (result.type === 'completed') {
+        grantExp(result.quest.rewards.exp ?? 0); coins += result.quest.rewards.coins ?? 0;
+        const items = grantQuestItemRewards(progress, result.quest);
+        const extras = items.granted.length ? ` · ${items.granted.join(', ')}` : '';
+        showDialog(hud, `Missão concluída: ${result.quest.title}! +${result.quest.rewards.exp ?? 0} EXP · +${result.quest.rewards.coins ?? 0} moedas${extras}`);
+        if (items.missed.length) window.setTimeout(() => showDialog(hud, `Inventário sem espaço para: ${items.missed.join(', ')}.`), 900);
       }
-
-      const check = skillController.canUse(skillId);
-      if ('reason' in check && check.reason) { showDialog(hud, check.reason); return; }
-      const activated = skillController.activate(skillId);
-      if ('reason' in activated && activated.reason) { showDialog(hud, activated.reason); return; }
-
-      const baseAttack = attackPower();
-      const color = skill.effectColor ?? 0xf0b85d;
-      if (skill.kind === 'melee' && target) {
-        faceTarget(target); hero.attack(); attackCooldown = 30; pulse(82, color, 280); hitMonster(target, baseAttack * (skill.damageMultiplier ?? 1), color);
-      } else if (skill.kind === 'charge' && target) {
-        faceTarget(target); dashToward(target); hero.attack(); attackCooldown = 34; pulse(58, color, 300); hitMonster(target, baseAttack * (skill.damageMultiplier ?? 1), color);
-      } else if (skill.kind === 'target' && target) {
-        faceTarget(target); hero.cast(); attackCooldown = 32; magicLink(target, color); hitMonster(target, baseAttack * (skill.damageMultiplier ?? 1), color);
-      } else if (skill.kind === 'aoe') {
-        if (classDef.id === 'mage') hero.cast(); else hero.attack();
-        attackCooldown = 38; pulse(skill.radius ?? 165, color, 480);
-        for (const monster of targets) hitMonster(monster, baseAttack * (skill.damageMultiplier ?? 1), color);
-      } else if (skill.kind === 'buff') {
-        if (classDef.id === 'mage') hero.cast();
-        pulse(105, color, 650);
-        floating(player.x, player.y - 105, `ATQ +${skill.buffAttackPercent ?? 0}%`, color);
-        showDialog(hud, `${skill.name}: Ataque +${skill.buffAttackPercent ?? 0}% por ${Math.round((skill.buffDurationMs ?? 0) / 1000)}s.`);
-      }
-
-      skillBar.refresh(skillController.snapshot());
-      save();
+      syncCollectObjectives(progress); inventory.refresh(); characterSheet.refresh(); refreshQuestUi(); save(); return true;
     };
 
     const interact = () => {
       if (uiOpen()) return;
-      let nearestMerchant: typeof merchants[number] | null = null;
-      let merchantDistance = Infinity;
+      let nearestId = 'elandra', nearestName = 'Elandra', nearestDistance = distance(player.x, player.y, npc.x, npc.y);
+      let nearestMerchant: VillageMerchant | null = null;
       for (const merchant of merchants) {
         const d = distance(player.x, player.y, merchant.npc.x, merchant.npc.y);
-        if (d < merchantDistance) { merchantDistance = d; nearestMerchant = merchant; }
+        if (d < nearestDistance) { nearestDistance = d; nearestId = merchant.id; nearestName = merchant.name; nearestMerchant = merchant; }
       }
-      if (nearestMerchant && merchantDistance < 120) {
-        keys.clear(); resetStick(); shop.open(nearestMerchant.shopId); return;
+      if (nearestDistance < 120) {
+        keys.clear(); resetStick();
+        const questResult = interactQuestNpc(progress, nearestId);
+        if (applyQuestInteraction(questResult, nearestName)) return;
+        if (nearestMerchant) { shop.open(nearestMerchant.shopId); return; }
+        showDialog(hud, 'Elandra: Continue explorando a floresta. Novas missões surgirão conforme você progride.');
+        return;
       }
-      if (distance(player.x, player.y, npc.x, npc.y) >= 115) return;
-      const result = interactQuest(progress);
-      if (result.type === 'all_done') showDialog(hud, 'Elandra: Você já concluiu todas as missões de teste.');
-      else if (result.type === 'accepted') showDialog(hud, `Elandra: ${result.quest.objective}. Recompensa: ${result.quest.rewardExp} EXP e ${result.quest.rewardCoins} moedas.`);
-      else if (result.type === 'completed') {
-        grantExp(result.quest.rewardExp); coins += result.quest.rewardCoins;
-        showDialog(hud, `Missão concluída! +${result.quest.rewardExp} EXP e +${result.quest.rewardCoins} moedas.`);
-      } else showDialog(hud, `Elandra: ${result.quest.objective}. Progresso ${result.state.progress}/${result.state.target}.`);
-      refresh(); save(); characterSheet.refresh();
+      const target = nearestQuestInteractable(player.x, player.y, progress.map || 'Floresta Inicial');
+      if (target) {
+        const updates = registerQuestEvent(progress, { type: 'interact', targetId: target.id });
+        announceQuestUpdates(updates);
+        if (!updates.length) showDialog(hud, target.ambientText);
+      }
     };
 
     const attack = () => {
       if (uiOpen() || attackCooldown > 0 || hero.isAttacking) return;
       if (isInSafeZone(player.x, player.y)) { showDialog(hud, 'Área segura: combates não são permitidos dentro da vila.'); return; }
-      const target = findAttackTarget(monsters, player.x, player.y, classDef.basicAttack.range);
-      if (!target) return;
-      faceTarget(target);
-      if (!playClassAction()) return;
-      attackCooldown = classDef.basicAttack.cooldownTicks;
+      const target = findAttackTarget(monsters, player.x, player.y, classDef.basicAttack.range); if (!target) return;
+      faceTarget(target); if (!playClassAction()) return; attackCooldown = classDef.basicAttack.cooldownTicks;
       if (classDef.id === 'mage') magicLink(target, 0x82b7ff);
       hitMonster(target, attackPower(), classDef.id === 'mage' ? 0x9ddcff : 0xffc2b8);
     };
@@ -356,11 +330,10 @@ export async function startGame() {
     window.addEventListener('keydown', (event) => {
       const key = event.key.toLowerCase();
       if (isDead) { event.preventDefault(); return; }
-      if (key === 'i' && characterSheet.isOpen()) characterSheet.close();
-      if (key === 'i' && shop.isOpen()) shop.close();
-      if (key === 'c' && inventory.isOpen()) inventory.close();
-      if (key === 'c' && shop.isOpen()) shop.close();
-      if (uiOpen() && event.key !== 'Escape' && key !== 'i' && key !== 'c') return;
+      if (key === 'i') { characterSheet.close(); questJournal.close(); if (shop.isOpen()) shop.close(); }
+      if (key === 'c') { inventory.close(); questJournal.close(); if (shop.isOpen()) shop.close(); }
+      if (key === 'j') { inventory.close(); characterSheet.close(); if (shop.isOpen()) shop.close(); }
+      if (uiOpen() && event.key !== 'Escape' && key !== 'i' && key !== 'c' && key !== 'j') return;
       keys.add(key);
       if (event.code === 'Space') attack();
       if (key === 'e') interact();
@@ -378,20 +351,16 @@ export async function startGame() {
     };
     hud.stick.addEventListener('pointerdown', (e) => { if (!uiOpen()) { hud.stick.setPointerCapture(e.pointerId); updateStick(e.clientX, e.clientY); } });
     hud.stick.addEventListener('pointermove', (e) => { if (hud.stick.hasPointerCapture(e.pointerId)) updateStick(e.clientX, e.clientY); });
-    hud.stick.addEventListener('pointerup', resetStick);
-    hud.stick.addEventListener('pointercancel', resetStick);
+    hud.stick.addEventListener('pointerup', resetStick); hud.stick.addEventListener('pointercancel', resetStick);
 
     document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
     window.addEventListener('pagehide', save);
-
     if (isDead) enterDeathState();
 
     app.ticker.add((ticker: Ticker) => {
-      autosaveMs += ticker.deltaMS;
-      if (autosaveMs >= 3000) { autosaveMs = 0; save(); }
+      autosaveMs += ticker.deltaMS; if (autosaveMs >= 3000) { autosaveMs = 0; save(); }
       attackCooldown = Math.max(0, attackCooldown - ticker.deltaTime);
-      skillController.tick(ticker.deltaMS, uiOpen());
-      skillUiMs += ticker.deltaMS;
+      skillController.tick(ticker.deltaMS, uiOpen()); skillUiMs += ticker.deltaMS;
       if (skillUiMs >= 100) { skillUiMs = 0; skillBar.refresh(skillController.snapshot(), uiOpen()); }
 
       let dx = uiOpen() ? 0 : stickX, dy = uiOpen() ? 0 : stickY;
@@ -404,8 +373,7 @@ export async function startGame() {
       const len = Math.hypot(dx, dy), moving = len > 0 && !hero.isAttacking;
       if (moving) {
         dx /= Math.max(1, len); dy /= Math.max(1, len);
-        const facing: Facing = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down');
-        hero.setFacing(facing);
+        const facing: Facing = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down'); hero.setFacing(facing);
         const speed = 4.4 * ticker.deltaTime;
         const nx = Math.max(40, Math.min(WORLD_W - 40, player.x + dx * speed));
         const ny = Math.max(80, Math.min(WORLD_H - 40, player.y + dy * speed));
@@ -416,28 +384,20 @@ export async function startGame() {
 
       if (!isDead) {
         const safeNow = isInSafeZone(player.x, player.y);
-        if (safeNow !== wasSafe) {
-          wasSafe = safeNow;
-          showDialog(hud, safeNow ? '🛡 Você entrou em uma área segura.' : 'Você saiu da área segura. Monstros podem atacar novamente.');
-        }
+        if (safeNow !== wasSafe) { wasSafe = safeNow; showDialog(hud, safeNow ? '🛡 Você entrou em uma área segura.' : 'Você saiu da área segura. Monstros podem atacar novamente.'); }
       }
 
       if (!uiOpen()) {
+        for (const zone of visitZonesAt(player.x, player.y, progress.map || 'Floresta Inicial')) announceQuestUpdates(registerQuestEvent(progress, { type: 'visit', zoneId: zone.id }));
         updateMonsters(monsters, ticker, player, progress.defense, (damage) => {
-          if (isDead) return;
-          playerHp = Math.max(0, playerHp - damage);
-          floating(player.x, player.y - 90, `-${damage}`, 0xff8f8f);
-          if (playerHp <= 0) { enterDeathState(); return; }
-          refresh();
+          if (isDead) return; playerHp = Math.max(0, playerHp - damage); floating(player.x, player.y - 90, `-${damage}`, 0xff8f8f);
+          if (playerHp <= 0) { enterDeathState(); return; } refresh();
         });
 
         updateGroundLoot(groundLoot, ticker, player, progress, (itemId, quantity) => {
           const item = getItem(itemId);
-          if (item) {
-            floating(player.x, player.y - 75, `+${quantity} ${item.icon}`, 0xffe7a0);
-            showDialog(hud, `${quantity}x ${item.name} adicionado ao inventário.`);
-          }
-          inventory.refresh(); save(); characterSheet.refresh();
+          if (item) { floating(player.x, player.y - 75, `+${quantity} ${item.icon}`, 0xffe7a0); showDialog(hud, `${quantity}x ${item.name} adicionado ao inventário.`); }
+          announceQuestUpdates(syncCollectObjectives(progress)); inventory.refresh(); refreshQuestUi(); save(); characterSheet.refresh();
         }, () => showDialog(hud, 'Inventário cheio. O item continuará no chão por um tempo.'));
       }
 
@@ -445,12 +405,11 @@ export async function startGame() {
       world.y = Math.max(Math.min(0, app.screen.height - WORLD_H), Math.min(0, app.screen.height / 2 - player.y));
     });
 
-    refresh(); inventory.refresh(); characterSheet.refresh(); skillBar.refresh(skillController.snapshot(), isDead); save();
+    refreshQuestUi(); inventory.refresh(); characterSheet.refresh(); skillBar.refresh(skillController.snapshot(), isDead); save();
     if (bootStatus) bootStatus.remove();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(error);
-    setBootMessage(`Erro ao iniciar o jogo: ${message}`);
+    console.error(error); setBootMessage(`Erro ao iniciar o jogo: ${message}`);
     if (bootStatus) { bootStatus.style.display = 'grid'; bootStatus.style.background = '#2b1115'; bootStatus.style.color = '#ffd7dc'; }
   }
 }
