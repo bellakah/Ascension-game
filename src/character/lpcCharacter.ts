@@ -24,7 +24,7 @@ export type CharacterEquipmentVisuals = {
   accessory2?: string | null;
 };
 
-type Animation = 'idle' | 'walk' | 'slash' | 'spellcast';
+type Animation = 'idle' | 'walk' | 'slash' | 'spellcast' | 'emote';
 type LayerName = 'body' | 'pants' | 'boots' | 'mail' | 'head' | 'eyes' | 'hair' | 'hood' | 'weaponBg' | 'weaponFg';
 
 export const DEFAULT_CHARACTER: CharacterConfig = {
@@ -101,9 +101,7 @@ export class LpcCharacter {
     }
   }
 
-  private eyeColorName() {
-    return eyePalette.get(this.config.eyeColor) ?? 'blue';
-  }
+  private eyeColorName() { return eyePalette.get(this.config.eyeColor) ?? 'blue'; }
 
   private baseLayerPath(name: 'body' | 'pants' | 'boots' | 'head' | 'eyes' | 'hair', animation: Animation) {
     const sex = this.config.sex;
@@ -128,16 +126,20 @@ export class LpcCharacter {
     return url(`hat/cloth/hood/adult/${animation}.png`);
   }
 
+  private isStaff() {
+    return this.equipment.weapon === 'apprentice_staff' || this.equipment.weapon === 'oak_arcane_staff';
+  }
+
   private swordMaterial() {
     if (this.equipment.weapon === 'basic_sword') return 'bronze';
     if (this.equipment.weapon === 'iron_sword') return 'iron';
     if (this.equipment.weapon === 'shadow_fang_blade') return 'silver';
-    if (this.equipment.weapon === 'apprentice_staff') return null;
+    if (this.isStaff()) return null;
     return this.equipment.weapon ? 'steel' : null;
   }
 
   private weaponPath(animation: Animation, side: 'bg' | 'fg') {
-    if (this.equipment.weapon === 'apprentice_staff') {
+    if (this.isStaff()) {
       const staffAnimation = animation === 'idle' ? 'walk' : animation === 'slash' ? 'spellcast' : animation;
       if (staffAnimation !== 'walk' && staffAnimation !== 'spellcast') return null;
       const layer = side === 'bg' ? 'background' : 'foreground';
@@ -145,7 +147,7 @@ export class LpcCharacter {
     }
     const material = this.swordMaterial();
     if (!material) return null;
-    if (animation === 'spellcast') return null;
+    if (animation === 'spellcast' || animation === 'emote') return null;
     if (animation === 'slash') return url(`weapon/sword/arming/attack_slash/${side}/${material}.png`);
     return url(`weapon/sword/arming/universal/${side}/${animation}/${material}.png`);
   }
@@ -160,27 +162,26 @@ export class LpcCharacter {
     }
   }
 
+  private animations(): Animation[] { return ['idle', 'walk', 'slash', 'spellcast', 'emote']; }
+
   private async loadBaseSheets() {
-    const animations: Animation[] = ['idle', 'walk', 'slash', 'spellcast'];
     const names: Array<'body' | 'pants' | 'boots' | 'head' | 'eyes' | 'hair'> = ['body', 'pants', 'boots', 'head', 'eyes', 'hair'];
     const jobs: Promise<void>[] = [];
-    for (const animation of animations) {
+    for (const animation of this.animations()) {
       for (const name of names) jobs.push(this.tryLoad(`${name}:${animation}`, this.baseLayerPath(name, animation)));
     }
     await Promise.all(jobs);
   }
 
   private async loadEquipmentSheets() {
-    const animations: Animation[] = ['idle', 'walk', 'slash', 'spellcast'];
-    for (const animation of animations) {
+    for (const animation of this.animations()) {
       this.sheets.delete(`mail:${animation}`);
       this.sheets.delete(`hood:${animation}`);
       this.sheets.delete(`weaponBg:${animation}`);
       this.sheets.delete(`weaponFg:${animation}`);
     }
-
     const jobs: Promise<void>[] = [];
-    for (const animation of animations) {
+    for (const animation of this.animations()) {
       const armor = this.armorPath(animation);
       const hood = this.hoodPath(animation);
       if (armor) jobs.push(this.tryLoad(`mail:${animation}`, armor));
@@ -208,12 +209,9 @@ export class LpcCharacter {
     this.render();
   }
 
-  setFacing(facing: Facing) {
-    this.facing = facing;
-    this.render();
-  }
+  setFacing(facing: Facing) { this.facing = facing; this.render(); }
 
-  private startAction(animation: 'slash' | 'spellcast') {
+  private startAction(animation: 'slash' | 'spellcast' | 'emote') {
     if (this.isAttacking) return false;
     this.isAttacking = true;
     this.animation = animation;
@@ -225,11 +223,12 @@ export class LpcCharacter {
 
   attack() { return this.startAction('slash'); }
   cast() { return this.startAction('spellcast'); }
+  emote() { return this.startAction('emote'); }
 
   update(moving: boolean, dt: number) {
     if (this.isAttacking) {
       this.clock += dt;
-      const actionSpeed = this.animation === 'spellcast' ? 5.2 : 4.2;
+      const actionSpeed = this.animation === 'spellcast' ? 5.2 : this.animation === 'emote' ? 6.2 : 4.2;
       if (this.clock >= actionSpeed) {
         this.clock = 0;
         this.frame += 1;
@@ -244,18 +243,10 @@ export class LpcCharacter {
     }
 
     const next: Animation = moving ? 'walk' : 'idle';
-    if (next !== this.animation) {
-      this.animation = next;
-      this.frame = 0;
-      this.clock = 0;
-    }
-
+    if (next !== this.animation) { this.animation = next; this.frame = 0; this.clock = 0; }
     this.clock += dt;
     const speed = moving ? 6 : 16;
-    if (this.clock >= speed) {
-      this.clock = 0;
-      this.frame = (this.frame + 1) % this.frameCount('body', this.animation);
-    }
+    if (this.clock >= speed) { this.clock = 0; this.frame = (this.frame + 1) % this.frameCount('body', this.animation); }
     this.render();
   }
 
@@ -297,7 +288,6 @@ export class LpcCharacter {
       const fallback = this.sheets.get(`${name}:idle`);
       const sheet = exact ?? fallback;
       if (!sheet) { sprite.visible = false; continue; }
-
       sprite.visible = true;
       const usingSlashFrame = this.animation === 'slash' && Boolean(exact);
       sprite.anchor.set(0.5, usingSlashFrame ? 2 / 3 : 1);

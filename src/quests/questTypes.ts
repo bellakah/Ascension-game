@@ -3,7 +3,7 @@ import type { ClassId } from '../classes/classCatalog';
 export type MonsterKind = 'wolf' | 'sludge';
 export type QuestStatus = 'not_started' | 'active' | 'ready' | 'completed';
 export type QuestMode = 'sequential' | 'parallel';
-export type QuestObjectiveType = 'kill' | 'boss' | 'collect' | 'deliver' | 'talk' | 'visit' | 'interact';
+export type QuestObjectiveType = 'kill' | 'boss' | 'collect' | 'deliver' | 'talk' | 'visit' | 'interact' | 'gather' | 'craft';
 
 export type QuestObjective = {
   id: string;
@@ -57,7 +57,6 @@ export type QuestRuntimeState = {
   objectives: Record<string, number>;
   acceptedAt?: number;
   completedAt?: number;
-  // Campos legados mantidos durante a migração do protótipo antigo.
   progress?: number;
   target?: number;
 };
@@ -67,7 +66,9 @@ export type QuestEvent =
   | { type: 'boss'; monsterKind: MonsterKind; monsterId: string }
   | { type: 'talk'; npcId: string }
   | { type: 'visit'; zoneId: string }
-  | { type: 'interact'; targetId: string };
+  | { type: 'interact'; targetId: string }
+  | { type: 'gather'; nodeId: string; itemId: string }
+  | { type: 'craft'; recipeId: string; outputItemId: string };
 
 export type QuestUpdate = {
   quest: QuestDefinition;

@@ -119,6 +119,8 @@ function matchesEvent(objective: QuestObjective, event: QuestEvent) {
   if (objective.type === 'talk' && event.type === 'talk') return objective.npcId === event.npcId;
   if (objective.type === 'visit' && event.type === 'visit') return objective.target === event.zoneId;
   if (objective.type === 'interact' && event.type === 'interact') return objective.target === event.targetId;
+  if (objective.type === 'gather' && event.type === 'gather') return (!objective.target || objective.target === event.nodeId) && (!objective.itemId || objective.itemId === event.itemId);
+  if (objective.type === 'craft' && event.type === 'craft') return (!objective.target || objective.target === event.recipeId) && (!objective.itemId || objective.itemId === event.outputItemId);
   return false;
 }
 
@@ -216,8 +218,6 @@ export function interactQuestNpc(progress: CharacterProgress, npcId: string): Qu
     (progress as QuestProgress).trackedQuestId = available.id;
     return { type: 'accepted', quest: available };
   }
-  // NPCs comerciantes continuam acessíveis mesmo enquanto uma quest deles está ativa.
-  // A Elandra não possui loja, então pode continuar fornecendo uma fala de progresso.
   if (npcId === 'elandra') {
     const related = QUEST_CATALOG.find((quest) => stateFor(progress, quest).status === 'active' && (quest.startNpcId === npcId || quest.endNpcId === npcId));
     if (related) return { type: 'progress', quest: related };
