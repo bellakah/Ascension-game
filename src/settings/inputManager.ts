@@ -8,6 +8,12 @@ const FRIENDLY_CODES: Record<string, string> = {
   AltLeft: 'Alt E', AltRight: 'Alt D',
 };
 
+const LEGACY_KEY: Record<InputActionId, string> = {
+  moveUp: 'w', moveDown: 's', moveLeft: 'a', moveRight: 'd',
+  basicAttack: ' ', interact: 'e', skill1: '1', skill2: '2', skill3: '3', skill4: '4',
+  inventory: 'i', character: 'c', quests: 'j', pet: 'p', map: 'm', menu: 'Escape',
+};
+
 export function formatKeyCode(code: string) {
   if (FRIENDLY_CODES[code]) return FRIENDLY_CODES[code];
   if (code.startsWith('Key')) return code.slice(3);
@@ -42,7 +48,44 @@ export function createInputManager(store: SettingsStore) {
     return { swappedWith };
   };
 
-  return { codeFor, matches, isDown, rebind, display: (action: InputActionId) => formatKeyCode(codeFor(action)) };
+  const installLegacyBridge = () => {
+    const syntheticEvents = new WeakSet<KeyboardEvent>();
+    const defaultCodes = new Set(INPUT_ACTIONS.filter((action) => action.id !== 'menu').map((action) => action.defaultCode));
+
+    const forward = (event: KeyboardEvent) => {
+      if (syntheticEvents.has(event)) return;
+      const action = INPUT_ACTIONS.find((candidate) => candidate.id !== 'menu' && codeFor(candidate.id) === event.code);
+      const shouldBlockLegacy = defaultCodes.has(event.code);
+      if (!action && !shouldBlockLegacy) return;
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (!action) return;
+
+      const forwarded = new KeyboardEvent(event.type, {
+        key: LEGACY_KEY[action.id],
+        code: action.defaultCode,
+        bubbles: false,
+        cancelable: true,
+        repeat: event.repeat,
+        shiftKey: event.shiftKey,
+        ctrlKey: event.ctrlKey,
+        altKey: event.altKey,
+        metaKey: event.metaKey,
+      });
+      syntheticEvents.add(forwarded);
+      window.dispatchEvent(forwarded);
+    };
+
+    window.addEventListener('keydown', forward, true);
+    window.addEventListener('keyup', forward, true);
+    return () => {
+      window.removeEventListener('keydown', forward, true);
+      window.removeEventListener('keyup', forward, true);
+    };
+  };
+
+  return { codeFor, matches, isDown, rebind, installLegacyBridge, display: (action: InputActionId) => formatKeyCode(codeFor(action)) };
 }
 
 export type InputManager = ReturnType<typeof createInputManager>;
