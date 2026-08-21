@@ -1,3 +1,4 @@
+import { resolveGuildMembership } from '../guild/localGuildRepository';
 import { createChatSystem, type ChatSystem } from './chatSystem';
 
 const SESSION_KEY = 'ascension.session.v1';
@@ -99,7 +100,10 @@ export function prepareChatBootstrap() {
       characterId: identity.characterId,
       characterName: identity.characterName,
       getMap: () => currentMap(identity.accountId, identity.characterId),
-      getGuild: () => null,
+      getGuild: () => {
+        const membership = resolveGuildMembership(identity.characterId);
+        return membership ? { id: membership.guild.id, name: membership.guild.name } : null;
+      },
     });
     const button = document.querySelector<HTMLButtonElement>('#chat-button');
     button?.addEventListener('pointerdown', () => chat?.toggle());
