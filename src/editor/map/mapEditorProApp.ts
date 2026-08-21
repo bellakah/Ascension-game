@@ -22,6 +22,7 @@ type DragMode = 'none' | 'pan' | 'paint' | 'move' | 'marquee' | 'shape';
 type PanelMode = 'terrain' | 'objects' | 'assets' | 'zones' | null;
 type RightMode = 'selection' | 'layers' | null;
 type SnapMode = 'grid' | 'half' | 'free';
+type BrushShape = 'circle' | 'square';
 type EditorMode = 'map' | 'world';
 
 type AssetCategory = {
@@ -33,6 +34,7 @@ const FAVORITES_KEY = 'ascension.map-editor.favorites.v2';
 const RECENTS_KEY = 'ascension.map-editor.recents.v2';
 const RANDOM_KEY = 'ascension.map-editor.random-pool.v1';
 const SNAP_KEY = 'ascension.map-editor.snap.v1';
+const BRUSH_SHAPE_KEY = 'ascension.map-editor.brush-shape.v1';
 const UI_PANEL_KEY = 'ascension.map-editor.pro.panel.v1';
 
 const CATEGORIES: AssetCategory[] = [
@@ -150,6 +152,7 @@ export async function startMapEditor() {
   let tool: MapToolId = 'brush';
   let entry = getPaletteEntry('grass');
   let brushSize = 1;
+  let brushShape: BrushShape = (localStorage.getItem(BRUSH_SHAPE_KEY) as BrushShape) || 'circle';
   let snapMode: SnapMode = (localStorage.getItem(SNAP_KEY) as SnapMode) || 'grid';
   let gridVisible = true;
   let collisionVisible = false;
@@ -326,7 +329,7 @@ export async function startMapEditor() {
 
   const fitMap = () => {
     const view = viewSize();
-    zoom = clamp(Math.min(view.width / (mapDoc.width * mapDoc.tileSize), view.height / (mapDoc.height * mapDoc.tileSize)) * .92, .2, 2.5);
+    zoom = clamp(Math.min(view.width / (mapDoc.width * mapDoc.tileSize), view.height / (mapDoc.height * mapDoc.tileSize)) * .80, .2, 2.5);
     cameraX = mapDoc.width * mapDoc.tileSize / 2 - view.width / (2 * zoom);
     cameraY = mapDoc.height * mapDoc.tileSize / 2 - view.height / (2 * zoom);
     clampCamera(); renderContext(); render();
@@ -376,14 +379,22 @@ export async function startMapEditor() {
     if (layer === 'detail') value.detail = selected.id; else value.ground = selected.id;
     mapDoc.tiles[key] = value;
   };
+  const brushContains = (ox: number, oy: number) => {
+    if (brushShape === 'square' || brushSize <= 1) return true;
+    const radius = Math.max(.75, (brushSize - 1) / 2 + .25);
+    return Math.hypot(ox, oy) <= radius;
+  };
   const paintTerrain = (x: number, y: number, random = false) => {
     const radius = Math.floor(brushSize / 2);
-    for (let oy = -radius; oy <= radius; oy++) for (let ox = -radius; ox <= radius; ox++) paintTerrainOne(x + ox, y + oy, random ? randomEntry() : entry);
+    for (let oy = -radius; oy <= radius; oy++) for (let ox = -radius; ox <= radius; ox++) {
+      if (!brushContains(ox, oy)) continue;
+      paintTerrainOne(x + ox, y + oy, random ? randomEntry() : entry);
+    }
   };
   const eraseTerrain = (x: number, y: number) => {
     const radius = Math.floor(brushSize / 2);
     for (let oy = -radius; oy <= radius; oy++) for (let ox = -radius; ox <= radius; ox++) {
-      if (!validTile(x + ox, y + oy)) continue;
+      if (!brushContains(ox, oy) || !validTile(x + ox, y + oy)) continue;
       const key = tileKey(x + ox, y + oy), value = mapDoc.tiles[key] ?? {};
       if (layer === 'detail') delete value.detail; else value.ground = 'grass';
       mapDoc.tiles[key] = value;
@@ -433,6 +444,7 @@ export async function startMapEditor() {
   const paintCollision = (x: number, y: number, remove = false) => {
     const radius = Math.floor(brushSize / 2);
     for (let oy = -radius; oy <= radius; oy++) for (let ox = -radius; ox <= radius; ox++) {
+      if (!brushContains(ox, oy)) continue;
       const tx = x + ox, ty = y + oy; if (!validTile(tx, ty)) continue;
       const key = tileKey(tx, ty);
       if (remove) mapDoc.collision = mapDoc.collision.filter((value) => value !== key);
@@ -546,7 +558,13 @@ export async function startMapEditor() {
       if (entry.palette === 'terrain' || tool === 'collision' || tool === 'eraser') {
         const radius = Math.floor(brushSize / 2), start = { x: hoverTile.x - radius, y: hoverTile.y - radius };
         const hx = (start.x * mapDoc.tileSize - cameraX) * zoom, hy = (start.y * mapDoc.tileSize - cameraY) * zoom;
-        ctx.fillStyle = 'rgba(133,219,255,.13)'; ctx.strokeStyle = '#8ddcff'; ctx.fillRect(hx, hy, tilePx * brushSize, tilePx * brushSize); ctx.strokeRect(hx, hy, tilePx * brushSize, tilePx * brushSize);
+        ctx.fillStyle = 'rgba(133,219,255,.13)'; ctx.strokeStyle = '#8ddcff'; ctx.lineWidth = 1.5;
+        if (brushShape === 'circle') {
+          const diameter = tilePx * brushSize, cx = hx + diameter / 2, cy = hy + diameter / 2;
+          ctx.beginPath(); ctx.arc(cx, cy, diameter / 2, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        } else {
+          ctx.fillRect(hx, hy, tilePx * brushSize, tilePx * brushSize); ctx.strokeRect(hx, hy, tilePx * brushSize, tilePx * brushSize);
+        }
       } else if (entry.objectKind && (tool === 'brush' || tool === 'random')) {
         const point = hoverMap ? snapPoint(hoverMap) : hoverTile, selected = tool === 'random' ? randomEntry() : entry;
         const ghost: MapObject = { id: 'ghost', kind: selected.objectKind ?? 'doodad', assetId: selected.id, x: point.x, y: point.y, scale: getAssetPreset(selected).scaleMode === 'custom' ? getAssetPreset(selected).scale : 1, properties: {} };
@@ -703,11 +721,12 @@ export async function startMapEditor() {
     const zoomControl = `<div class="group desktop-soft"><button id="mep-fit">Enquadrar</button><button id="mep-zoom-out">−</button><input id="mep-zoom" type="range" min="20" max="300" value="${Math.round(zoom * 100)}"><button id="mep-zoom-in">＋</button></div>`;
     if (tool === 'select') contextBar.innerHTML = `<strong>SELECIONAR</strong><div class="group"><label>Snap<select id="mep-snap"><option value="grid">1 tile</option><option value="half">½ tile</option><option value="free">Livre</option></select></label></div><div class="group"><span style="font-size:9px;color:#7795a4">Arraste para selecionar vários • Shift adiciona</span></div><div class="mep-spacer"></div>${zoomControl}`;
     else if (layer === 'collision' || tool === 'collision') contextBar.innerHTML = `<strong>COLISÃO</strong><div class="group"><button data-context-tool="collision" class="${tool === 'collision' ? 'active' : ''}">Pintar</button><button data-context-tool="eraser" class="${tool === 'eraser' ? 'active' : ''}">Apagar</button></div><div class="group"><label>Tamanho<select id="mep-brush-size"><option>1</option><option>3</option><option>5</option><option>7</option></select></label></div><div class="mep-spacer"></div>${zoomControl}`;
-    else if (entry.palette === 'terrain' || panelMode === 'terrain') contextBar.innerHTML = `<strong>TERRENO</strong><div class="group"><button data-context-tool="brush" class="${tool === 'brush' ? 'active' : ''}">Pincel</button><button data-context-tool="line" class="${tool === 'line' ? 'active' : ''}">Linha</button><button data-context-tool="rect" class="${tool === 'rect' ? 'active' : ''}">Retângulo</button><button data-context-tool="fill" class="${tool === 'fill' ? 'active' : ''}">Preencher</button><button data-context-tool="random" class="${tool === 'random' ? 'active' : ''}">Aleatório ${randomPool.size ? `(${randomPool.size})` : ''}</button><button data-context-tool="eraser" class="${tool === 'eraser' ? 'active' : ''}">Apagar</button></div><div class="group"><label>Tamanho<select id="mep-brush-size"><option>1</option><option>3</option><option>5</option><option>7</option></select></label><label>Camada<select id="mep-terrain-layer"><option value="ground">Chão</option><option value="detail">Detalhe</option></select></label></div><div class="mep-spacer"></div>${zoomControl}`;
+    else if (entry.palette === 'terrain' || panelMode === 'terrain') contextBar.innerHTML = `<strong>TERRENO</strong><div class="group"><button data-context-tool="brush" class="${tool === 'brush' ? 'active' : ''}">Pincel</button><button data-context-tool="line" class="${tool === 'line' ? 'active' : ''}">Linha</button><button data-context-tool="rect" class="${tool === 'rect' ? 'active' : ''}">Retângulo</button><button data-context-tool="fill" class="${tool === 'fill' ? 'active' : ''}">Preencher</button><button data-context-tool="random" class="${tool === 'random' ? 'active' : ''}">Aleatório ${randomPool.size ? `(${randomPool.size})` : ''}</button><button data-context-tool="eraser" class="${tool === 'eraser' ? 'active' : ''}">Apagar</button></div><div class="group"><label>Formato</label><button data-brush-shape="circle" class="${brushShape === 'circle' ? 'active' : ''}">Circular</button><button data-brush-shape="square" class="${brushShape === 'square' ? 'active' : ''}">Quadrado</button></div><div class="group"><label>Tamanho<select id="mep-brush-size"><option>1</option><option>3</option><option>5</option><option>7</option></select></label><label>Camada<select id="mep-terrain-layer"><option value="ground">Chão</option><option value="detail">Detalhe</option></select></label></div><div class="mep-spacer"></div>${zoomControl}`;
     else if (entry.palette === 'zone' || panelMode === 'zones') contextBar.innerHTML = `<strong>ZONA</strong><div class="group"><span style="font-size:9px;color:#7b9aa9">Arraste no mapa para desenhar a área</span></div><div class="mep-spacer"></div>${zoomControl}`;
     else contextBar.innerHTML = `<strong>OBJETOS</strong><div class="group"><button data-context-tool="brush" class="${tool === 'brush' ? 'active' : ''}">Colocar</button><button data-context-tool="random" class="${tool === 'random' ? 'active' : ''}">Aleatório ${randomPool.size ? `(${randomPool.size})` : ''}</button><button data-context-tool="select">Selecionar</button></div><div class="group"><label>Snap<select id="mep-snap"><option value="grid">1 tile</option><option value="half">½ tile</option><option value="free">Livre</option></select></label></div><div class="mep-spacer"></div>${zoomControl}`;
 
     const brush = contextBar.querySelector<HTMLSelectElement>('#mep-brush-size'); if (brush) { brush.value = String(brushSize); brush.onchange = () => { brushSize = Number(brush.value) || 1; }; }
+    contextBar.querySelectorAll<HTMLButtonElement>('[data-brush-shape]').forEach((button) => button.onclick = () => { brushShape = button.dataset.brushShape === 'square' ? 'square' : 'circle'; localStorage.setItem(BRUSH_SHAPE_KEY, brushShape); renderContext(); render(); });
     const snap = contextBar.querySelector<HTMLSelectElement>('#mep-snap'); if (snap) { snap.value = snapMode; snap.onchange = () => { snapMode = snap.value as SnapMode; localStorage.setItem(SNAP_KEY, snapMode); }; }
     const terrainLayer = contextBar.querySelector<HTMLSelectElement>('#mep-terrain-layer'); if (terrainLayer) { terrainLayer.value = layer === 'detail' ? 'detail' : 'ground'; terrainLayer.onchange = () => { layer = terrainLayer.value === 'detail' ? 'detail' : 'ground'; refreshChrome(); render(); }; }
     contextBar.querySelectorAll<HTMLButtonElement>('[data-context-tool]').forEach((button) => button.onclick = () => { tool = button.dataset.contextTool as MapToolId; if (tool === 'collision') layer = 'collision'; renderContext(); refreshChrome(); render(); });
