@@ -71,6 +71,11 @@ export function createGuildService(repository: GuildRepository, actor: GuildActo
     return { ok: true as const, guild, member };
   };
 
+  const currentGuildError = (current: Awaited<ReturnType<typeof requireCurrentGuild>>): GuildActionResult | null => {
+    if ('reason' in current && current.reason) return { ok: false, reason: current.reason };
+    return null;
+  };
+
   const save = async (guild: GuildRecord) => {
     await repository.saveGuild(guild);
     return guild;
@@ -133,7 +138,8 @@ export function createGuildService(repository: GuildRepository, actor: GuildActo
 
   const reviewApplication = async (applicationId: string, accept: boolean): Promise<GuildActionResult> => {
     const current = await requireCurrentGuild();
-    if (!current.ok) return current;
+    const error = currentGuildError(current);
+    if (error) return error;
     const { guild } = current;
     if (!can(guild, actor, 'reviewApplications')) return { ok: false, reason: 'Seu cargo não pode revisar candidaturas.' };
     const application = guild.applications.find((entry) => entry.id === applicationId);
@@ -161,7 +167,8 @@ export function createGuildService(repository: GuildRepository, actor: GuildActo
 
   const inviteByName = async (targetName: string): Promise<GuildActionResult> => {
     const current = await requireCurrentGuild();
-    if (!current.ok) return current;
+    const error = currentGuildError(current);
+    if (error) return error;
     const { guild } = current;
     if (!can(guild, actor, 'invite')) return { ok: false, reason: 'Seu cargo não pode convidar membros.' };
     if (guild.members.length >= guildMemberCap(guild.level)) return { ok: false, reason: 'A guilda atingiu o limite de membros.' };
@@ -207,7 +214,8 @@ export function createGuildService(repository: GuildRepository, actor: GuildActo
 
   const updateMotd = async (motd: string): Promise<GuildActionResult> => {
     const current = await requireCurrentGuild();
-    if (!current.ok) return current;
+    const error = currentGuildError(current);
+    if (error) return error;
     if (!can(current.guild, actor, 'editMotd')) return { ok: false, reason: 'Seu cargo não pode editar o aviso.' };
     current.guild.motd = motd.trim().slice(0, GUILD_CONFIG.motdMax);
     addLog(current.guild, 'motd', actor.characterName, `${actor.characterName} atualizou a mensagem da guilda.`);
@@ -217,7 +225,8 @@ export function createGuildService(repository: GuildRepository, actor: GuildActo
 
   const updateDescription = async (description: string): Promise<GuildActionResult> => {
     const current = await requireCurrentGuild();
-    if (!current.ok) return current;
+    const error = currentGuildError(current);
+    if (error) return error;
     if (!can(current.guild, actor, 'editDescription')) return { ok: false, reason: 'Seu cargo não pode editar a descrição.' };
     current.guild.description = description.trim().slice(0, GUILD_CONFIG.descriptionMax);
     addLog(current.guild, 'description', actor.characterName, `${actor.characterName} atualizou a descrição pública.`);
@@ -227,7 +236,8 @@ export function createGuildService(repository: GuildRepository, actor: GuildActo
 
   const setRankPermissions = async (rankId: string, permissions: GuildPermission[]): Promise<GuildActionResult> => {
     const current = await requireCurrentGuild();
-    if (!current.ok) return current;
+    const error = currentGuildError(current);
+    if (error) return error;
     const { guild } = current;
     if (!can(guild, actor, 'manageRanks')) return { ok: false, reason: 'Seu cargo não pode gerenciar cargos.' };
     if (rankId === 'leader') return { ok: false, reason: 'As permissões do Líder são protegidas.' };
@@ -241,7 +251,8 @@ export function createGuildService(repository: GuildRepository, actor: GuildActo
 
   const changeMemberRank = async (targetCharacterId: string, direction: 'promote' | 'demote'): Promise<GuildActionResult> => {
     const current = await requireCurrentGuild();
-    if (!current.ok) return current;
+    const error = currentGuildError(current);
+    if (error) return error;
     const { guild } = current;
     if (!can(guild, actor, direction)) return { ok: false, reason: `Seu cargo não pode ${direction === 'promote' ? 'promover' : 'rebaixar'} membros.` };
     const target = memberFor(guild, targetCharacterId);
@@ -267,7 +278,8 @@ export function createGuildService(repository: GuildRepository, actor: GuildActo
 
   const kick = async (targetCharacterId: string): Promise<GuildActionResult> => {
     const current = await requireCurrentGuild();
-    if (!current.ok) return current;
+    const error = currentGuildError(current);
+    if (error) return error;
     const { guild } = current;
     if (!can(guild, actor, 'kick')) return { ok: false, reason: 'Seu cargo não pode expulsar membros.' };
     const target = memberFor(guild, targetCharacterId);
@@ -283,7 +295,8 @@ export function createGuildService(repository: GuildRepository, actor: GuildActo
 
   const leave = async (): Promise<GuildActionResult> => {
     const current = await requireCurrentGuild();
-    if (!current.ok) return current;
+    const error = currentGuildError(current);
+    if (error) return error;
     const { guild, member } = current;
     if (member.rankId === 'leader') return { ok: false, reason: 'O Líder precisa transferir a liderança ou dissolver a guilda antes de sair.' };
     guild.members = guild.members.filter((entry) => entry.characterId !== actor.characterId);
@@ -294,7 +307,8 @@ export function createGuildService(repository: GuildRepository, actor: GuildActo
 
   const transferLeadership = async (targetCharacterId: string): Promise<GuildActionResult> => {
     const current = await requireCurrentGuild();
-    if (!current.ok) return current;
+    const error = currentGuildError(current);
+    if (error) return error;
     const { guild, member } = current;
     if (!can(guild, actor, 'transferLeadership') || member.rankId !== 'leader') return { ok: false, reason: 'Somente o Líder pode transferir a liderança.' };
     const target = memberFor(guild, targetCharacterId);
@@ -308,7 +322,8 @@ export function createGuildService(repository: GuildRepository, actor: GuildActo
 
   const disband = async (): Promise<GuildActionResult> => {
     const current = await requireCurrentGuild();
-    if (!current.ok) return current;
+    const error = currentGuildError(current);
+    if (error) return error;
     if (!can(current.guild, actor, 'disband') || current.member.rankId !== 'leader') return { ok: false, reason: 'Somente o Líder pode dissolver a guilda.' };
     const name = current.guild.name;
     await repository.deleteGuild(current.guild.id);
@@ -317,7 +332,8 @@ export function createGuildService(repository: GuildRepository, actor: GuildActo
 
   const grantExp = async (amount: number): Promise<GuildActionResult> => {
     const current = await requireCurrentGuild();
-    if (!current.ok) return current;
+    const error = currentGuildError(current);
+    if (error) return error;
     const guild = current.guild;
     guild.exp += Math.max(0, Math.floor(amount));
     while (guild.level < GUILD_CONFIG.maxLevel) {
