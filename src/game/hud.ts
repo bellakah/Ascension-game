@@ -18,7 +18,7 @@ export function createHud(progress: CharacterProgress) {
     <div id="dialog-box" class="hidden"></div>
     <div id="stick"><div id="knob"></div></div>
     <div class="utility-dock">
-      <button id="map-button" title="Mapa Mundial" aria-label="Mapa Mundial">🗺️</button>
+      <button id="map-button" title="Mapa Mundial" aria-label="Mapa Mundial" style="pointer-events:auto;width:42px;height:42px;border:2px solid rgba(121,190,216,.35);border-radius:12px;background:rgba(37,77,91,.94);color:#fff;font-size:18px;box-shadow:0 4px 12px rgba(0,0,0,.25);-webkit-tap-highlight-color:transparent">🗺️</button>
       <button id="quest-journal-button" title="Diário de Missões" aria-label="Diário de Missões">📖</button>
       <button id="pet-button" title="Mascote" aria-label="Mascote">🐾</button>
       <button id="character-button" title="Personagem" aria-label="Personagem">👤</button>
