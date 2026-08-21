@@ -1,7 +1,10 @@
 const params = new URLSearchParams(window.location.search);
 const editor = params.get('editor');
+const playtest = params.get('playtest');
 
-if (editor === 'map') {
+if (playtest === 'map') {
+  void import('./editor/map/mapPlaytest').then(({ startMapPlaytest }) => startMapPlaytest());
+} else if (editor === 'map') {
   void import('./editor/map/mapEditor').then(({ startMapEditor }) => startMapEditor());
 } else {
   void import('./gameBootstrap').then(({ startGameApp }) => startGameApp());
