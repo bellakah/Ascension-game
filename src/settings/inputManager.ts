@@ -11,7 +11,7 @@ const FRIENDLY_CODES: Record<string, string> = {
 const LEGACY_KEY: Record<InputActionId, string> = {
   moveUp: 'w', moveDown: 's', moveLeft: 'a', moveRight: 'd',
   basicAttack: ' ', interact: 'e', skill1: '1', skill2: '2', skill3: '3', skill4: '4',
-  inventory: 'i', character: 'c', quests: 'j', pet: 'p', map: 'm', chat: 'Enter', menu: 'Escape',
+  inventory: 'i', character: 'c', quests: 'j', pet: 'p', map: 'm', guild: 'g', chat: 'Enter', menu: 'Escape',
 };
 
 const DIRECT_ACTIONS = new Set<InputActionId>(['menu', 'chat']);

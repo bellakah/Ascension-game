@@ -1,3 +1,4 @@
+import { resolveGuildMembership } from '../guild/localGuildRepository';
 import { createChatSystem, type ChatSystem } from './chatSystem';
 
 const SESSION_KEY = 'ascension.session.v1';
@@ -62,7 +63,9 @@ function currentChatCode() {
 
 function actualGameMenuOpen() {
   const menu = document.querySelector<HTMLElement>('#game-menu-overlay');
-  return Boolean(menu && !menu.classList.contains('game-menu-hidden') && !menu.classList.contains('chat-pause-proxy'));
+  if (!menu || menu.classList.contains('game-menu-hidden')) return false;
+  // O proxy do próprio chat não conta como menu; o proxy da Guilda deve bloquear o Chat.
+  return !menu.classList.contains('chat-pause-proxy');
 }
 
 /**
@@ -99,7 +102,10 @@ export function prepareChatBootstrap() {
       characterId: identity.characterId,
       characterName: identity.characterName,
       getMap: () => currentMap(identity.accountId, identity.characterId),
-      getGuild: () => null,
+      getGuild: () => {
+        const membership = resolveGuildMembership(identity.characterId);
+        return membership ? { id: membership.guild.id, name: membership.guild.name } : null;
+      },
     });
     const button = document.querySelector<HTMLButtonElement>('#chat-button');
     button?.addEventListener('pointerdown', () => chat?.toggle());
