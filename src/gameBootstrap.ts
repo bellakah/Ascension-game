@@ -11,11 +11,20 @@ import { prepareGuildBootstrap } from './guild/guildBootstrap';
 import { startGame } from './game/runtime';
 import './game/responsive.css';
 import { installResponsiveUi } from './game/responsive';
+import { preparePublishedWorldRuntime } from './map/publishedMapRuntime';
+import { subscribePublishedMap } from './map/publishedMapStore';
 
-export function startGameApp() {
+export async function startGameApp() {
   installResponsiveUi();
   const chatBootstrap = prepareChatBootstrap();
   const guildBootstrap = prepareGuildBootstrap();
+  await preparePublishedWorldRuntime();
+  const unsubscribePublished = subscribePublishedMap(() => {
+    sessionStorage.setItem('ascension.map.just-published.v1', '1');
+    window.location.reload();
+  });
+  window.addEventListener('pagehide', unsubscribePublished, { once: true });
+
   return startGame().then(() => {
     if (!document.querySelector('#hud')) return;
     chatBootstrap.attach();
