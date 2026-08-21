@@ -1,7 +1,8 @@
 import { Container, Graphics, Text } from 'pixi.js';
+import { getPreparedPublishedWorldRuntime, getPublishedObjectPositions } from '../map/publishedMapRuntime';
 
-export const WORLD_W = 2200;
-export const WORLD_H = 1600;
+export let WORLD_W = 2200;
+export let WORLD_H = 1600;
 export const PLAYER_RADIUS = 20;
 export type Obstacle = { x: number; y: number; radius: number };
 export type SafeZone = { x: number; y: number; width: number; height: number };
@@ -25,7 +26,43 @@ export const VILLAGES: Village[] = [
 
 export const SPAWN = { ...VILLAGES[0].respawn };
 
+function publishedVillages() {
+  const runtime = getPreparedPublishedWorldRuntime();
+  if (!runtime) return [] as Village[];
+  const map = runtime.document;
+  const respawns = map.zones.filter((zone) => zone.kind === 'respawn');
+  const safeZones = map.zones.filter((zone) => zone.kind === 'safe');
+  return safeZones.map((zone, index) => {
+    const centerX = (zone.x + zone.width / 2) * map.tileSize;
+    const centerY = (zone.y + zone.height / 2) * map.tileSize;
+    const nearestRespawn = respawns.reduce<typeof respawns[number] | null>((best, next) => {
+      if (!best) return next;
+      const bestD = Math.hypot((best.x + best.width / 2) * map.tileSize - centerX, (best.y + best.height / 2) * map.tileSize - centerY);
+      const nextD = Math.hypot((next.x + next.width / 2) * map.tileSize - centerX, (next.y + next.height / 2) * map.tileSize - centerY);
+      return nextD < bestD ? next : best;
+    }, null);
+    const respawn = nearestRespawn
+      ? { x: (nearestRespawn.x + nearestRespawn.width / 2) * map.tileSize, y: (nearestRespawn.y + nearestRespawn.height / 2) * map.tileSize }
+      : runtime.spawn;
+    return {
+      id: `published-village-${index}`,
+      name: zone.name || map.name,
+      map: map.name,
+      safeZone: { x: zone.x * map.tileSize, y: zone.y * map.tileSize, width: zone.width * map.tileSize, height: zone.height * map.tileSize },
+      respawn,
+    };
+  });
+}
+
 export function isInSafeZone(x: number, y: number, map = 'Floresta Inicial') {
+  const runtime = getPreparedPublishedWorldRuntime();
+  if (runtime) {
+    return runtime.document.zones.some((zone) => zone.kind === 'safe'
+      && x >= zone.x * runtime.document.tileSize
+      && x <= (zone.x + zone.width) * runtime.document.tileSize
+      && y >= zone.y * runtime.document.tileSize
+      && y <= (zone.y + zone.height) * runtime.document.tileSize);
+  }
   return VILLAGES.some((village) => {
     if (village.map !== map) return false;
     const zone = village.safeZone;
@@ -34,6 +71,15 @@ export function isInSafeZone(x: number, y: number, map = 'Floresta Inicial') {
 }
 
 export function nearestVillage(x: number, y: number, map = 'Floresta Inicial') {
+  const published = publishedVillages();
+  if (published.length) {
+    return published.reduce((best, village) => {
+      if (!best) return village;
+      const bestDistance = distance(x, y, best.respawn.x, best.respawn.y);
+      const nextDistance = distance(x, y, village.respawn.x, village.respawn.y);
+      return nextDistance < bestDistance ? village : best;
+    }, published[0]);
+  }
   const candidates = VILLAGES.filter((village) => village.map === map);
   const pool = candidates.length ? candidates : VILLAGES;
   return pool.reduce((best, village) => {
@@ -53,7 +99,6 @@ function createVillage(world: Container, obstacles: Obstacle[], village: Village
       .stroke({ width: 5, color: 0xbfe6a3, alpha: .68 }),
   );
 
-  // Vias internas deixam a vila legível e reservam uma praça central para novos NPCs.
   world.addChild(
     new Graphics().roundRect(925, 1055, 90, 450, 28).fill({ color: 0xb89a6c, alpha: .3 }),
     new Graphics().roundRect(645, 1318, 650, 86, 28).fill({ color: 0xb89a6c, alpha: .26 }),
@@ -149,6 +194,19 @@ function createVillage(world: Container, obstacles: Obstacle[], village: Village
 }
 
 export function createWorld() {
+  const published = getPreparedPublishedWorldRuntime();
+  if (published) {
+    WORLD_W = published.width;
+    WORLD_H = published.height;
+    SPAWN.x = published.spawn.x;
+    SPAWN.y = published.spawn.y;
+    return { world: published.view, obstacles: published.obstacles };
+  }
+
+  WORLD_W = 2200;
+  WORLD_H = 1600;
+  SPAWN.x = VILLAGES[0].respawn.x;
+  SPAWN.y = VILLAGES[0].respawn.y;
   const world = new Container();
   const obstacles: Obstacle[] = [];
   world.addChild(new Graphics().rect(0, 0, WORLD_W, WORLD_H).fill(0x527b45));
@@ -195,7 +253,8 @@ export function createElandra(world: Container) {
     new Graphics().roundRect(-18, -28, 36, 50, 9).fill(0x4f78b8).stroke({ width: 3, color: 0xbfd8ff }),
     new Graphics().circle(0, -39, 14).fill(0xe4b991), mark, name,
   );
-  npc.position.set(970, 520);
+  const publishedPosition = getPublishedObjectPositions('elandra')[0];
+  npc.position.set(publishedPosition?.x ?? 970, publishedPosition?.y ?? 520);
   world.addChild(npc);
   return { npc, mark };
 }
