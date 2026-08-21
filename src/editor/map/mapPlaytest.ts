@@ -1,9 +1,13 @@
 import './mapPlaytest.css';
-import { drawObjectAsset, drawTerrainAsset, preloadMapAssets } from './mapAssetRenderer';
+import { preloadMapAssets } from './mapAssetRenderer';
 import { hydrateAssetLibraryV2 } from './mapAssetLibraryV2';
+import { objectBlocksPoint } from './mapAssetPresets';
+import { drawConfiguredObject } from './mapObjectRenderer';
+import { drawBlendedTerrainTile } from './mapTerrainBlend';
 import { getPaletteEntry, MAP_PALETTE_ENTRIES } from './mapEditorCatalog';
-import { loadMapDocument, loadOrCreateActiveMap } from './mapEditorStorage';
+import { listMapDocuments, loadMapDocument, loadOrCreateActiveMap } from './mapEditorStorage';
 import { readPlaytestSnapshot, subscribeMapPreview } from './mapPreviewBridge';
+import { worldLinkFrom, type WorldDirection } from './mapWorldStore';
 import type { AscensionMapDocument } from './mapEditorTypes';
 import { parseTileKey, tileKey } from './mapEditorTypes';
 
@@ -28,7 +32,7 @@ export async function startMapPlaytest() {
       </div>
       <main class="mpt-stage" id="mpt-stage">
         <canvas class="mpt-canvas" id="mpt-canvas"></canvas>
-        <div class="mpt-help"><strong>WASD / setas</strong> mover • atualizações do Editor entram ao vivo<br>Esta sessão não publica alterações no jogo principal.</div>
+        <div class="mpt-help"><strong>WASD / setas</strong> mover • atravesse uma borda conectada para trocar de mapa<br>Entre em um portal configurado para testar viagens internas.</div>
         <div class="mpt-toast" id="mpt-toast"></div>
       </main>
     </div>`;
@@ -43,21 +47,27 @@ export async function startMapPlaytest() {
   let showGrid = false;
   let toastTimer = 0;
   let lastTime = performance.now();
+  let transitionBlockedUntil = 0;
   let scale = 1.6;
   const keys = new Set<string>();
 
   const id = new URLSearchParams(location.search).get('id') ?? undefined;
   let mapDoc: AscensionMapDocument = readPlaytestSnapshot(id) ?? (id ? loadMapDocument(id) : null) ?? loadOrCreateActiveMap();
-  const spawnZone = mapDoc.zones.find((zone) => zone.kind === 'respawn');
-  let player = spawnZone
-    ? { x: spawnZone.x + spawnZone.width / 2, y: spawnZone.y + spawnZone.height / 2 }
-    : { x: mapDoc.width / 2, y: mapDoc.height / 2 };
+
+  const spawnFor = (document: AscensionMapDocument) => {
+    const zone = document.zones.find((value) => value.kind === 'respawn');
+    return zone
+      ? { x: zone.x + zone.width / 2, y: zone.y + zone.height / 2 }
+      : { x: document.width / 2, y: document.height / 2 };
+  };
+
+  let player = spawnFor(mapDoc);
 
   const showToast = (message: string) => {
     toast.textContent = message;
     toast.classList.add('show');
     window.clearTimeout(toastTimer);
-    toastTimer = window.setTimeout(() => toast.classList.remove('show'), 1600);
+    toastTimer = window.setTimeout(() => toast.classList.remove('show'), 1900);
   };
 
   const resize = () => {
@@ -71,26 +81,85 @@ export async function startMapPlaytest() {
     scale = clamp(Math.min(rect.width / 900, rect.height / 600) * 2, .8, 2.2);
   };
 
-  const objectBlocksTile = (tileX: number, tileY: number) => mapDoc.objects.some((object) => {
-    const entry = getPaletteEntry(object.assetId);
-    const collision = entry.footprint?.collision;
-    if (!collision?.length) return false;
-    return collision.some((cell) => object.x + cell.x === tileX && object.y + cell.y === tileY);
-  });
+  const objectBlocks = (x: number, y: number) => mapDoc.objects.some((object) => objectBlocksPoint(getPaletteEntry(object.assetId), object, x, y));
 
   const blocked = (x: number, y: number) => {
     const tileX = Math.floor(x), tileY = Math.floor(y);
     if (tileX < 0 || tileY < 0 || tileX >= mapDoc.width || tileY >= mapDoc.height) return true;
-    return mapDoc.collision.includes(tileKey(tileX, tileY)) || objectBlocksTile(tileX, tileY);
+    return mapDoc.collision.includes(tileKey(tileX, tileY)) || objectBlocks(x, y);
+  };
+
+  const loadTravelMap = (targetId: string) => loadMapDocument(targetId) ?? (readPlaytestSnapshot(targetId) ?? null);
+
+  const travelAcrossEdge = (direction: WorldDirection) => {
+    if (performance.now() < transitionBlockedUntil) return false;
+    const documents = listMapDocuments();
+    const link = worldLinkFrom(mapDoc.id, direction, documents);
+    if (!link) return false;
+    const next = loadTravelMap(link.toMapId);
+    if (!next) return false;
+
+    const previous = mapDoc;
+    const normalizedX = clamp(player.x / Math.max(1, previous.width), 0, 1);
+    const normalizedY = clamp(player.y / Math.max(1, previous.height), 0, 1);
+    mapDoc = next;
+    if (direction === 'east') player = { x: .58, y: clamp(normalizedY * next.height, .58, next.height - .58) };
+    if (direction === 'west') player = { x: next.width - .58, y: clamp(normalizedY * next.height, .58, next.height - .58) };
+    if (direction === 'south') player = { x: clamp(normalizedX * next.width, .58, next.width - .58), y: .58 };
+    if (direction === 'north') player = { x: clamp(normalizedX * next.width, .58, next.width - .58), y: next.height - .58 };
+    transitionBlockedUntil = performance.now() + 450;
+    preloadMapAssets(MAP_PALETTE_ENTRIES, render);
+    showToast(`${previous.name} → ${next.name}`);
+    return true;
+  };
+
+  const tryEdgeTransition = (x: number, y: number) => {
+    if (x < .12) return travelAcrossEdge('west');
+    if (x > mapDoc.width - .12) return travelAcrossEdge('east');
+    if (y < .12) return travelAcrossEdge('north');
+    if (y > mapDoc.height - .12) return travelAcrossEdge('south');
+    return false;
+  };
+
+  const tryPortalTransition = () => {
+    if (performance.now() < transitionBlockedUntil) return false;
+    const portal = mapDoc.objects.find((object) => {
+      if (object.kind !== 'portal') return false;
+      const targetMapId = String(object.properties?.targetMapId ?? '');
+      if (!targetMapId) return false;
+      const dx = player.x - (object.x + .5), dy = player.y - (object.y + .5);
+      return dx * dx + dy * dy <= .32;
+    });
+    if (!portal) return false;
+    const targetMapId = String(portal.properties?.targetMapId ?? '');
+    const next = loadTravelMap(targetMapId);
+    if (!next) { showToast('O destino deste portal não existe.'); transitionBlockedUntil = performance.now() + 800; return false; }
+    const previous = mapDoc;
+    mapDoc = next;
+    const targetX = Number(portal.properties?.targetX ?? spawnFor(next).x);
+    const targetY = Number(portal.properties?.targetY ?? spawnFor(next).y);
+    player = { x: clamp(targetX, .58, next.width - .58), y: clamp(targetY, .58, next.height - .58) };
+    transitionBlockedUntil = performance.now() + 850;
+    preloadMapAssets(MAP_PALETTE_ENTRIES, render);
+    showToast(`${previous.name} → ${next.name}`);
+    return true;
   };
 
   const attemptMove = (dx: number, dy: number) => {
     const radius = .22;
     const canStand = (x: number, y: number) => !blocked(x - radius, y - radius) && !blocked(x + radius, y - radius) && !blocked(x - radius, y + radius) && !blocked(x + radius, y + radius);
-    const nextX = player.x + dx;
+    let nextX = player.x + dx;
+    let nextY = player.y + dy;
+
+    if (nextX < .12 || nextX > mapDoc.width - .12 || nextY < .12 || nextY > mapDoc.height - .12) {
+      if (tryEdgeTransition(nextX, nextY)) return;
+      nextX = clamp(nextX, .22, mapDoc.width - .22);
+      nextY = clamp(nextY, .22, mapDoc.height - .22);
+    }
+
     if (canStand(nextX, player.y)) player.x = nextX;
-    const nextY = player.y + dy;
     if (canStand(player.x, nextY)) player.y = nextY;
+    tryPortalTransition();
   };
 
   const render = (now = performance.now()) => {
@@ -107,10 +176,9 @@ export async function startMapPlaytest() {
     const endY = clamp(Math.ceil((cameraY + height) / tilePx) + 2, 0, mapDoc.height - 1);
 
     for (let y = startY; y <= endY; y++) for (let x = startX; x <= endX; x++) {
-      const tile = mapDoc.tiles[tileKey(x, y)] ?? { ground: 'grass' };
       const sx = x * tilePx - cameraX, sy = y * tilePx - cameraY;
-      drawTerrainAsset(ctx, getPaletteEntry(tile.ground ?? 'grass'), sx, sy, tilePx, 1, render, now);
-      if (tile.detail) drawTerrainAsset(ctx, getPaletteEntry(tile.detail), sx, sy, tilePx, .72, render, now);
+      drawBlendedTerrainTile(ctx, mapDoc, { x, y, screenX: sx, screenY: sy, tilePixels: tilePx, layer: 'ground', onReady: render, now });
+      if (mapDoc.tiles[tileKey(x, y)]?.detail) drawBlendedTerrainTile(ctx, mapDoc, { x, y, screenX: sx, screenY: sy, tilePixels: tilePx, layer: 'detail', alpha: .82, onReady: render, now });
     }
 
     for (const zone of mapDoc.zones) {
@@ -121,9 +189,17 @@ export async function startMapPlaytest() {
 
     const sortedObjects = [...mapDoc.objects].sort((a, b) => (a.y + (a.height ?? 1)) - (b.y + (b.height ?? 1)));
     for (const object of sortedObjects) {
-      const anchorX = (object.x + .5) * tilePx - cameraX;
-      const anchorY = (object.y + 1) * tilePx - cameraY;
-      drawObjectAsset(ctx, getPaletteEntry(object.assetId), { x: anchorX, y: anchorY, tilePixels: tilePx, scale: object.scale ?? 1, onReady: render, now });
+      drawConfiguredObject(ctx, getPaletteEntry(object.assetId), {
+        object,
+        x: (object.x + .5) * tilePx - cameraX,
+        y: (object.y + 1) * tilePx - cameraY,
+        tilePixels: tilePx,
+        scale: object.scale ?? 1,
+        showHitbox: showCollision,
+        showLight: true,
+        onReady: render,
+        now,
+      });
     }
 
     if (showCollision) {
@@ -131,10 +207,6 @@ export async function startMapPlaytest() {
       for (const key of mapDoc.collision) {
         const point = parseTileKey(key);
         ctx.fillRect(point.x * tilePx - cameraX, point.y * tilePx - cameraY, tilePx, tilePx);
-      }
-      for (const object of mapDoc.objects) {
-        const collision = getPaletteEntry(object.assetId).footprint?.collision ?? [];
-        for (const cell of collision) ctx.fillRect((object.x + cell.x) * tilePx - cameraX, (object.y + cell.y) * tilePx - cameraY, tilePx, tilePx);
       }
     }
 
@@ -145,7 +217,12 @@ export async function startMapPlaytest() {
       ctx.stroke();
     }
 
-    drawObjectAsset(ctx, getPaletteEntry('pc_knight_npc'), { x: width / 2, y: height / 2 + tilePx * .5, tilePixels: tilePx, selected: true, onReady: render, now });
+    const playerAsset = getPaletteEntry('pc_knight_npc');
+    drawConfiguredObject(ctx, playerAsset, {
+      object: { id: 'playtest-player', kind: 'npc', assetId: playerAsset.id, x: 0, y: 0, scale: 1, properties: {} },
+      x: width / 2, y: height / 2 + tilePx * .5, tilePixels: tilePx, selected: true, onReady: render, now,
+    });
+
     nameNode.textContent = mapDoc.name;
     positionNode.textContent = `X ${player.x.toFixed(1)} • Y ${player.y.toFixed(1)}`;
   };
