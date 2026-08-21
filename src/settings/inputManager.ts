@@ -16,6 +16,12 @@ const LEGACY_KEY: Record<InputActionId, string> = {
 
 const DIRECT_ACTIONS = new Set<InputActionId>(['menu', 'chat']);
 
+function isEditableTarget(target: EventTarget | null) {
+  return target instanceof HTMLInputElement
+    || target instanceof HTMLTextAreaElement
+    || (target instanceof HTMLElement && target.isContentEditable);
+}
+
 export function formatKeyCode(code: string) {
   if (FRIENDLY_CODES[code]) return FRIENDLY_CODES[code];
   if (code.startsWith('Key')) return code.slice(3);
@@ -55,7 +61,9 @@ export function createInputManager(store: SettingsStore) {
     const defaultCodes = new Set(INPUT_ACTIONS.filter((action) => !DIRECT_ACTIONS.has(action.id)).map((action) => action.defaultCode));
 
     const forward = (event: KeyboardEvent) => {
-      if (syntheticEvents.has(event)) return;
+      if (syntheticEvents.has(event) || isEditableTarget(event.target)) return;
+      const directAction = INPUT_ACTIONS.find((candidate) => DIRECT_ACTIONS.has(candidate.id) && codeFor(candidate.id) === event.code);
+      if (directAction) return;
       const action = INPUT_ACTIONS.find((candidate) => !DIRECT_ACTIONS.has(candidate.id) && codeFor(candidate.id) === event.code);
       const shouldBlockLegacy = defaultCodes.has(event.code);
       if (!action && !shouldBlockLegacy) return;
