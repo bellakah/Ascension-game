@@ -2,6 +2,9 @@ import { Application, Container, Graphics, Text, Ticker } from 'pixi.js';
 import { LpcCharacter, type Facing } from '../character/lpcCharacter';
 import { persistSelectedCharacter, showCharacterCreator } from '../character/characterCreator';
 import { createCharacterSheet } from '../character/characterSheet';
+import { createCraftingStations, nearestCraftingStation } from '../crafting/craftingStations';
+import { createCraftingUi } from '../crafting/craftingUi';
+import { createGatheringSystem, gatheringItemName } from '../gathering/gatheringSystem';
 import { createInventory } from '../items/inventory';
 import { ensureInventoryState, getItem } from '../items/itemCatalog';
 import { spawnMonsterLoot, updateGroundLoot, type GroundLoot } from '../items/lootSystem';
@@ -45,6 +48,14 @@ export async function startGame() {
     app.stage.addChild(world);
     const { npc, mark: npcMark } = createElandra(world);
     const merchants = createVillageMerchants(world);
+    const craftingStations = createCraftingStations(world);
+    const gatheringSystem = createGatheringSystem(world, progress);
+
+    const shrineHint = new Text({
+      text: '✦ Santuário de Renascimento',
+      style: { fill: 0xe6ffd8, fontSize: 10, fontWeight: 'bold', stroke: { color: 0x17321f, width: 4 } },
+    });
+    shrineHint.anchor.set(.5); shrineHint.position.set(970, 1332); shrineHint.alpha = .48; world.addChild(shrineHint);
 
     const player = new Container();
     player.addChild(new Graphics().ellipse(0, 5, 25, 10).fill({ color: 0, alpha: .25 }));
@@ -97,7 +108,6 @@ export async function startGame() {
     const refresh = () => { updateHud(hud, progress, playerHp, coins); syncNpcMarkers(); };
     const questJournal = createQuestJournal(progress, { onChanged: () => { refresh(); save(); } });
     const characterSheet = createCharacterSheet(config, progress);
-
     const refreshQuestUi = () => { refresh(); questJournal.refresh(); };
     const syncEquipmentVisuals = () => {
       void hero.setEquipment(ensureInventoryState(progress).equipment);
@@ -123,6 +133,19 @@ export async function startGame() {
       notify: (message) => showDialog(hud, message),
     });
 
+    const craftingUi = createCraftingUi(progress, {
+      onChanged: () => { syncCollectObjectives(progress); inventory.refresh(); characterSheet.refresh(); refreshQuestUi(); save(); },
+      notify: (message) => showDialog(hud, message),
+      onCrafted: (recipe, amount) => {
+        for (let i = 0; i < amount; i++) {
+          const updates = registerQuestEvent(progress, { type: 'craft', recipeId: recipe.id, outputItemId: recipe.output.itemId });
+          const ready = updates.find((update) => update.becameReady);
+          if (ready) showDialog(hud, `${ready.quest.title}: objetivo de fabricação concluído.`);
+        }
+        refreshQuestUi(); save();
+      },
+    });
+
     let useSkill: (skillId: SkillId) => void = () => {};
     const skillBar = createSkillBar(classSkills, { onUse: (skillId) => useSkill(skillId) });
 
@@ -144,16 +167,16 @@ export async function startGame() {
       },
     });
 
-    const uiOpen = () => isDead || respawnScreen.isOpen() || inventory.isOpen() || characterSheet.isOpen() || shop.isOpen() || questJournal.isOpen();
-    hud.inventory.addEventListener('pointerdown', () => { if (isDead) return; shop.close(); characterSheet.close(); questJournal.close(); inventory.toggle(); });
-    hud.character.addEventListener('pointerdown', () => { if (isDead) return; shop.close(); inventory.close(); questJournal.close(); characterSheet.toggle(); });
-    hud.questJournal.addEventListener('pointerdown', () => { if (isDead) return; shop.close(); inventory.close(); characterSheet.close(); questJournal.toggle(); });
+    const uiOpen = () => isDead || respawnScreen.isOpen() || inventory.isOpen() || characterSheet.isOpen() || shop.isOpen() || questJournal.isOpen() || craftingUi.isOpen();
+    hud.inventory.addEventListener('pointerdown', () => { if (isDead) return; shop.close(); craftingUi.close(); characterSheet.close(); questJournal.close(); inventory.toggle(); });
+    hud.character.addEventListener('pointerdown', () => { if (isDead) return; shop.close(); craftingUi.close(); inventory.close(); questJournal.close(); characterSheet.toggle(); });
+    hud.questJournal.addEventListener('pointerdown', () => { if (isDead) return; shop.close(); craftingUi.close(); inventory.close(); characterSheet.close(); questJournal.toggle(); });
 
     const enterDeathState = () => {
       if (respawnScreen.isOpen()) return;
       isDead = true; playerHp = 0; progress.hp = 0;
       deathPosition = { x: player.x, y: player.y }; player.alpha = .42;
-      keys.clear(); resetStick(); inventory.close(); characterSheet.close(); shop.close(); questJournal.close();
+      keys.clear(); resetStick(); inventory.close(); characterSheet.close(); shop.close(); questJournal.close(); craftingUi.close();
       skillBar.refresh(skillController.snapshot(), true);
       const village = nearestVillage(deathPosition.x, deathPosition.y, progress.map || 'Floresta Inicial');
       if (village) respawnScreen.show(village);
@@ -227,11 +250,12 @@ export async function startGame() {
     };
 
     const attackPower = () => Math.max(1, Math.round(progress.attack * skillController.attackMultiplier()));
-    const faceTarget = (target: Monster) => {
-      const dx = target.view.x - player.x, dy = target.view.y - player.y;
+    const facePoint = (x: number, y: number) => {
+      const dx = x - player.x, dy = y - player.y;
       const facing: Facing = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down');
       hero.setFacing(facing);
     };
+    const faceTarget = (target: Monster) => facePoint(target.view.x, target.view.y);
     const hitMonster = (monster: Monster, amount: number, color = 0xffc2b8) => {
       const damage = Math.max(1, Math.round(amount));
       const died = damageMonster(monster, damage); floating(monster.view.x, monster.view.y - 25, `-${damage}`, color);
@@ -292,8 +316,45 @@ export async function startGame() {
       syncCollectObjectives(progress); inventory.refresh(); characterSheet.refresh(); refreshQuestUi(); save(); return true;
     };
 
+    const gatherNearby = () => {
+      const closest = gatheringSystem.nearest(player.x, player.y, progress.map || 'Floresta Inicial', 0);
+      if (!closest) return false;
+      const result = gatheringSystem.gather(player.x, player.y, progress.map || 'Floresta Inicial');
+      if (!result.ok) { showDialog(hud, result.reason ?? 'Não foi possível coletar.'); return true; }
+      if (!result.node || !result.itemId) return true;
+      facePoint(result.node.x, result.node.y);
+      if (result.node.animation === 'emote') hero.emote(); else hero.attack();
+      const item = getItem(result.itemId);
+      floating(player.x, player.y - 82, `+${result.added ?? 0} ${item?.icon ?? ''}`, 0xbfe9a8);
+      const suffix = result.lost ? ` ${result.lost} não coube no inventário.` : '';
+      showDialog(hud, `${result.added ?? 0}x ${gatheringItemName(result.itemId)} coletado.${suffix}`);
+      announceQuestUpdates(registerQuestEvent(progress, { type: 'gather', nodeId: result.node.id, itemId: result.itemId }));
+      announceQuestUpdates(syncCollectObjectives(progress));
+      inventory.refresh(); refreshQuestUi(); save();
+      return true;
+    };
+
     const interact = () => {
-      if (uiOpen()) return;
+      if (uiOpen() || hero.isAttacking) return;
+      const map = progress.map || 'Floresta Inicial';
+
+      // Objetos de quest têm prioridade para impedir que NPCs próximos bloqueiem a interação.
+      const questTarget = nearestQuestInteractable(player.x, player.y, map);
+      if (questTarget) {
+        keys.clear(); resetStick();
+        const updates = registerQuestEvent(progress, { type: 'interact', targetId: questTarget.id });
+        announceQuestUpdates(updates);
+        if (!updates.length) showDialog(hud, questTarget.ambientText);
+        return;
+      }
+
+      const station = nearestCraftingStation(craftingStations, player.x, player.y, map, 0);
+      if (station?.actionable) {
+        keys.clear(); resetStick(); shop.close(); inventory.close(); characterSheet.close(); questJournal.close();
+        craftingUi.open(station.station.definition.type);
+        return;
+      }
+
       let nearestId = 'elandra', nearestName = 'Elandra', nearestDistance = distance(player.x, player.y, npc.x, npc.y);
       let nearestMerchant: VillageMerchant | null = null;
       for (const merchant of merchants) {
@@ -308,12 +369,10 @@ export async function startGame() {
         showDialog(hud, 'Elandra: Continue explorando a floresta. Novas missões surgirão conforme você progride.');
         return;
       }
-      const target = nearestQuestInteractable(player.x, player.y, progress.map || 'Floresta Inicial');
-      if (target) {
-        const updates = registerQuestEvent(progress, { type: 'interact', targetId: target.id });
-        announceQuestUpdates(updates);
-        if (!updates.length) showDialog(hud, target.ambientText);
-      }
+
+      if (gatherNearby()) return;
+      const hint = gatheringSystem.hint(player.x, player.y, map);
+      if (hint) showDialog(hud, hint.actionable ? hint.text : `Chegue mais perto de ${hint.text}.`);
     };
 
     const attack = () => {
@@ -330,9 +389,9 @@ export async function startGame() {
     window.addEventListener('keydown', (event) => {
       const key = event.key.toLowerCase();
       if (isDead) { event.preventDefault(); return; }
-      if (key === 'i') { characterSheet.close(); questJournal.close(); if (shop.isOpen()) shop.close(); }
-      if (key === 'c') { inventory.close(); questJournal.close(); if (shop.isOpen()) shop.close(); }
-      if (key === 'j') { inventory.close(); characterSheet.close(); if (shop.isOpen()) shop.close(); }
+      if (key === 'i') { characterSheet.close(); questJournal.close(); craftingUi.close(); if (shop.isOpen()) shop.close(); }
+      if (key === 'c') { inventory.close(); questJournal.close(); craftingUi.close(); if (shop.isOpen()) shop.close(); }
+      if (key === 'j') { inventory.close(); characterSheet.close(); craftingUi.close(); if (shop.isOpen()) shop.close(); }
       if (uiOpen() && event.key !== 'Escape' && key !== 'i' && key !== 'c' && key !== 'j') return;
       keys.add(key);
       if (event.code === 'Space') attack();
@@ -363,6 +422,12 @@ export async function startGame() {
       skillController.tick(ticker.deltaMS, uiOpen()); skillUiMs += ticker.deltaMS;
       if (skillUiMs >= 100) { skillUiMs = 0; skillBar.refresh(skillController.snapshot(), uiOpen()); }
 
+      const map = progress.map || 'Floresta Inicial';
+      gatheringSystem.update(player.x, player.y, map, ticker.deltaMS);
+      const nearbyStation = nearestCraftingStation(craftingStations, player.x, player.y, map);
+      for (const station of craftingStations) station.marker.alpha = nearbyStation?.station === station ? .92 : .48;
+      shrineHint.alpha = distance(player.x, player.y, 970, 1380) < 180 ? .88 : .48;
+
       let dx = uiOpen() ? 0 : stickX, dy = uiOpen() ? 0 : stickY;
       if (!uiOpen()) {
         if (keys.has('a') || keys.has('arrowleft')) dx -= 1;
@@ -388,7 +453,7 @@ export async function startGame() {
       }
 
       if (!uiOpen()) {
-        for (const zone of visitZonesAt(player.x, player.y, progress.map || 'Floresta Inicial')) announceQuestUpdates(registerQuestEvent(progress, { type: 'visit', zoneId: zone.id }));
+        for (const zone of visitZonesAt(player.x, player.y, map)) announceQuestUpdates(registerQuestEvent(progress, { type: 'visit', zoneId: zone.id }));
         updateMonsters(monsters, ticker, player, progress.defense, (damage) => {
           if (isDead) return; playerHp = Math.max(0, playerHp - damage); floating(player.x, player.y - 90, `-${damage}`, 0xff8f8f);
           if (playerHp <= 0) { enterDeathState(); return; } refresh();
@@ -405,7 +470,7 @@ export async function startGame() {
       world.y = Math.max(Math.min(0, app.screen.height - WORLD_H), Math.min(0, app.screen.height / 2 - player.y));
     });
 
-    refreshQuestUi(); inventory.refresh(); characterSheet.refresh(); skillBar.refresh(skillController.snapshot(), isDead); save();
+    refreshQuestUi(); inventory.refresh(); characterSheet.refresh(); craftingUi.refresh(); skillBar.refresh(skillController.snapshot(), isDead); save();
     if (bootStatus) bootStatus.remove();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
