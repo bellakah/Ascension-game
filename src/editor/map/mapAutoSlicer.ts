@@ -178,9 +178,9 @@ export async function openAutoObjectSlicer(file: File, onCreated: (entries: MapP
       const values: AssetLibraryCreateInput[] = chosen.map((box, index) => ({
         label: `${baseName} ${String(index + 1).padStart(2, '0')}`,
         palette: category.palette, folder: category.folder, objectKind: category.objectKind,
-        color: '#61788b', sourceRect: { x: box.x, y: box.y, width: box.width, height: box.height }, animation: undefined,
+        color: '#61788b', sourceRect: { x: box.x, y: box.y, width: box.width, height: box.height },
         widthTiles: Math.max(.5, Math.round((box.width / 32) * 2) / 2), heightTiles: Math.max(.5, Math.round((box.height / 32) * 2) / 2),
-        anchorX: .5, anchorY: 1, footprint: undefined, tags: ['auto-detect', file.name],
+        anchorX: .5, anchorY: 1, tags: ['auto-detect', file.name],
       }));
       const entries = await addAssetsToLibrary(sourceId, values); onCreated(entries); modal.remove(); URL.revokeObjectURL(url);
     } catch (error) {

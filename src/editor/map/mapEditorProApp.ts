@@ -1,4 +1,5 @@
 import './mapEditorPro.css';
+import './mapEditorProOverrides.css';
 import { drawAssetThumbnail, preloadMapAssets } from './mapAssetRenderer';
 import { deleteLibraryAsset, hydrateAssetLibraryV2, isV2LibraryAsset } from './mapAssetLibraryV2';
 import { openMapAssetStudio } from './mapAssetStudio';
@@ -831,10 +832,9 @@ export async function startMapEditor() {
     if (locked[layer]) { if (initial) showToast('Esta camada está bloqueada.'); return; }
     if (tool === 'fill') { if (!initial) return; beginMutation('Preencher terreno'); floodFill(tile.x, tile.y); finishMutation(); return; }
     beginMutation(tool === 'eraser' ? 'Apagar' : tool === 'collision' ? 'Pintar colisão' : tool === 'random' ? 'Pincel aleatório' : 'Pintar mapa');
-    if (layer === 'collision' || tool === 'collision') paintCollision(tile.x, tile.y, false);
+    if (layer === 'collision' || tool === 'collision') paintCollision(tile.x, tile.y, tool === 'eraser');
     else if (tool === 'eraser') {
       if (layer === 'ground' || layer === 'detail') eraseTerrain(tile.x, tile.y);
-      else if (layer === 'collision') paintCollision(tile.x, tile.y, true);
       else if (layer === 'objects') { const hit = objectAt(tile.x + .5, tile.y + .5); if (hit) mapDoc.objects = mapDoc.objects.filter((value) => value.id !== hit.id); }
     } else if (entry.palette === 'terrain') paintTerrain(tile.x, tile.y, tool === 'random');
     else if (entry.objectKind) placeObject(snapPoint({ x: tile.x, y: tile.y }), tool === 'random' ? randomEntry() : entry);
