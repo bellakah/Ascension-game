@@ -21,7 +21,7 @@ jobs:
           node-version: 22
 
       - name: Apply requested brush correction
-        if: github.event.pull_request.head.ref == 'fix/editor-brush-shape'
+        if: startsWith(github.event.pull_request.head.ref, 'fix/editor-brush-shape')
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -134,7 +134,7 @@ jobs:
       - run: npm run build
 
       - name: Push corrected files
-        if: github.event.pull_request.head.ref == 'fix/editor-brush-shape'
+        if: startsWith(github.event.pull_request.head.ref, 'fix/editor-brush-shape')
         run: |
           if git diff --quiet; then exit 0; fi
           git config user.name "github-actions[bot]"
