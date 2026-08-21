@@ -2,7 +2,7 @@ export type InputActionId =
   | 'moveUp' | 'moveDown' | 'moveLeft' | 'moveRight'
   | 'basicAttack' | 'interact'
   | 'skill1' | 'skill2' | 'skill3' | 'skill4'
-  | 'inventory' | 'character' | 'quests' | 'pet' | 'map' | 'menu';
+  | 'inventory' | 'character' | 'quests' | 'pet' | 'map' | 'chat' | 'menu';
 
 export type InputActionDefinition = {
   id: InputActionId;
@@ -29,6 +29,7 @@ export const INPUT_ACTIONS: InputActionDefinition[] = [
   { id: 'quests', group: 'Interfaces', label: 'Diário de Missões', description: 'Abre ou fecha o diário de missões.', defaultCode: 'KeyJ' },
   { id: 'pet', group: 'Interfaces', label: 'Mascote', description: 'Abre ou fecha as opções do mascote.', defaultCode: 'KeyP' },
   { id: 'map', group: 'Interfaces', label: 'Mapa', description: 'Abre ou fecha o mapa mundial.', defaultCode: 'KeyM' },
+  { id: 'chat', group: 'Interfaces', label: 'Abrir Chat', description: 'Abre o chat e posiciona o cursor no campo de mensagem.', defaultCode: 'Enter' },
   { id: 'menu', group: 'Interfaces', label: 'Menu do jogo', description: 'Abre o menu de pausa. ESC continua funcionando como tecla de segurança.', defaultCode: 'Escape' },
 ];
 
