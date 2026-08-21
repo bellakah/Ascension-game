@@ -61,8 +61,8 @@ function createHerbVisual(moon = false) {
   c.addChild(
     new Graphics().ellipse(0, 11, 20, 7).fill({ color: 0, alpha: .1 }),
     new Graphics().moveTo(0, 11).lineTo(0, -12).stroke({ width: 3, color: 0x446d40 }),
-    new Graphics().ellipse(-9, -1, 12, 5).fill(leaf).rotate(-.45),
-    new Graphics().ellipse(9, 2, 12, 5).fill(leaf).rotate(.45),
+    new Graphics().ellipse(-9, -1, 12, 5).fill(leaf),
+    new Graphics().ellipse(9, 2, 12, 5).fill(leaf),
     new Graphics().circle(0, -14, 6).fill(bloom),
     new Graphics().circle(0, -14, 2).fill(0xf4f2d0),
   );
@@ -159,13 +159,7 @@ export function createGatheringSystem(world: Container, progress: CharacterProgr
     const result = addItem(progress, node.definition.yieldItemId, amount);
     if (result.added <= 0) return { ok: false, reason: 'Inventário cheio.', node: node.definition };
     saveState(progress)[node.definition.id] = { readyAt: Date.now() + node.definition.respawnMs };
-    return {
-      ok: true,
-      node: node.definition,
-      itemId: node.definition.yieldItemId,
-      added: result.added,
-      lost: result.remaining,
-    };
+    return { ok: true, node: node.definition, itemId: node.definition.yieldItemId, added: result.added, lost: result.remaining };
   };
 
   const hint = (x: number, y: number, map = 'Floresta Inicial') => {
@@ -181,6 +175,4 @@ export function createGatheringSystem(world: Container, progress: CharacterProgr
   return { nodes, update, gather, hint, nearest };
 }
 
-export function gatheringItemName(itemId: string) {
-  return getItem(itemId)?.name ?? itemId;
-}
+export function gatheringItemName(itemId: string) { return getItem(itemId)?.name ?? itemId; }
