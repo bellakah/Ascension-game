@@ -1,5 +1,5 @@
 import type { CharacterProgress } from '../character/characterCreator';
-import { currentQuest } from './quests';
+import { getQuestState, getTrackedQuest, NPC_NAMES, questObjectiveProgress } from '../quests/questEngine';
 
 export type Hud = ReturnType<typeof createHud>;
 
@@ -13,11 +13,12 @@ export function createHud(progress: CharacterProgress) {
       <div class="hp-shell"><div id="hp-fill"></div><span id="hp-text"></span></div>
       <div class="coins">🪙 <span id="coins"></span></div>
     </div>
-    <button id="quest-toggle" type="button" aria-label="Mostrar missão" aria-expanded="false" title="Missão">📜<span>Missão</span></button>
+    <button id="quest-toggle" type="button" aria-label="Mostrar missão" aria-expanded="false" title="Missão rastreada">📜<span>Missão</span></button>
     <div id="quest-box"><strong id="quest-title">Missão</strong><div id="quest-text"></div></div>
     <div id="dialog-box" class="hidden"></div>
     <div id="stick"><div id="knob"></div></div>
     <div class="utility-dock">
+      <button id="quest-journal-button" title="Diário de Missões" aria-label="Diário de Missões">📖</button>
       <button id="character-button" title="Personagem" aria-label="Personagem">👤</button>
       <button id="inventory-button" title="Inventário" aria-label="Inventário">🎒</button>
     </div>
@@ -26,7 +27,7 @@ export function createHud(progress: CharacterProgress) {
       <button id="attack-btn" aria-label="Atacar">⚔</button>
     </div>
     <div class="desktop-shortcuts" aria-hidden="true">
-      <span><kbd>WASD</kbd>Mover</span><span><kbd>Espaço</kbd>Atacar</span><span><kbd>E</kbd>Interagir</span><span><kbd>I</kbd>Inventário</span><span><kbd>C</kbd>Personagem</span>
+      <span><kbd>WASD</kbd>Mover</span><span><kbd>Espaço</kbd>Atacar</span><span><kbd>E</kbd>Interagir</span><span><kbd>J</kbd>Missões</span><span><kbd>I</kbd>Inventário</span><span><kbd>C</kbd>Personagem</span>
     </div>`;
   document.body.appendChild(root);
 
@@ -47,6 +48,7 @@ export function createHud(progress: CharacterProgress) {
     questTitle: root.querySelector<HTMLElement>('#quest-title')!,
     questText: root.querySelector<HTMLDivElement>('#quest-text')!,
     questToggle,
+    questJournal: root.querySelector<HTMLButtonElement>('#quest-journal-button')!,
     dialog: root.querySelector<HTMLDivElement>('#dialog-box')!,
     stick: root.querySelector<HTMLDivElement>('#stick')!,
     knob: root.querySelector<HTMLDivElement>('#knob')!,
@@ -63,19 +65,28 @@ export function updateHud(hud: Hud, progress: CharacterProgress, playerHp: numbe
   hud.coinText.textContent = String(coins);
   hud.levelText.textContent = `Nv. ${progress.level}`;
   hud.expText.textContent = `EXP ${progress.exp}/${progress.expToNext}`;
-  const quest = currentQuest(progress);
+
+  const quest = getTrackedQuest(progress);
   if (!quest) {
     hud.questTitle.textContent = 'Missões';
-    hud.questText.textContent = 'Todas as missões de teste foram concluídas.';
+    hud.questText.textContent = 'Nenhuma missão rastreada. Abra o Diário para ver missões disponíveis.';
     hud.questToggle.classList.remove('quest-ready');
     return;
   }
-  const state = progress.quests[quest.id];
+  const state = getQuestState(progress, quest.id)!;
   hud.questToggle.classList.toggle('quest-ready', state.status === 'ready');
   hud.questTitle.textContent = quest.title;
-  if (state.status === 'not_started') hud.questText.textContent = `Fale com Elandra — ${quest.objective}.`;
-  else if (state.status === 'ready') hud.questText.textContent = `Objetivo concluído (${state.progress}/${state.target}). Volte para Elandra.`;
-  else hud.questText.textContent = `${quest.objective} — ${state.progress}/${state.target}`;
+  if (state.status === 'ready') {
+    hud.questText.textContent = `Objetivos concluídos. Volte para ${NPC_NAMES[quest.endNpcId] ?? quest.endNpcId}.`;
+    return;
+  }
+  const pending = quest.objectives.find((objective) => !questObjectiveProgress(progress, quest, objective).done);
+  if (!pending) {
+    hud.questText.textContent = 'Objetivos concluídos.';
+    return;
+  }
+  const value = questObjectiveProgress(progress, quest, pending);
+  hud.questText.textContent = `${pending.label} — ${value.current}/${value.target}`;
 }
 
 export function showDialog(hud: Hud, text: string) {

@@ -1,6 +1,6 @@
 import { Container, Graphics, Text, Ticker } from 'pixi.js';
 import { ToxicSludgeView } from '../monsters/toxicSludge';
-import type { MonsterKind } from './quests';
+import type { MonsterKind } from '../quests/questTypes';
 import { distance, isInSafeZone } from './world';
 
 export type Monster = {

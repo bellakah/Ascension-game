@@ -7,6 +7,7 @@ export type VillageMerchant = {
   name: string;
   role: string;
   npc: Container;
+  questMark: Text;
 };
 
 type MerchantVisual = {
@@ -33,16 +34,18 @@ function createMerchant(world: Container, data: MerchantVisual): VillageMerchant
   const apron = new Graphics().roundRect(-11, -8, 22, 28, 5).fill({ color: 0x332d27, alpha: .5 });
   const head = new Graphics().circle(0, -39, 14).fill(0xe1b58d);
   const hair = new Graphics().arc(0, -42, 13, Math.PI, Math.PI * 2).stroke({ width: 7, color: data.shopId === 'mira' ? 0x3d2b2b : 0x4c3428 });
+  const questMark = new Text({ text: '', style: { fill: 0xffdd57, fontSize: 29, fontWeight: 'bold', stroke: { color: 0x122018, width: 5 } } });
+  questMark.anchor.set(.5); questMark.y = -116;
   const icon = new Text({ text: data.icon, style: { fill: 0xffdf79, fontSize: 24, fontWeight: 'bold', stroke: { color: 0x122018, width: 5 } } });
   icon.anchor.set(.5); icon.y = -91;
   const name = new Text({ text: data.name, style: { fill: 0xffffff, fontSize: 13, fontWeight: 'bold', stroke: { color: 0, width: 4 } } });
   name.anchor.set(.5); name.y = -69;
   const role = new Text({ text: data.role, style: { fill: 0xd9c77d, fontSize: 9, fontWeight: 'bold', stroke: { color: 0, width: 3 } } });
   role.anchor.set(.5); role.y = -56;
-  npc.addChild(shadow, body, apron, head, hair, icon, name, role);
+  npc.addChild(shadow, body, apron, head, hair, questMark, icon, name, role);
   npc.position.set(data.x, data.y);
   world.addChild(npc);
-  return { id: `merchant-${data.shopId}`, shopId: data.shopId, name: data.name, role: data.role, npc };
+  return { id: data.shopId, shopId: data.shopId, name: data.name, role: data.role, npc, questMark };
 }
 
 export function createVillageMerchants(world: Container) {
