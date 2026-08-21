@@ -58,7 +58,7 @@ export function createPetUi(progress: CharacterProgress, options: PetUiOptions) 
             <section class="pet-section pet-security"><b>🔒</b><div><strong>Loot privado do dono</strong><small>Este mascote só pode recolher drops cujo proprietário seja este personagem. Drops de outros jogadores são bloqueados no sistema de loot, não apenas no filtro visual do pet.</small></div></section>
             <section class="pet-section">
               <div class="pet-section-title"><strong>Preparado para evolução</strong><small>Capacidades definidas pelo catálogo do pet</small></div>
-              <div class="pet-future"><div class="pet-future-card"><strong>Raio maior</strong><small>Pets/evoluções poderão procurar loot mais longe.</small></div><div class="pet-future-card"><strong>Múltiplos drops</strong><small>`maxDropsPerTrip` já existe na engine.</small></div><div class="pet-future-card"><strong>Mais velocidade</strong><small>Cada pet poderá ter velocidade própria.</small></div></div>
+              <div class="pet-future"><div class="pet-future-card"><strong>Raio maior</strong><small>Pets/evoluções poderão procurar loot mais longe.</small></div><div class="pet-future-card"><strong>Múltiplos drops</strong><small>maxDropsPerTrip já existe na engine.</small></div><div class="pet-future-card"><strong>Mais velocidade</strong><small>Cada pet poderá ter velocidade própria.</small></div></div>
             </section>
           </main>
         </div>
