@@ -81,7 +81,7 @@ export function prepareChatBootstrap() {
   };
 
   const onKeyUp = (event: KeyboardEvent) => {
-    if (!chat || event.code !== 'Escape' || !chat.isTyping()) return;
+    if (!chat || event.code !== 'Escape' || !(chat.isTyping() || chat.blocksGameplay())) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     chat.close();
