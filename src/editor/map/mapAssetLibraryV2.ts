@@ -166,10 +166,28 @@ export async function addAssetsToLibrary(sourceId: string, values: AssetLibraryC
 
 export async function deleteLibraryAsset(assetId: string) {
   const db = await openDb();
+  let sourceId: string | null = null;
   try {
+    const lookup = db.transaction(ASSET_STORE, 'readonly');
+    const record = await requestToPromise(lookup.objectStore(ASSET_STORE).get(assetId)) as AssetRecord | undefined;
+    sourceId = record?.sourceId ?? null;
+
     const transaction = db.transaction(ASSET_STORE, 'readwrite');
     transaction.objectStore(ASSET_STORE).delete(assetId);
     await transactionDone(transaction);
+
+    if (sourceId) {
+      const countTx = db.transaction(ASSET_STORE, 'readonly');
+      const count = await requestToPromise(countTx.objectStore(ASSET_STORE).index('sourceId').count(sourceId));
+      if (count === 0) {
+        const sourceTx = db.transaction(SOURCE_STORE, 'readwrite');
+        sourceTx.objectStore(SOURCE_STORE).delete(sourceId);
+        await transactionDone(sourceTx);
+        const url = sourceUrls.get(sourceId);
+        if (url) URL.revokeObjectURL(url);
+        sourceUrls.delete(sourceId);
+      }
+    }
   } finally {
     db.close();
   }
