@@ -65,6 +65,10 @@ function updateAggregate(progress: CharacterProgress, quest: QuestDefinition) {
   if (state.status === 'active' && quest.objectives.every((objective) => objectiveDone(progress, quest, objective))) state.status = 'ready';
 }
 
+function questIsReady(progress: CharacterProgress, quest: QuestDefinition) {
+  return stateFor(progress, quest).status === 'ready';
+}
+
 export function ensureQuestStates(progress: CharacterProgress) {
   for (const quest of QUEST_CATALOG) { stateFor(progress, quest); updateAggregate(progress, quest); }
   const extended = progress as QuestProgress;
@@ -127,10 +131,9 @@ export function registerQuestEvent(progress: CharacterProgress, event: QuestEven
     for (const objective of activeObjectives(progress, quest)) {
       if (!matchesEvent(objective, event)) continue;
       const wasDone = objectiveDone(progress, quest, objective);
-      const beforeStatus = state.status;
       state.objectives[objective.id] = Math.min(objectiveAmount(objective), Number(state.objectives[objective.id] ?? 0) + 1);
       updateAggregate(progress, quest);
-      updates.push({ quest, objective, objectiveCompleted: !wasDone && objectiveDone(progress, quest, objective), becameReady: beforeStatus === 'active' && state.status === 'ready' });
+      updates.push({ quest, objective, objectiveCompleted: !wasDone && objectiveDone(progress, quest, objective), becameReady: questIsReady(progress, quest) });
       if (quest.mode === 'sequential') break;
     }
   }
@@ -146,10 +149,9 @@ export function syncCollectObjectives(progress: CharacterProgress) {
     for (const objective of activeObjectives(progress, quest)) {
       if (objective.type !== 'collect' || !objective.itemId) continue;
       const before = Number(state.objectives[objective.id] ?? 0);
-      const beforeStatus = state.status;
       state.objectives[objective.id] = Math.min(objectiveAmount(objective), itemQuantity(progress, objective.itemId));
       updateAggregate(progress, quest);
-      if (before !== state.objectives[objective.id]) updates.push({ quest, objective, objectiveCompleted: before < objectiveAmount(objective) && objectiveDone(progress, quest, objective), becameReady: beforeStatus === 'active' && state.status === 'ready' });
+      if (before !== state.objectives[objective.id]) updates.push({ quest, objective, objectiveCompleted: before < objectiveAmount(objective) && objectiveDone(progress, quest, objective), becameReady: questIsReady(progress, quest) });
     }
   }
   return updates;
@@ -165,20 +167,18 @@ function processNpcObjectives(progress: CharacterProgress, npcId: string) {
       if (objective.type === 'talk') {
         const amount = objectiveAmount(objective);
         const wasDone = objectiveDone(progress, quest, objective);
-        const beforeStatus = state.status;
         state.objectives[objective.id] = amount;
         updateAggregate(progress, quest);
-        updates.push({ quest, objective, objectiveCompleted: !wasDone, becameReady: beforeStatus === 'active' && state.status === 'ready' });
+        updates.push({ quest, objective, objectiveCompleted: !wasDone, becameReady: questIsReady(progress, quest) });
         if (quest.mode === 'sequential') break;
       } else if (objective.type === 'deliver' && objective.itemId) {
         const amount = objectiveAmount(objective);
         if (itemQuantity(progress, objective.itemId) < amount) continue;
-        const beforeStatus = state.status;
         const removed = removeItem(progress, objective.itemId, amount);
         if (removed < amount) continue;
         state.objectives[objective.id] = amount;
         updateAggregate(progress, quest);
-        updates.push({ quest, objective, objectiveCompleted: true, becameReady: beforeStatus === 'active' && state.status === 'ready' });
+        updates.push({ quest, objective, objectiveCompleted: true, becameReady: questIsReady(progress, quest) });
         if (quest.mode === 'sequential') break;
       }
     }
