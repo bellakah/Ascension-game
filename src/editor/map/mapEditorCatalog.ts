@@ -1,4 +1,5 @@
 import { PIXEL_CRAWLER_ASSETS } from './pixelCrawlerPack';
+import { ASCENSION_SAND_ATLAS, ASCENSION_TERRAIN_ATLAS } from './terrainAtlas';
 import type { MapObject, MapPaletteEntry, MapPaletteId } from './mapEditorTypes';
 
 const CUSTOM_ASSET_KEY = 'ascension.map-editor.custom-assets.v1';
@@ -24,14 +25,16 @@ export const MAP_PALETTES: Array<{ id: MapPaletteId; label: string; icon: string
   { id: 'raw', label: 'Raw', icon: '◇', description: 'Assets importados e elementos genéricos.' },
 ];
 
+const terrainSprite = (src: string, x: number, y: number) => ({ src, nativeWidth: 16, nativeHeight: 16, sourceRect: { x, y, width: 16, height: 16 }, pixelated: true });
+
 const BASE_ENTRIES: MapPaletteEntry[] = [
-  { id: 'grass', palette: 'terrain', label: 'Grama Pixel Crawler', icon: '▩', color: '#327603', description: 'Tile 16px ampliado com nearest-neighbor.', defaultLayer: 'ground', tags: ['verde', 'forest', 'pixel crawler'], source: 'pixel-crawler', sprite: { src: PIXEL_CRAWLER_ASSETS.pc_grass, nativeWidth: 16, nativeHeight: 16, pixelated: true } },
-  { id: 'forest_grass', palette: 'terrain', label: 'Grama escura', icon: '▩', color: '#3f6b3b', description: 'Grama alternativa para áreas densas.', defaultLayer: 'ground', tags: ['forest'], source: 'ascension' },
-  { id: 'dirt', palette: 'terrain', label: 'Terra Pixel Crawler', icon: '▧', color: '#9d6a3d', description: 'Solo de terra do pack.', defaultLayer: 'ground', tags: ['pixel crawler'], source: 'pixel-crawler', sprite: { src: PIXEL_CRAWLER_ASSETS.pc_dirt, nativeWidth: 16, nativeHeight: 16, pixelated: true } },
-  { id: 'road', palette: 'terrain', label: 'Estrada', icon: '▥', color: '#a58458', description: 'Caminho principal do protótipo.', defaultLayer: 'ground', source: 'ascension' },
-  { id: 'stone', palette: 'terrain', label: 'Pedra Pixel Crawler', icon: '▦', color: '#756b5f', description: 'Piso de pedra do pack.', defaultLayer: 'ground', tags: ['pixel crawler'], source: 'pixel-crawler', sprite: { src: PIXEL_CRAWLER_ASSETS.pc_stone, nativeWidth: 16, nativeHeight: 16, pixelated: true } },
-  { id: 'water', palette: 'terrain', label: 'Água Pixel Crawler', icon: '≈', color: '#3e91d0', description: 'Tile de água do pack.', defaultLayer: 'ground', tags: ['pixel crawler'], source: 'pixel-crawler', sprite: { src: PIXEL_CRAWLER_ASSETS.pc_water, nativeWidth: 16, nativeHeight: 16, pixelated: true } },
-  { id: 'sand', palette: 'terrain', label: 'Areia', icon: '░', color: '#c4ad72', description: 'Areia e margens.', defaultLayer: 'ground', source: 'ascension' },
+  { id: 'grass', palette: 'terrain', label: 'Grama florida', icon: '▩', color: '#74ad48', description: 'Grama clara do novo conjunto de terreno.', defaultLayer: 'ground', tags: ['verde', 'grama', 'novo terreno'], source: 'ascension', sprite: terrainSprite(ASCENSION_TERRAIN_ATLAS, 0, 0) },
+  { id: 'forest_grass', palette: 'terrain', label: 'Grama floresta', icon: '▩', color: '#559f42', description: 'Grama mais densa para florestas.', defaultLayer: 'ground', tags: ['verde', 'floresta', 'novo terreno'], source: 'ascension', sprite: terrainSprite(ASCENSION_TERRAIN_ATLAS, 32, 0) },
+  { id: 'dirt', palette: 'terrain', label: 'Terra', icon: '▧', color: '#b9783c', description: 'Solo de terra do novo conjunto.', defaultLayer: 'ground', tags: ['terra', 'solo', 'novo terreno'], source: 'ascension', sprite: terrainSprite(ASCENSION_TERRAIN_ATLAS, 32, 16) },
+  { id: 'road', palette: 'terrain', label: 'Caminho de pedra', icon: '▥', color: '#b79a71', description: 'Pedras claras para ruas e caminhos.', defaultLayer: 'ground', tags: ['caminho', 'rua', 'pedra'], source: 'ascension', sprite: terrainSprite(ASCENSION_TERRAIN_ATLAS, 16, 48) },
+  { id: 'stone', palette: 'terrain', label: 'Pedra cinza', icon: '▦', color: '#86878a', description: 'Piso de pedra cinza.', defaultLayer: 'ground', tags: ['pedra', 'cidade', 'novo terreno'], source: 'ascension', sprite: terrainSprite(ASCENSION_TERRAIN_ATLAS, 32, 48) },
+  { id: 'water', palette: 'terrain', label: 'Água', icon: '≈', color: '#4aadd5', description: 'Água azul do novo conjunto.', defaultLayer: 'ground', tags: ['água', 'rio', 'lago'], source: 'ascension', sprite: terrainSprite(ASCENSION_TERRAIN_ATLAS, 16, 32) },
+  { id: 'sand', palette: 'terrain', label: 'Areia', icon: '░', color: '#e6bd68', description: 'Areia clara com desenho natural.', defaultLayer: 'ground', tags: ['areia', 'praia', 'deserto'], source: 'ascension', sprite: terrainSprite(ASCENSION_SAND_ATLAS, 16, 0) },
 
   { id: 'tree_oak', palette: 'doodad', label: 'Árvore Pixel Crawler', icon: '🌲', color: '#2f7045', description: 'Árvore multi-tile com pivot na base.', defaultLayer: 'objects', objectKind: 'doodad', tags: ['natureza', 'pixel crawler'], source: 'pixel-crawler', sprite: { src: PIXEL_CRAWLER_ASSETS.pc_tree, nativeWidth: 45, nativeHeight: 47, widthTiles: 1.5, heightTiles: 1.6, anchorX: .5, anchorY: 1, pixelated: true }, footprint: { width: 1, height: 1, collision: [{ x: 0, y: 0 }] } },
   { id: 'bush', palette: 'doodad', label: 'Arbusto Pixel Crawler', icon: '♣', color: '#4f8b49', description: 'Arbusto real do pack.', defaultLayer: 'objects', objectKind: 'doodad', tags: ['pixel crawler'], source: 'pixel-crawler', sprite: { src: PIXEL_CRAWLER_ASSETS.pc_bush, nativeWidth: 29, nativeHeight: 27, widthTiles: 1, heightTiles: 1, anchorX: .5, anchorY: 1, pixelated: true } },
