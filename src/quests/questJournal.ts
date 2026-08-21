@@ -61,13 +61,15 @@ export function createQuestJournal(progress: CharacterProgress, callbacks: Quest
       <p class="quest-detail-summary">${quest.summary}</p>
       <strong>Objetivos</strong><div class="quest-objectives">${objectiveRows}</div>
       <div class="quest-rewards"><strong>Recompensas</strong><br>${rewardText(quest) || 'Sem recompensa definida'}</div>
-      ${canTrack ? `<button class="quest-track${tracked ? ' tracked' : ''}" type="button">${tracked ? '✓ Rastreando na HUD' : 'Rastrear na HUD'}</button>` : ''}
+      ${canTrack ? `<button class="quest-track${tracked ? ' tracked' : ''}" type="button"${tracked ? ' disabled' : ''}>${tracked ? '✓ Rastreando na HUD' : 'Rastrear na HUD'}</button>` : ''}
       <p class="quest-detail-summary" style="margin-top:14px">Início: ${NPC_NAMES[quest.startNpcId] ?? quest.startNpcId} · Entrega: ${NPC_NAMES[quest.endNpcId] ?? quest.endNpcId}</p>`;
-    detailHost.querySelector<HTMLButtonElement>('.quest-track')?.addEventListener('click', () => {
-      setTrackedQuest(progress, tracked ? null : quest.id);
-      callbacks.onChanged?.();
-      render();
-    });
+    if (!tracked) {
+      detailHost.querySelector<HTMLButtonElement>('.quest-track')?.addEventListener('click', () => {
+        setTrackedQuest(progress, quest.id);
+        callbacks.onChanged?.();
+        render();
+      });
+    }
   };
 
   const render = () => {
