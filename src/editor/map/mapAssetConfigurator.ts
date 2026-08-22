@@ -32,6 +32,11 @@ export function openMapAssetConfigurator(entry: MapPaletteEntry): Promise<Config
           </div>
           <div class="pro-config-controls">
             <section>
+              <h3>Camada do personagem</h3>
+              <label>Comportamento<select id="pro-depth-mode"><option value="ground">No chão — personagem sempre por cima</option><option value="auto">Automática — passa na frente ou atrás</option><option value="foreground">Sempre na frente — objeto cobre o personagem</option></select></label>
+              <p>Escolha como este tipo de objeto deve aparecer em relação ao personagem. Isso não altera a colisão.</p>
+            </section>
+            <section>
               <h3>Colisão</h3>
               <label>Formato<select id="pro-hit-type"><option value="none">Sem colisão</option><option value="rectangle">Retângulo</option><option value="circle">Círculo</option><option value="polygon">Forma livre</option></select></label>
               <div class="pro-two" id="pro-hit-size"><label>Largura<input id="pro-hit-w" type="number" min="0.02" max="1" step="0.02"></label><label>Altura<input id="pro-hit-h" type="number" min="0.02" max="1" step="0.02"></label></div>
@@ -64,6 +69,7 @@ export function openMapAssetConfigurator(entry: MapPaletteEntry): Promise<Config
 
     const canvas = backdrop.querySelector<HTMLCanvasElement>('#pro-config-canvas')!;
     const ctx = canvas.getContext('2d')!;
+    const depthMode = backdrop.querySelector<HTMLSelectElement>('#pro-depth-mode')!;
     const hitType = backdrop.querySelector<HTMLSelectElement>('#pro-hit-type')!;
     const hitW = backdrop.querySelector<HTMLInputElement>('#pro-hit-w')!;
     const hitH = backdrop.querySelector<HTMLInputElement>('#pro-hit-h')!;
@@ -110,6 +116,7 @@ export function openMapAssetConfigurator(entry: MapPaletteEntry): Promise<Config
     };
 
     const syncInputs = () => {
+      depthMode.value = preset.depthMode ?? 'auto';
       hitType.value = preset.hitbox?.type ?? 'none';
       const rect = preset.hitbox?.type === 'rectangle' ? preset.hitbox : null;
       hitW.value = String(rect?.width ?? .64);
@@ -189,6 +196,7 @@ export function openMapAssetConfigurator(entry: MapPaletteEntry): Promise<Config
       }
     }
 
+    depthMode.onchange = () => { preset.depthMode = depthMode.value === 'ground' ? 'ground' : depthMode.value === 'foreground' ? 'foreground' : 'auto'; };
     hitType.onchange = () => { ensureHitbox(hitType.value); syncInputs(); };
     hitW.oninput = () => { if (preset.hitbox?.type === 'rectangle') preset.hitbox.width = clamp(Number(hitW.value) || .1, .02, 1 - preset.hitbox.x); render(); };
     hitH.oninput = () => { if (preset.hitbox?.type === 'rectangle') preset.hitbox.height = clamp(Number(hitH.value) || .1, .02, 1 - preset.hitbox.y); render(); };

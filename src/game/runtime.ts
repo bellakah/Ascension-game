@@ -328,7 +328,7 @@ export async function startGame() {
     const syncWorldDepth = () => {
       if (!world.sortableChildren) return;
       for (const child of world.children) {
-        if (child.zIndex <= -900_000) continue;
+        if (child.zIndex <= -400_000 || child.zIndex >= 400_000) continue;
         child.zIndex = child.y;
       }
       world.sortChildren();
