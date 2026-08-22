@@ -5,7 +5,11 @@ const playtest = params.get('playtest');
 if (playtest === 'map') {
   void import('./editor/map/mapPlaytest').then(({ startMapPlaytest }) => startMapPlaytest());
 } else if (editor === 'map') {
-  void import('./editor/map/mapEditorProApp').then(({ startMapEditor }) => startMapEditor());
+  void import('./editor/map/mapEditorProApp').then(async ({ startMapEditor }) => {
+    await startMapEditor();
+    const { installMapEditorInteractionPerf } = await import('./editor/map/mapEditorInteractionPerf');
+    installMapEditorInteractionPerf();
+  });
 } else {
   void import('./gameBootstrap').then(({ startGameApp }) => startGameApp());
 }
