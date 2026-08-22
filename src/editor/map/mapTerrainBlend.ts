@@ -164,9 +164,15 @@ function trimCache<T>(cache: Map<string, T>, maximum: number) {
 }
 
 function renderSizeFor(tilePixels: number) {
-  // Terrain is cached independently from zoom. Large zoom levels reuse a 64px
-  // source instead of creating hundreds of very large temporary canvases.
-  return Math.max(8, Math.min(64, Math.round(tilePixels)));
+  // Stable size buckets prevent zoom from rebuilding every terrain blend for
+  // every tiny wheel step. The cached source is simply scaled on screen.
+  if (tilePixels <= 10) return 8;
+  if (tilePixels <= 14) return 12;
+  if (tilePixels <= 20) return 16;
+  if (tilePixels <= 28) return 24;
+  if (tilePixels <= 40) return 32;
+  if (tilePixels <= 56) return 48;
+  return 64;
 }
 
 function plainTerrainTile(entry: MapPaletteEntry, tileX: number, tileY: number, size: number, onReady?: () => void, now?: number) {
