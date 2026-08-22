@@ -46,11 +46,13 @@ export function installMapEditorInteractionPerf() {
         const point = pending;
         pending = null;
         if (!point) return;
-        originalClick.call(minimap, new MouseEvent('click', {
+        originalClick.call(minimap, new PointerEvent('click', {
           cancelable: true,
           clientX: point.x,
           clientY: point.y,
           button: 0,
+          pointerType: 'mouse',
+          isPrimary: true,
         }));
       });
     };
