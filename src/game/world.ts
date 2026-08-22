@@ -288,6 +288,13 @@ export function collides(obstacles: Obstacle[], x: number, y: number) {
       const nearestY = Math.max(obstacle.y, Math.min(y, obstacle.y + obstacle.height));
       return Math.hypot(x - nearestX, y - nearestY) < PLAYER_RADIUS;
     }
+    if (obstacle.kind === 'ellipse') {
+      const radiusX = Math.max(1, obstacle.radiusX + PLAYER_RADIUS);
+      const radiusY = Math.max(1, obstacle.radiusY + PLAYER_RADIUS);
+      const dx = (x - obstacle.x) / radiusX;
+      const dy = (y - obstacle.y) / radiusY;
+      return dx * dx + dy * dy < 1;
+    }
     if (obstacle.kind === 'polygon') {
       if (pointInPolygon(x, y, obstacle.points)) return true;
       return obstacle.points.some((point, index) => {
