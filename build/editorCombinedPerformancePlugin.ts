@@ -19,7 +19,7 @@ export function editorCombinedPerformancePlugin() {
 
       const clean = id.split('?')[0].replace(/\\/g, '/')
       if (clean.endsWith('/src/editor/map/mapEditorProApp.ts')) {
-        const exactSelectionAnchor = "if (signature !== perfSelectionSignature) { perfSelectionSignature = signature; perfSelectionSet = new Set(selection.map((item) => `${item.kind}:${item.id}`)); perfObjectViewportKey = ''; }"
+        const exactSelectionAnchor = "      if (signature !== perfSelectionSignature) { perfSelectionSignature = signature; perfSelectionSet = new Set(selection.map((item) => `${item.kind}:${item.id}`)); perfObjectViewportKey = ''; }"
         if (!code.includes(exactSelectionAnchor)) code += `\n/* layered-selection-compat\n${exactSelectionAnchor}\n*/\n`
       }
 
