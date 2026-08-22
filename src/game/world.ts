@@ -1,10 +1,10 @@
 import { Container, Graphics, Text } from 'pixi.js';
-import { getPreparedPublishedWorldRuntime, getPublishedObjectPositions } from '../map/publishedMapRuntime';
+import { getPreparedPublishedWorldRuntime, getPublishedObjectPositions, type PublishedObstacle } from '../map/publishedMapRuntime';
 
 export let WORLD_W = 2200;
 export let WORLD_H = 1600;
 export const PLAYER_RADIUS = 20;
-export type Obstacle = { x: number; y: number; radius: number };
+export type Obstacle = PublishedObstacle;
 export type SafeZone = { x: number; y: number; width: number; height: number };
 export type Village = {
   id: string;
@@ -263,6 +263,38 @@ export function distance(ax: number, ay: number, bx: number, by: number) {
   return Math.hypot(ax - bx, ay - by);
 }
 
+function pointInPolygon(x: number, y: number, points: Array<{ x: number; y: number }>) {
+  let inside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const a = points[i], b = points[j];
+    const crosses = ((a.y > y) !== (b.y > y)) && (x < (b.x - a.x) * (y - a.y) / ((b.y - a.y) || 1e-9) + a.x);
+    if (crosses) inside = !inside;
+  }
+  return inside;
+}
+
+function distanceToSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number) {
+  const vx = bx - ax, vy = by - ay;
+  const lengthSq = vx * vx + vy * vy;
+  if (lengthSq <= 1e-9) return Math.hypot(px - ax, py - ay);
+  const t = Math.max(0, Math.min(1, ((px - ax) * vx + (py - ay) * vy) / lengthSq));
+  return Math.hypot(px - (ax + vx * t), py - (ay + vy * t));
+}
+
 export function collides(obstacles: Obstacle[], x: number, y: number) {
-  return obstacles.some((o) => distance(x, y, o.x, o.y) < PLAYER_RADIUS + o.radius);
+  return obstacles.some((obstacle) => {
+    if (obstacle.kind === 'rect') {
+      const nearestX = Math.max(obstacle.x, Math.min(x, obstacle.x + obstacle.width));
+      const nearestY = Math.max(obstacle.y, Math.min(y, obstacle.y + obstacle.height));
+      return Math.hypot(x - nearestX, y - nearestY) < PLAYER_RADIUS;
+    }
+    if (obstacle.kind === 'polygon') {
+      if (pointInPolygon(x, y, obstacle.points)) return true;
+      return obstacle.points.some((point, index) => {
+        const next = obstacle.points[(index + 1) % obstacle.points.length];
+        return distanceToSegment(x, y, point.x, point.y, next.x, next.y) < PLAYER_RADIUS;
+      });
+    }
+    return distance(x, y, obstacle.x, obstacle.y) < PLAYER_RADIUS + obstacle.radius;
+  });
 }
