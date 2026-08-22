@@ -3,6 +3,7 @@ import { getMapAssetImage } from '../editor/map/mapAssetRenderer';
 import { hydrateAssetLibraryV2 } from '../editor/map/mapAssetLibraryV2';
 import { getPaletteEntry, MAP_PALETTE_ENTRIES } from '../editor/map/mapEditorCatalog';
 import { circleHitboxRadii, getAssetPreset, objectVisualBounds } from '../editor/map/mapAssetPresets';
+import { drawBlendedTerrainTile } from '../editor/map/mapTerrainBlend';
 import type { AscensionMapDocument, MapAnimationFrame, MapObject, MapPaletteEntry, MapSpriteRect } from '../editor/map/mapEditorTypes';
 import { parseTileKey, tileKey } from '../editor/map/mapEditorTypes';
 import { loadPublishedMap } from './publishedMapStore';
@@ -95,27 +96,12 @@ function createObjectView(entry: MapPaletteEntry, object: MapObject, tileSize: n
   return sprite;
 }
 
-function drawTerrainTile(ctx: CanvasRenderingContext2D, entry: MapPaletteEntry, x: number, y: number, tileSize: number, alpha = 1) {
-  const image = getMapAssetImage(entry);
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  if (image?.complete && image.naturalWidth > 0) {
-    const rect = entry.sprite?.sourceRect;
-    ctx.imageSmoothingEnabled = !entry.sprite?.pixelated;
-    if (rect) ctx.drawImage(image, rect.x, rect.y, rect.width, rect.height, x, y, tileSize + .5, tileSize + .5);
-    else ctx.drawImage(image, x, y, tileSize + .5, tileSize + .5);
-  } else {
-    ctx.fillStyle = entry.color || '#527b45';
-    ctx.fillRect(x, y, tileSize + .5, tileSize + .5);
-  }
-  ctx.restore();
-}
-
 function addTerrainChunks(view: Container, map: AscensionMapDocument) {
   const chunkPixels = 1024;
   const tileSize = map.tileSize;
   const widthPx = map.width * tileSize;
   const heightPx = map.height * tileSize;
+  const now = performance.now();
   for (let cy = 0; cy < heightPx; cy += chunkPixels) {
     for (let cx = 0; cx < widthPx; cx += chunkPixels) {
       const cw = Math.min(chunkPixels, widthPx - cx);
@@ -135,8 +121,8 @@ function addTerrainChunks(view: Container, map: AscensionMapDocument) {
         const tile = map.tiles[tileKey(x, y)] ?? { ground: 'grass' };
         const px = x * tileSize - cx;
         const py = y * tileSize - cy;
-        drawTerrainTile(ctx, getPaletteEntry(tile.ground ?? 'grass'), px, py, tileSize, 1);
-        if (tile.detail) drawTerrainTile(ctx, getPaletteEntry(tile.detail), px, py, tileSize, .78);
+        drawBlendedTerrainTile(ctx, map, { x, y, screenX: px, screenY: py, tilePixels: tileSize, layer: 'ground', now });
+        if (tile.detail) drawBlendedTerrainTile(ctx, map, { x, y, screenX: px, screenY: py, tilePixels: tileSize, layer: 'detail', alpha: .78, now });
       }
       const sprite = Sprite.from(canvas);
       sprite.position.set(cx, cy);

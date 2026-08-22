@@ -1,4 +1,4 @@
-import { drawTerrainAsset } from './mapAssetRenderer';
+import { drawTerrainAsset, getMapAssetImage } from './mapAssetRenderer';
 import { getPaletteEntry } from './mapEditorCatalog';
 import type { AscensionMapDocument, MapPaletteEntry } from './mapEditorTypes';
 import { tileKey } from './mapEditorTypes';
@@ -16,6 +16,18 @@ export type TerrainDrawOptions = {
   blend?: boolean;
 };
 
+type TerrainSource = {
+  id: string;
+  x: number;
+  y: number;
+};
+
+const blendedTileCache = new Map<string, HTMLCanvasElement>();
+const MAX_BLEND_CACHE = 420;
+const BLEND_RADIUS = 0.94;
+const MASK_MIN = 28;
+const MASK_MAX = 56;
+
 function terrainId(map: AscensionMapDocument, x: number, y: number, layer: 'ground' | 'detail') {
   if (x < 0 || y < 0 || x >= map.width || y >= map.height) return null;
   const tile = map.tiles[tileKey(x, y)];
@@ -23,112 +35,150 @@ function terrainId(map: AscensionMapDocument, x: number, y: number, layer: 'grou
   return tile?.ground ?? 'grass';
 }
 
-function hash01(a: number, b: number, c: number) {
-  let value = Math.imul(a + 374761393, 668265263) ^ Math.imul(b + 1442695041, 2246822519) ^ Math.imul(c + 17, 3266489917);
-  value = Math.imul(value ^ (value >>> 13), 1274126177);
-  return ((value ^ (value >>> 16)) >>> 0) / 4294967295;
-}
-
-function edgeSeed(tileX: number, tileY: number, side: 'left' | 'right' | 'top' | 'bottom') {
-  if (side === 'left') return { a: tileX, b: tileY, orientation: 1 };
-  if (side === 'right') return { a: tileX + 1, b: tileY, orientation: 1 };
-  if (side === 'top') return { a: tileX, b: tileY, orientation: 2 };
-  return { a: tileX, b: tileY + 1, orientation: 2 };
-}
-
-function edgeDepths(tileX: number, tileY: number, side: 'left' | 'right' | 'top' | 'bottom', size: number, band: number) {
-  const seed = edgeSeed(tileX, tileY, side);
-  const samples = 7;
-  const base = size * (0.42 - band * 0.075);
-  const wobble = size * (0.12 - band * 0.012);
-  return Array.from({ length: samples }, (_, index) => {
-    const n1 = hash01(seed.a, seed.b, seed.orientation * 100 + index);
-    const n2 = hash01(seed.a + index, seed.b - index, seed.orientation * 200 + band);
-    const wave = Math.sin((index / (samples - 1)) * Math.PI * 2 + n2 * 2.2) * wobble * 0.45;
-    return Math.max(size * 0.05, base + (n1 - 0.5) * wobble + wave);
-  });
-}
-
-function clipOrganicEdge(
-  ctx: CanvasRenderingContext2D,
-  tileX: number,
-  tileY: number,
-  x: number,
-  y: number,
-  size: number,
-  side: 'left' | 'right' | 'top' | 'bottom',
-  band: number,
-) {
-  const depths = edgeDepths(tileX, tileY, side, size, band);
-  const step = size / (depths.length - 1);
-  ctx.beginPath();
-
-  if (side === 'left') {
-    ctx.moveTo(x, y);
-    for (let i = 0; i < depths.length; i++) ctx.lineTo(x + depths[i], y + i * step);
-    ctx.lineTo(x, y + size);
-  } else if (side === 'right') {
-    ctx.moveTo(x + size, y);
-    for (let i = 0; i < depths.length; i++) ctx.lineTo(x + size - depths[i], y + i * step);
-    ctx.lineTo(x + size, y + size);
-  } else if (side === 'top') {
-    ctx.moveTo(x, y);
-    for (let i = 0; i < depths.length; i++) ctx.lineTo(x + i * step, y + depths[i]);
-    ctx.lineTo(x + size, y);
-  } else {
-    ctx.moveTo(x, y + size);
-    for (let i = 0; i < depths.length; i++) ctx.lineTo(x + i * step, y + size - depths[i]);
-    ctx.lineTo(x + size, y + size);
+function neighborhood(map: AscensionMapDocument, tileX: number, tileY: number, layer: 'ground' | 'detail') {
+  const sources: TerrainSource[] = [];
+  const signature: string[] = [];
+  const ids = new Set<string>();
+  for (let oy = -1; oy <= 1; oy++) {
+    for (let ox = -1; ox <= 1; ox++) {
+      const x = tileX + ox;
+      const y = tileY + oy;
+      const id = terrainId(map, x, y, layer);
+      signature.push(id ?? '-');
+      if (!id) continue;
+      ids.add(id);
+      sources.push({ id, x: x + .5, y: y + .5 });
+    }
   }
-  ctx.closePath();
-  ctx.clip();
+  return { sources, signature: signature.join(','), ids: [...ids] };
 }
 
-function drawOrganicNeighbor(
-  ctx: CanvasRenderingContext2D,
-  entry: MapPaletteEntry,
+function smoothKernel(distance: number) {
+  if (distance >= BLEND_RADIUS) return 0;
+  const t = 1 - distance / BLEND_RADIUS;
+  const smooth = t * t * (3 - 2 * t);
+  return smooth * smooth;
+}
+
+function warpedWorldPoint(x: number, y: number) {
+  // Small continuous warp breaks geometric-looking borders without reintroducing tile steps.
+  const wx = Math.sin(y * 2.35 + Math.sin(x * 1.31) * .75) * .026;
+  const wy = Math.sin(x * 2.61 + Math.cos(y * 1.47) * .72) * .026;
+  return { x: x + wx, y: y + wy };
+}
+
+function createMaskCanvas(
+  id: string,
+  sources: TerrainSource[],
   tileX: number,
   tileY: number,
-  x: number,
-  y: number,
-  size: number,
-  side: 'left' | 'right' | 'top' | 'bottom',
-  alpha: number,
-  onReady?: () => void,
-  now?: number,
+  resolution: number,
 ) {
-  const bandAlpha = [0.32, 0.21, 0.13, 0.07];
-  for (let band = 0; band < bandAlpha.length; band++) {
-    ctx.save();
-    clipOrganicEdge(ctx, tileX, tileY, x, y, size, side, band);
-    drawTerrainAsset(ctx, entry, x, y, size, alpha * bandAlpha[band], onReady, now);
-    ctx.restore();
+  const canvas = document.createElement('canvas');
+  canvas.width = resolution;
+  canvas.height = resolution;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return canvas;
+  const image = ctx.createImageData(resolution, resolution);
+  const data = image.data;
+
+  for (let py = 0; py < resolution; py++) {
+    for (let px = 0; px < resolution; px++) {
+      const u = (px + .5) / resolution;
+      const v = (py + .5) / resolution;
+      const world = warpedWorldPoint(tileX + u, tileY + v);
+      let wanted = 0;
+      let total = 0;
+
+      for (const source of sources) {
+        const distance = Math.hypot(world.x - source.x, world.y - source.y);
+        const weight = smoothKernel(distance);
+        if (weight <= 0) continue;
+        total += weight;
+        if (source.id === id) wanted += weight;
+      }
+
+      const alpha = total > 1e-8 ? Math.max(0, Math.min(1, wanted / total)) : 0;
+      const offset = (py * resolution + px) * 4;
+      data[offset] = 255;
+      data[offset + 1] = 255;
+      data[offset + 2] = 255;
+      data[offset + 3] = Math.round(alpha * 255);
+    }
+  }
+
+  ctx.putImageData(image, 0, 0);
+  return canvas;
+}
+
+function trimCache() {
+  while (blendedTileCache.size > MAX_BLEND_CACHE) {
+    const first = blendedTileCache.keys().next().value as string | undefined;
+    if (!first) break;
+    blendedTileCache.delete(first);
   }
 }
 
-function drawOrganicCorner(
-  ctx: CanvasRenderingContext2D,
-  entry: MapPaletteEntry,
-  tileX: number,
-  tileY: number,
-  x: number,
-  y: number,
-  size: number,
-  corner: 'tl' | 'tr' | 'bl' | 'br',
-  alpha: number,
-  onReady?: () => void,
-  now?: number,
+function cachedBlendTile(
+  map: AscensionMapDocument,
+  options: TerrainDrawOptions,
+  layer: 'ground' | 'detail',
+  currentId: string,
 ) {
-  const seed = hash01(tileX, tileY, corner === 'tl' ? 11 : corner === 'tr' ? 17 : corner === 'bl' ? 23 : 29);
-  const radius = size * (0.28 + seed * 0.12);
-  const cx = corner.endsWith('l') ? x : x + size;
-  const cy = corner.startsWith('t') ? y : y + size;
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-  ctx.clip();
-  drawTerrainAsset(ctx, entry, x, y, size, alpha * 0.16, onReady, now);
-  ctx.restore();
+  const group = neighborhood(map, options.x, options.y, layer);
+  if (group.ids.length <= 1) return null;
+
+  const entries = new Map<string, MapPaletteEntry>();
+  let animated = false;
+  for (const id of group.ids) {
+    const entry = getPaletteEntry(id);
+    entries.set(id, entry);
+    animated ||= Boolean(entry.sprite?.animation?.frames?.length);
+    const image = getMapAssetImage(entry, options.onReady);
+    if (image && (!image.complete || image.naturalWidth <= 0)) return null;
+  }
+
+  const size = Math.max(2, Math.ceil(options.tilePixels + .75));
+  const frameKey = animated ? Math.floor((options.now ?? performance.now()) / 110) : 0;
+  const cacheKey = `${layer}|${size}|${currentId}|${group.signature}|${frameKey}`;
+  const cached = blendedTileCache.get(cacheKey);
+  if (cached) return cached;
+
+  const finalCanvas = document.createElement('canvas');
+  finalCanvas.width = size;
+  finalCanvas.height = size;
+  const finalCtx = finalCanvas.getContext('2d');
+  if (!finalCtx) return null;
+  finalCtx.clearRect(0, 0, size, size);
+  finalCtx.globalCompositeOperation = 'lighter';
+
+  const maskResolution = Math.max(MASK_MIN, Math.min(MASK_MAX, Math.round(size * .72)));
+
+  for (const id of group.ids) {
+    const entry = entries.get(id)!;
+    const layerCanvas = document.createElement('canvas');
+    layerCanvas.width = size;
+    layerCanvas.height = size;
+    const layerCtx = layerCanvas.getContext('2d');
+    if (!layerCtx) continue;
+
+    drawTerrainAsset(layerCtx, entry, 0, 0, size, 1, options.onReady, options.now);
+    const mask = createMaskCanvas(id, group.sources, options.x, options.y, maskResolution);
+    layerCtx.globalCompositeOperation = 'destination-in';
+    layerCtx.imageSmoothingEnabled = true;
+    layerCtx.drawImage(mask, 0, 0, size, size);
+
+    finalCtx.drawImage(layerCanvas, 0, 0);
+  }
+
+  finalCtx.globalCompositeOperation = 'source-over';
+  blendedTileCache.set(cacheKey, finalCanvas);
+  trimCache();
+  return finalCanvas;
+}
+
+export function clearTerrainBlendCache() {
+  blendedTileCache.clear();
 }
 
 export function drawBlendedTerrainTile(ctx: CanvasRenderingContext2D, map: AscensionMapDocument, options: TerrainDrawOptions) {
@@ -138,56 +188,21 @@ export function drawBlendedTerrainTile(ctx: CanvasRenderingContext2D, map: Ascen
   const current = getPaletteEntry(id);
   const alpha = options.alpha ?? 1;
 
-  drawTerrainAsset(ctx, current, options.screenX, options.screenY, options.tilePixels, alpha, options.onReady, options.now);
-  if (options.blend === false || options.tilePixels < 5) return;
-
-  const neighbors = [
-    { side: 'left' as const, dx: -1, dy: 0 },
-    { side: 'right' as const, dx: 1, dy: 0 },
-    { side: 'top' as const, dx: 0, dy: -1 },
-    { side: 'bottom' as const, dx: 0, dy: 1 },
-  ];
-
-  for (const neighbor of neighbors) {
-    const neighborId = terrainId(map, options.x + neighbor.dx, options.y + neighbor.dy, layer);
-    if (!neighborId || neighborId === id) continue;
-    drawOrganicNeighbor(
-      ctx,
-      getPaletteEntry(neighborId),
-      options.x,
-      options.y,
-      options.screenX,
-      options.screenY,
-      options.tilePixels,
-      neighbor.side,
-      alpha,
-      options.onReady,
-      options.now,
-    );
+  if (options.blend === false || options.tilePixels < 5) {
+    drawTerrainAsset(ctx, current, options.screenX, options.screenY, options.tilePixels, alpha, options.onReady, options.now);
+    return;
   }
 
-  const corners = [
-    { corner: 'tl' as const, dx: -1, dy: -1 },
-    { corner: 'tr' as const, dx: 1, dy: -1 },
-    { corner: 'bl' as const, dx: -1, dy: 1 },
-    { corner: 'br' as const, dx: 1, dy: 1 },
-  ];
-
-  for (const corner of corners) {
-    const diagonal = terrainId(map, options.x + corner.dx, options.y + corner.dy, layer);
-    if (!diagonal || diagonal === id) continue;
-    drawOrganicCorner(
-      ctx,
-      getPaletteEntry(diagonal),
-      options.x,
-      options.y,
-      options.screenX,
-      options.screenY,
-      options.tilePixels,
-      corner.corner,
-      alpha,
-      options.onReady,
-      options.now,
-    );
+  const blended = cachedBlendTile(map, options, layer, id);
+  if (!blended) {
+    drawTerrainAsset(ctx, current, options.screenX, options.screenY, options.tilePixels, alpha, options.onReady, options.now);
+    return;
   }
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.imageSmoothingEnabled = true;
+  // Slight overlap avoids hairline seams between independently rendered visible tiles.
+  ctx.drawImage(blended, options.screenX, options.screenY, options.tilePixels + .8, options.tilePixels + .8);
+  ctx.restore();
 }
