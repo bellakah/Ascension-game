@@ -19,9 +19,9 @@ export function editorCombinedPerformancePlugin() {
 
       const clean = id.split('?')[0].replace(/\\/g, '/')
       if (clean.endsWith('/src/editor/map/mapEditorProApp.ts')) {
-        const selectionPattern = /if \(signature !== perfSelectionSignature\) \{\s*perfSelectionSignature = signature;\s*perfSelectionSet = new Set\(selection\.map\(\(item\) => `\$\{item\.kind\}:\$\{item\.id\}`\)\);\s*perfObjectViewportKey = '';\s*\}/m
-        if (selectionPattern.test(code)) {
-          code = code.replace(selectionPattern, "if (signature !== perfSelectionSignature) { perfSelectionSignature = signature; perfSelectionSet = new Set(selection.map((item) => `${item.kind}:${item.id}`)); perfObjectViewportKey = ''; }")
+        const selectionBlock = /if\s*\(\s*signature\s*!==\s*perfSelectionSignature\s*\)\s*\{[\s\S]*?\}/m
+        if (selectionBlock.test(code)) {
+          code = code.replace(selectionBlock, "if (signature !== perfSelectionSignature) { perfSelectionSignature = signature; perfSelectionSet = new Set(selection.map((item) => `${item.kind}:${item.id}`)); perfObjectViewportKey = ''; }")
         }
       }
 
