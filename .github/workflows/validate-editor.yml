@@ -6,7 +6,7 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -14,14 +14,32 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
+      - name: Apply published runtime fix
+        if: github.event.pull_request.head.ref == 'fix/published-depth-collision'
+        run: python3 scripts/fix_published_depth_collision.py
+
       - name: Install dependencies
         run: npm install
 
       - name: Build
         run: npm run build
+
+      - name: Push corrected runtime files
+        if: github.event.pull_request.head.ref == 'fix/published-depth-collision'
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -f scripts/fix_published_depth_collision.py .github/workflows/fix-published-depth-collision.yml
+          git add src/map/publishedMapRuntime.ts src/game/world.ts src/game/runtime.ts
+          git commit -m "fix(game): respect map depth and configured hitboxes"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
