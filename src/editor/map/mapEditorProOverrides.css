@@ -13,6 +13,13 @@
 .mep-stage-wrap:has(.mep-panel:not(.hidden)) .mep-stage{left:calc(var(--panel) + 8px)}
 .mep-stage-wrap:has(.mep-inspector:not(.hidden)) .mep-stage{right:calc(var(--inspector) + 8px)}
 
+/* Renderização em camadas: terreno e objetos parados não dependem mais do canvas de interação. */
+.mep-stage>.mep-render-layer{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.mep-stage>.mep-terrain-layer{z-index:0;pointer-events:none;will-change:transform}
+.mep-stage>.mep-object-layer{z-index:1;pointer-events:none;will-change:transform}
+.mep-stage>.mep-interaction-layer{z-index:2;pointer-events:auto}
+.mep-chip{z-index:6}
+
 .mep-stage-wrap:has(.mep-panel:not(.hidden)) .mep-chip{left:calc(var(--panel) + 18px)}
 .mep-stage-wrap:has(.mep-inspector:not(.hidden)) .mep-minimap-float{right:calc(var(--inspector) + 18px)}
 
