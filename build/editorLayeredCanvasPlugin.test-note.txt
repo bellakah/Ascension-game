@@ -1,0 +1,1 @@
+Layered renderer validation target: terrain canvas + static object canvas + interaction canvas. Remove after validation if desired.
