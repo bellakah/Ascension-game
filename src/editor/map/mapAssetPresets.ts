@@ -36,7 +36,10 @@ export type AssetStretchPreset = {
   cap: number;
 };
 
+export type AssetDepthMode = 'ground' | 'auto' | 'foreground';
+
 export type MapAssetPreset = {
+  depthMode: AssetDepthMode;
   scaleMode: 'set' | 'custom';
   scale: number;
   shadow: boolean;
@@ -50,6 +53,7 @@ const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
 const defaults: MapAssetPreset = {
+  depthMode: 'auto',
   scaleMode: 'set',
   scale: 1,
   shadow: false,

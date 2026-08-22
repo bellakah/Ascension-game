@@ -215,8 +215,14 @@ export async function loadPublishedWorldRuntime(): Promise<PublishedWorldRuntime
   const visualObjects = map.objects.filter((object) => !FUNCTIONAL_ASSETS.has(object.assetId));
   visualObjects.sort((a, b) => a.y - b.y);
   for (const object of visualObjects) {
-    const objectView = createObjectView(getPaletteEntry(object.assetId), object, map.tileSize);
-    objectView.zIndex = (object.y + 1) * map.tileSize;
+    const objectEntry = getPaletteEntry(object.assetId);
+    const objectView = createObjectView(objectEntry, object, map.tileSize);
+    const depthMode = getAssetPreset(objectEntry).depthMode ?? 'auto';
+    objectView.zIndex = depthMode === 'ground'
+      ? -500_000
+      : depthMode === 'foreground'
+        ? 500_000
+        : (object.y + 1) * map.tileSize;
     view.addChild(objectView);
   }
 
