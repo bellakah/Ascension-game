@@ -325,6 +325,16 @@ export async function startGame() {
       onInventoryFull: () => showDialog(hud, 'Mascote: inventário cheio. O drop continuará no chão.'),
     });
 
+    const syncWorldDepth = () => {
+      if (!world.sortableChildren) return;
+      for (const child of world.children) {
+        if (child.zIndex <= -900_000) continue;
+        child.zIndex = child.y;
+      }
+      world.sortChildren();
+    };
+    syncWorldDepth();
+
     const onKill = (monster: Monster) => {
       grantExp(monster.expReward); coins += monster.coinReward;
       spawnMonsterLoot(world, monster.kind, monster.view.x, monster.view.y, groundLoot, selected.id);
@@ -554,6 +564,8 @@ export async function startGame() {
           announceQuestUpdates(syncCollectObjectives(progress)); inventory.refresh(); refreshQuestUi(); save(); characterSheet.refresh();
         }, () => showDialog(hud, 'Inventário cheio. O item continuará no chão por um tempo.'));
       }
+
+      syncWorldDepth();
 
       world.x = Math.max(Math.min(0, app.screen.width - WORLD_W), Math.min(0, app.screen.width / 2 - player.x));
       world.y = Math.max(Math.min(0, app.screen.height - WORLD_H), Math.min(0, app.screen.height / 2 - player.y));

@@ -2,11 +2,15 @@ import { AnimatedSprite, Container, Graphics, Sprite, Texture } from 'pixi.js';
 import { getMapAssetImage } from '../editor/map/mapAssetRenderer';
 import { hydrateAssetLibraryV2 } from '../editor/map/mapAssetLibraryV2';
 import { getPaletteEntry, MAP_PALETTE_ENTRIES } from '../editor/map/mapEditorCatalog';
+import { getAssetPreset, objectVisualBounds } from '../editor/map/mapAssetPresets';
 import type { AscensionMapDocument, MapAnimationFrame, MapObject, MapPaletteEntry, MapSpriteRect } from '../editor/map/mapEditorTypes';
 import { parseTileKey, tileKey } from '../editor/map/mapEditorTypes';
 import { loadPublishedMap } from './publishedMapStore';
 
-export type PublishedObstacle = { x: number; y: number; radius: number };
+export type PublishedObstacle =
+  | { kind?: 'circle'; x: number; y: number; radius: number }
+  | { kind: 'rect'; x: number; y: number; width: number; height: number }
+  | { kind: 'polygon'; points: Array<{ x: number; y: number }> };
 
 export type PublishedWorldRuntime = {
   document: AscensionMapDocument;
@@ -135,6 +139,7 @@ function addTerrainChunks(view: Container, map: AscensionMapDocument) {
       }
       const sprite = Sprite.from(canvas);
       sprite.position.set(cx, cy);
+      sprite.zIndex = -1_000_000;
       view.addChild(sprite);
     }
   }
@@ -143,14 +148,46 @@ function addTerrainChunks(view: Container, map: AscensionMapDocument) {
 function buildObstacles(map: AscensionMapDocument) {
   const obstacles: PublishedObstacle[] = [];
   const tileSize = map.tileSize;
-  const add = (x: number, y: number, radius = tileSize * .42) => obstacles.push({ x, y, radius });
+  const addCircle = (x: number, y: number, radius = tileSize * .42) => obstacles.push({ kind: 'circle', x, y, radius });
+
   for (const key of map.collision) {
     const point = parseTileKey(key);
-    add((point.x + .5) * tileSize, (point.y + .5) * tileSize);
+    addCircle((point.x + .5) * tileSize, (point.y + .5) * tileSize);
   }
+
   for (const object of map.objects) {
-    const collision = getPaletteEntry(object.assetId).footprint?.collision ?? [];
-    for (const cell of collision) add((object.x + cell.x + .5) * tileSize, (object.y + cell.y + .5) * tileSize);
+    const entry = getPaletteEntry(object.assetId);
+    const preset = getAssetPreset(entry);
+    if (preset.hitbox) {
+      const bounds = objectVisualBounds(entry, object);
+      const bx = bounds.x * tileSize, by = bounds.y * tileSize;
+      const bw = bounds.width * tileSize, bh = bounds.height * tileSize;
+      const hitbox = preset.hitbox;
+      if (hitbox.type === 'rectangle') {
+        obstacles.push({
+          kind: 'rect',
+          x: bx + hitbox.x * bw,
+          y: by + hitbox.y * bh,
+          width: hitbox.width * bw,
+          height: hitbox.height * bh,
+        });
+      } else if (hitbox.type === 'circle') {
+        addCircle(
+          bx + hitbox.x * bw,
+          by + hitbox.y * bh,
+          hitbox.radius * Math.min(bw, bh),
+        );
+      } else if (hitbox.points.length >= 3) {
+        obstacles.push({
+          kind: 'polygon',
+          points: hitbox.points.map((point) => ({ x: bx + point.x * bw, y: by + point.y * bh })),
+        });
+      }
+      continue;
+    }
+
+    const collision = entry.footprint?.collision ?? [];
+    for (const cell of collision) addCircle((object.x + cell.x + .5) * tileSize, (object.y + cell.y + .5) * tileSize);
   }
   return obstacles;
 }
@@ -173,10 +210,15 @@ export async function loadPublishedWorldRuntime(): Promise<PublishedWorldRuntime
   await Promise.all(entries.map(waitForImage));
 
   const view = new Container();
+  view.sortableChildren = true;
   addTerrainChunks(view, map);
   const visualObjects = map.objects.filter((object) => !FUNCTIONAL_ASSETS.has(object.assetId));
   visualObjects.sort((a, b) => a.y - b.y);
-  for (const object of visualObjects) view.addChild(createObjectView(getPaletteEntry(object.assetId), object, map.tileSize));
+  for (const object of visualObjects) {
+    const objectView = createObjectView(getPaletteEntry(object.assetId), object, map.tileSize);
+    objectView.zIndex = (object.y + 1) * map.tileSize;
+    view.addChild(objectView);
+  }
 
   return {
     document: map,
