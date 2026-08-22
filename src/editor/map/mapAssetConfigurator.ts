@@ -1,5 +1,12 @@
 import { getMapAssetImage } from './mapAssetRenderer';
-import { defaultAssetPreset, getAssetPreset, saveAssetPreset, type AssetHitbox, type MapAssetPreset } from './mapAssetPresets';
+import {
+  circleHitboxRadii,
+  defaultAssetPreset,
+  getAssetPreset,
+  saveAssetPreset,
+  type AssetHitboxCircle,
+  type MapAssetPreset,
+} from './mapAssetPresets';
 import type { MapPaletteEntry } from './mapEditorTypes';
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
@@ -7,15 +14,27 @@ const esc = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, (char) =
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 type PreviewRect = { x: number; y: number; width: number; height: number };
-
+type NormalPoint = { x: number; y: number };
 type ConfigureResult = { saved: boolean; preset: MapAssetPreset };
+type DragMode =
+  | 'move-rect'
+  | 'resize-rect'
+  | 'move-ellipse'
+  | 'resize-ellipse-x'
+  | 'resize-ellipse-y'
+  | 'move-polygon-point'
+  | 'light'
+  | null;
 
 export function openMapAssetConfigurator(entry: MapPaletteEntry): Promise<ConfigureResult> {
   return new Promise((resolve) => {
     let preset = clone(getAssetPreset(entry));
-    let dragMode: 'move-rect' | 'resize-rect' | 'move-circle' | 'light' | null = null;
+    let dragMode: DragMode = null;
     let dragOffset = { x: 0, y: 0 };
     let previewRect: PreviewRect = { x: 40, y: 30, width: 340, height: 260 };
+    let polygonDragIndex = -1;
+    let polygonSelectedIndex = -1;
+    let polygonHoverIndex = -1;
 
     const backdrop = document.createElement('div');
     backdrop.className = 'pro-modal-backdrop';
@@ -28,7 +47,7 @@ export function openMapAssetConfigurator(entry: MapPaletteEntry): Promise<Config
         <div class="pro-config-body">
           <div class="pro-config-preview-wrap">
             <canvas id="pro-config-canvas"></canvas>
-            <div class="pro-config-hint">Arraste a área vermelha. No modo livre, clique para marcar os pontos.</div>
+            <div class="pro-config-hint">Oval: arraste o centro ou os pontos brancos. Forma livre: arraste pontos; clique numa linha para adicionar; clique direito para remover.</div>
           </div>
           <div class="pro-config-controls">
             <section>
@@ -38,10 +57,16 @@ export function openMapAssetConfigurator(entry: MapPaletteEntry): Promise<Config
             </section>
             <section>
               <h3>Colisão</h3>
-              <label>Formato<select id="pro-hit-type"><option value="none">Sem colisão</option><option value="rectangle">Retângulo</option><option value="circle">Círculo</option><option value="polygon">Forma livre</option></select></label>
+              <label>Formato<select id="pro-hit-type"><option value="none">Sem colisão</option><option value="rectangle">Retângulo</option><option value="circle">Círculo / oval</option><option value="polygon">Forma livre</option></select></label>
               <div class="pro-two" id="pro-hit-size"><label>Largura<input id="pro-hit-w" type="number" min="0.02" max="1" step="0.02"></label><label>Altura<input id="pro-hit-h" type="number" min="0.02" max="1" step="0.02"></label></div>
-              <div class="pro-two" id="pro-hit-circle"><label>Raio<input id="pro-hit-radius" type="number" min="0.02" max="0.7" step="0.02"></label><button id="pro-center-hit" type="button">Centralizar</button></div>
-              <button id="pro-clear-points" type="button">Limpar pontos da forma livre</button>
+              <div id="pro-hit-circle">
+                <div class="pro-two"><label>Largura<input id="pro-ellipse-w" type="number" min="0.04" max="1" step="0.02"></label><label>Altura<input id="pro-ellipse-h" type="number" min="0.04" max="1" step="0.02"></label></div>
+                <button id="pro-center-hit" type="button">Centralizar</button>
+              </div>
+              <div id="pro-hit-polygon-actions" class="pro-two">
+                <button id="pro-undo-point" type="button">Desfazer último ponto</button>
+                <button id="pro-clear-points" type="button">Limpar forma</button>
+              </div>
             </section>
             <section>
               <h3>Tamanho padrão</h3>
@@ -73,7 +98,8 @@ export function openMapAssetConfigurator(entry: MapPaletteEntry): Promise<Config
     const hitType = backdrop.querySelector<HTMLSelectElement>('#pro-hit-type')!;
     const hitW = backdrop.querySelector<HTMLInputElement>('#pro-hit-w')!;
     const hitH = backdrop.querySelector<HTMLInputElement>('#pro-hit-h')!;
-    const hitRadius = backdrop.querySelector<HTMLInputElement>('#pro-hit-radius')!;
+    const ellipseW = backdrop.querySelector<HTMLInputElement>('#pro-ellipse-w')!;
+    const ellipseH = backdrop.querySelector<HTMLInputElement>('#pro-ellipse-h')!;
     const scale = backdrop.querySelector<HTMLInputElement>('#pro-scale')!;
     const shadow = backdrop.querySelector<HTMLInputElement>('#pro-shadow')!;
     const light = backdrop.querySelector<HTMLInputElement>('#pro-light')!;
@@ -84,6 +110,7 @@ export function openMapAssetConfigurator(entry: MapPaletteEntry): Promise<Config
     const stretchCap = backdrop.querySelector<HTMLInputElement>('#pro-stretch-cap')!;
 
     const close = (saved: boolean) => {
+      window.removeEventListener('keydown', onKeyDown);
       backdrop.remove();
       resolve({ saved, preset: clone(preset) });
     };
@@ -96,7 +123,7 @@ export function openMapAssetConfigurator(entry: MapPaletteEntry): Promise<Config
       return Math.max(.05, width / Math.max(1, height));
     };
 
-    const normalizedPoint = (event: PointerEvent) => {
+    const normalizedPoint = (event: PointerEvent | MouseEvent): NormalPoint => {
       const rect = canvas.getBoundingClientRect();
       const scaleX = canvas.width / Math.max(1, rect.width);
       const scaleY = canvas.height / Math.max(1, rect.height);
@@ -108,10 +135,55 @@ export function openMapAssetConfigurator(entry: MapPaletteEntry): Promise<Config
       };
     };
 
+    const pixelDistance = (a: NormalPoint, b: NormalPoint) => Math.hypot(
+      (a.x - b.x) * previewRect.width,
+      (a.y - b.y) * previewRect.height,
+    );
+
+    const nearestPolygonPoint = (point: NormalPoint, threshold = 14) => {
+      if (preset.hitbox?.type !== 'polygon') return -1;
+      let best = -1, bestDistance = threshold;
+      preset.hitbox.points.forEach((candidate, index) => {
+        const distance = pixelDistance(point, candidate);
+        if (distance <= bestDistance) { best = index; bestDistance = distance; }
+      });
+      return best;
+    };
+
+    const nearestPolygonEdge = (point: NormalPoint, threshold = 10) => {
+      if (preset.hitbox?.type !== 'polygon' || preset.hitbox.points.length < 2) return null;
+      let best: { index: number; point: NormalPoint; distance: number } | null = null;
+      const px = point.x * previewRect.width, py = point.y * previewRect.height;
+      preset.hitbox.points.forEach((a, index) => {
+        const b = preset.hitbox!.type === 'polygon' ? preset.hitbox.points[(index + 1) % preset.hitbox.points.length] : a;
+        const ax = a.x * previewRect.width, ay = a.y * previewRect.height;
+        const bx = b.x * previewRect.width, by = b.y * previewRect.height;
+        const vx = bx - ax, vy = by - ay;
+        const lengthSq = vx * vx + vy * vy;
+        const t = lengthSq <= 1e-9 ? 0 : clamp(((px - ax) * vx + (py - ay) * vy) / lengthSq, 0, 1);
+        const projected = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+        const distance = pixelDistance(point, projected);
+        if (distance <= threshold && (!best || distance < best.distance)) best = { index, point: projected, distance };
+      });
+      return best;
+    };
+
+    const ensureEllipseRadii = (hitbox: AssetHitboxCircle) => {
+      const radii = circleHitboxRadii(hitbox);
+      hitbox.radiusX = radii.radiusX;
+      hitbox.radiusY = radii.radiusY;
+      delete hitbox.radius;
+      return radii;
+    };
+
     const ensureHitbox = (type: string) => {
+      polygonDragIndex = -1; polygonSelectedIndex = -1; polygonHoverIndex = -1;
       if (type === 'none') { preset.hitbox = null; return; }
       if (type === 'rectangle' && preset.hitbox?.type !== 'rectangle') preset.hitbox = { type: 'rectangle', x: .18, y: .55, width: .64, height: .38 };
-      if (type === 'circle' && preset.hitbox?.type !== 'circle') preset.hitbox = { type: 'circle', x: .5, y: .75, radius: .2 };
+      if (type === 'circle') {
+        if (preset.hitbox?.type !== 'circle') preset.hitbox = { type: 'circle', x: .5, y: .72, radiusX: .28, radiusY: .16 };
+        else ensureEllipseRadii(preset.hitbox);
+      }
       if (type === 'polygon' && preset.hitbox?.type !== 'polygon') preset.hitbox = { type: 'polygon', points: [{ x: .2, y: .82 }, { x: .35, y: .58 }, { x: .68, y: .58 }, { x: .82, y: .82 }] };
     };
 
@@ -122,7 +194,13 @@ export function openMapAssetConfigurator(entry: MapPaletteEntry): Promise<Config
       hitW.value = String(rect?.width ?? .64);
       hitH.value = String(rect?.height ?? .38);
       const circle = preset.hitbox?.type === 'circle' ? preset.hitbox : null;
-      hitRadius.value = String(circle?.radius ?? .2);
+      if (circle) {
+        const radii = ensureEllipseRadii(circle);
+        ellipseW.value = (radii.radiusX * 2).toFixed(2);
+        ellipseH.value = (radii.radiusY * 2).toFixed(2);
+      } else {
+        ellipseW.value = '.56'; ellipseH.value = '.32';
+      }
       scale.value = String(preset.scale);
       shadow.checked = preset.shadow;
       light.checked = preset.light.enabled;
@@ -134,7 +212,7 @@ export function openMapAssetConfigurator(entry: MapPaletteEntry): Promise<Config
       backdrop.querySelectorAll<HTMLInputElement>('input[name="scale-mode"]').forEach((node) => { node.checked = node.value === preset.scaleMode; });
       backdrop.querySelector<HTMLElement>('#pro-hit-size')!.classList.toggle('hidden', preset.hitbox?.type !== 'rectangle');
       backdrop.querySelector<HTMLElement>('#pro-hit-circle')!.classList.toggle('hidden', preset.hitbox?.type !== 'circle');
-      backdrop.querySelector<HTMLButtonElement>('#pro-clear-points')!.classList.toggle('hidden', preset.hitbox?.type !== 'polygon');
+      backdrop.querySelector<HTMLElement>('#pro-hit-polygon-actions')!.classList.toggle('hidden', preset.hitbox?.type !== 'polygon');
       render();
     };
 
@@ -155,6 +233,14 @@ export function openMapAssetConfigurator(entry: MapPaletteEntry): Promise<Config
         ctx.fillRect(previewRect.x, previewRect.y, previewRect.width, previewRect.height);
       }
     }
+
+    const drawHandle = (point: NormalPoint, active = false) => {
+      const x = previewRect.x + point.x * previewRect.width;
+      const y = previewRect.y + point.y * previewRect.height;
+      ctx.beginPath(); ctx.arc(x, y, active ? 7 : 6, 0, Math.PI * 2);
+      ctx.fillStyle = active ? '#ffd96b' : '#ffffff'; ctx.fill();
+      ctx.strokeStyle = '#3769dd'; ctx.lineWidth = 2; ctx.stroke();
+    };
 
     function render() {
       const shell = canvas.parentElement!;
@@ -182,10 +268,26 @@ export function openMapAssetConfigurator(entry: MapPaletteEntry): Promise<Config
           ctx.fillRect(x, y, w, h); ctx.strokeRect(x, y, w, h);
           ctx.fillStyle = '#fff'; ctx.fillRect(x + w - 7, y + h - 7, 14, 14);
         } else if (hitbox.type === 'circle') {
-          ctx.beginPath(); ctx.arc(previewRect.x + hitbox.x * previewRect.width, previewRect.y + hitbox.y * previewRect.height, hitbox.radius * Math.min(previewRect.width, previewRect.height), 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          const { radiusX, radiusY } = ensureEllipseRadii(hitbox);
+          const cx = previewRect.x + hitbox.x * previewRect.width;
+          const cy = previewRect.y + hitbox.y * previewRect.height;
+          const rx = radiusX * previewRect.width;
+          const ry = radiusY * previewRect.height;
+          ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          drawHandle({ x: hitbox.x - radiusX, y: hitbox.y });
+          drawHandle({ x: hitbox.x + radiusX, y: hitbox.y });
+          drawHandle({ x: hitbox.x, y: hitbox.y - radiusY });
+          drawHandle({ x: hitbox.x, y: hitbox.y + radiusY });
+          ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fillStyle = '#67d9ff'; ctx.fill(); ctx.strokeStyle = '#17445a'; ctx.lineWidth = 2; ctx.stroke();
         } else if (hitbox.points.length) {
-          ctx.beginPath(); hitbox.points.forEach((point, index) => { const x = previewRect.x + point.x * previewRect.width, y = previewRect.y + point.y * previewRect.height; if (index === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }); if (hitbox.points.length >= 3) ctx.closePath(); ctx.fill(); ctx.stroke();
-          ctx.fillStyle = '#fff'; hitbox.points.forEach((point) => { ctx.beginPath(); ctx.arc(previewRect.x + point.x * previewRect.width, previewRect.y + point.y * previewRect.height, 5, 0, Math.PI * 2); ctx.fill(); });
+          ctx.beginPath();
+          hitbox.points.forEach((point, index) => {
+            const x = previewRect.x + point.x * previewRect.width, y = previewRect.y + point.y * previewRect.height;
+            if (index === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+          });
+          if (hitbox.points.length >= 3) ctx.closePath();
+          ctx.fill(); ctx.stroke();
+          hitbox.points.forEach((point, index) => drawHandle(point, index === polygonHoverIndex || index === polygonSelectedIndex));
         }
       }
 
@@ -200,7 +302,16 @@ export function openMapAssetConfigurator(entry: MapPaletteEntry): Promise<Config
     hitType.onchange = () => { ensureHitbox(hitType.value); syncInputs(); };
     hitW.oninput = () => { if (preset.hitbox?.type === 'rectangle') preset.hitbox.width = clamp(Number(hitW.value) || .1, .02, 1 - preset.hitbox.x); render(); };
     hitH.oninput = () => { if (preset.hitbox?.type === 'rectangle') preset.hitbox.height = clamp(Number(hitH.value) || .1, .02, 1 - preset.hitbox.y); render(); };
-    hitRadius.oninput = () => { if (preset.hitbox?.type === 'circle') preset.hitbox.radius = clamp(Number(hitRadius.value) || .1, .02, .7); render(); };
+    ellipseW.oninput = () => {
+      if (preset.hitbox?.type !== 'circle') return;
+      const radius = clamp((Number(ellipseW.value) || .04) / 2, .02, Math.max(.02, Math.min(preset.hitbox.x, 1 - preset.hitbox.x)));
+      preset.hitbox.radiusX = radius; ellipseW.value = (radius * 2).toFixed(2); render();
+    };
+    ellipseH.oninput = () => {
+      if (preset.hitbox?.type !== 'circle') return;
+      const radius = clamp((Number(ellipseH.value) || .04) / 2, .02, Math.max(.02, Math.min(preset.hitbox.y, 1 - preset.hitbox.y)));
+      preset.hitbox.radiusY = radius; ellipseH.value = (radius * 2).toFixed(2); render();
+    };
     scale.oninput = () => { preset.scale = clamp(Number(scale.value) || 1, .1, 10); };
     shadow.onchange = () => { preset.shadow = shadow.checked; render(); };
     light.onchange = () => { preset.light.enabled = light.checked; render(); };
@@ -210,9 +321,18 @@ export function openMapAssetConfigurator(entry: MapPaletteEntry): Promise<Config
     stretchAxis.onchange = () => { preset.stretch.axis = stretchAxis.value === 'vertical' ? 'vertical' : 'horizontal'; };
     stretchCap.oninput = () => { preset.stretch.cap = clamp(Number(stretchCap.value) || .2, .05, .45); };
     backdrop.querySelectorAll<HTMLInputElement>('input[name="scale-mode"]').forEach((node) => node.onchange = () => { if (node.checked) preset.scaleMode = node.value === 'custom' ? 'custom' : 'set'; });
-    backdrop.querySelector<HTMLButtonElement>('#pro-center-hit')!.onclick = () => { if (preset.hitbox?.type === 'circle') { preset.hitbox.x = .5; preset.hitbox.y = .72; render(); } };
-    backdrop.querySelector<HTMLButtonElement>('#pro-clear-points')!.onclick = () => { if (preset.hitbox?.type === 'polygon') { preset.hitbox.points = []; render(); } };
-    backdrop.querySelector<HTMLButtonElement>('#pro-reset')!.onclick = () => { preset = defaultAssetPreset(entry); syncInputs(); };
+    backdrop.querySelector<HTMLButtonElement>('#pro-center-hit')!.onclick = () => {
+      if (preset.hitbox?.type === 'circle') { preset.hitbox.x = .5; preset.hitbox.y = .5; render(); }
+    };
+    backdrop.querySelector<HTMLButtonElement>('#pro-undo-point')!.onclick = () => {
+      if (preset.hitbox?.type === 'polygon' && preset.hitbox.points.length) {
+        preset.hitbox.points.pop(); polygonSelectedIndex = -1; polygonHoverIndex = -1; render();
+      }
+    };
+    backdrop.querySelector<HTMLButtonElement>('#pro-clear-points')!.onclick = () => {
+      if (preset.hitbox?.type === 'polygon') { preset.hitbox.points = []; polygonSelectedIndex = -1; polygonHoverIndex = -1; render(); }
+    };
+    backdrop.querySelector<HTMLButtonElement>('#pro-reset')!.onclick = () => { preset = defaultAssetPreset(entry); polygonSelectedIndex = -1; polygonHoverIndex = -1; syncInputs(); };
 
     canvas.onpointerdown = (event) => {
       const point = normalizedPoint(event);
@@ -222,18 +342,79 @@ export function openMapAssetConfigurator(entry: MapPaletteEntry): Promise<Config
         if (Math.hypot(dx, dy) < .08) { dragMode = 'light'; canvas.setPointerCapture(event.pointerId); return; }
       }
       if (!hitbox) return;
-      if (hitbox.type === 'polygon') { hitbox.points.push(point); render(); return; }
-      if (hitbox.type === 'circle') { dragMode = 'move-circle'; dragOffset = { x: point.x - hitbox.x, y: point.y - hitbox.y }; canvas.setPointerCapture(event.pointerId); return; }
+
+      if (hitbox.type === 'polygon') {
+        const existing = nearestPolygonPoint(point);
+        if (existing >= 0) {
+          polygonSelectedIndex = existing; polygonDragIndex = existing; dragMode = 'move-polygon-point';
+          canvas.setPointerCapture(event.pointerId); render(); return;
+        }
+        const edge = nearestPolygonEdge(point);
+        if (edge) {
+          const insertIndex = edge.index + 1;
+          hitbox.points.splice(insertIndex, 0, edge.point);
+          polygonSelectedIndex = insertIndex; polygonDragIndex = insertIndex; dragMode = 'move-polygon-point';
+          canvas.setPointerCapture(event.pointerId); render(); return;
+        }
+        hitbox.points.push(point);
+        polygonSelectedIndex = hitbox.points.length - 1;
+        polygonDragIndex = polygonSelectedIndex;
+        dragMode = 'move-polygon-point';
+        canvas.setPointerCapture(event.pointerId); render(); return;
+      }
+
+      if (hitbox.type === 'circle') {
+        const { radiusX, radiusY } = ensureEllipseRadii(hitbox);
+        const left = { x: hitbox.x - radiusX, y: hitbox.y }, right = { x: hitbox.x + radiusX, y: hitbox.y };
+        const top = { x: hitbox.x, y: hitbox.y - radiusY }, bottom = { x: hitbox.x, y: hitbox.y + radiusY };
+        if (Math.min(pixelDistance(point, left), pixelDistance(point, right)) <= 16) dragMode = 'resize-ellipse-x';
+        else if (Math.min(pixelDistance(point, top), pixelDistance(point, bottom)) <= 16) dragMode = 'resize-ellipse-y';
+        else {
+          const dx = (point.x - hitbox.x) / Math.max(.001, radiusX);
+          const dy = (point.y - hitbox.y) / Math.max(.001, radiusY);
+          if (dx * dx + dy * dy <= 1.05) {
+            dragMode = 'move-ellipse';
+            dragOffset = { x: point.x - hitbox.x, y: point.y - hitbox.y };
+          } else return;
+        }
+        canvas.setPointerCapture(event.pointerId); return;
+      }
+
       const nearHandle = Math.hypot(point.x - (hitbox.x + hitbox.width), point.y - (hitbox.y + hitbox.height)) < .08;
       dragMode = nearHandle ? 'resize-rect' : 'move-rect';
       dragOffset = { x: point.x - hitbox.x, y: point.y - hitbox.y };
       canvas.setPointerCapture(event.pointerId);
     };
+
     canvas.onpointermove = (event) => {
-      if (!dragMode) return;
       const point = normalizedPoint(event);
+      if (!dragMode) {
+        if (preset.hitbox?.type === 'polygon') {
+          const hover = nearestPolygonPoint(point);
+          if (hover !== polygonHoverIndex) { polygonHoverIndex = hover; render(); }
+          canvas.style.cursor = hover >= 0 ? 'grab' : nearestPolygonEdge(point) ? 'copy' : 'crosshair';
+        } else canvas.style.cursor = preset.hitbox?.type === 'circle' ? 'move' : 'default';
+        return;
+      }
       if (dragMode === 'light') { preset.light.x = point.x; preset.light.y = point.y; render(); return; }
-      if (preset.hitbox?.type === 'circle' && dragMode === 'move-circle') { preset.hitbox.x = point.x; preset.hitbox.y = point.y; render(); return; }
+      if (dragMode === 'move-polygon-point' && preset.hitbox?.type === 'polygon' && polygonDragIndex >= 0 && polygonDragIndex < preset.hitbox.points.length) {
+        preset.hitbox.points[polygonDragIndex] = point; polygonSelectedIndex = polygonDragIndex; polygonHoverIndex = polygonDragIndex; render(); return;
+      }
+      if (preset.hitbox?.type === 'circle') {
+        const hitbox = preset.hitbox;
+        const { radiusX, radiusY } = ensureEllipseRadii(hitbox);
+        if (dragMode === 'move-ellipse') {
+          hitbox.x = clamp(point.x - dragOffset.x, radiusX, 1 - radiusX);
+          hitbox.y = clamp(point.y - dragOffset.y, radiusY, 1 - radiusY);
+        } else if (dragMode === 'resize-ellipse-x') {
+          hitbox.radiusX = clamp(Math.abs(point.x - hitbox.x), .02, Math.max(.02, Math.min(hitbox.x, 1 - hitbox.x)));
+          ellipseW.value = (hitbox.radiusX * 2).toFixed(2);
+        } else if (dragMode === 'resize-ellipse-y') {
+          hitbox.radiusY = clamp(Math.abs(point.y - hitbox.y), .02, Math.max(.02, Math.min(hitbox.y, 1 - hitbox.y)));
+          ellipseH.value = (hitbox.radiusY * 2).toFixed(2);
+        }
+        render(); return;
+      }
       if (preset.hitbox?.type !== 'rectangle') return;
       if (dragMode === 'move-rect') {
         preset.hitbox.x = clamp(point.x - dragOffset.x, 0, 1 - preset.hitbox.width);
@@ -245,8 +426,29 @@ export function openMapAssetConfigurator(entry: MapPaletteEntry): Promise<Config
       }
       render();
     };
-    const stopDrag = () => { dragMode = null; };
-    canvas.onpointerup = stopDrag; canvas.onpointercancel = stopDrag;
+
+    const stopDrag = () => { dragMode = null; polygonDragIndex = -1; };
+    canvas.onpointerup = stopDrag;
+    canvas.onpointercancel = stopDrag;
+    canvas.onpointerleave = () => { if (!dragMode && polygonHoverIndex !== -1) { polygonHoverIndex = -1; render(); } };
+
+    canvas.oncontextmenu = (event) => {
+      if (preset.hitbox?.type !== 'polygon') return;
+      event.preventDefault();
+      const index = nearestPolygonPoint(normalizedPoint(event), 18);
+      if (index < 0) return;
+      preset.hitbox.points.splice(index, 1);
+      polygonSelectedIndex = -1; polygonHoverIndex = -1; render();
+    };
+
+    function onKeyDown(event: KeyboardEvent) {
+      if ((event.key === 'Delete' || event.key === 'Backspace') && preset.hitbox?.type === 'polygon' && polygonSelectedIndex >= 0 && polygonSelectedIndex < preset.hitbox.points.length) {
+        event.preventDefault();
+        preset.hitbox.points.splice(polygonSelectedIndex, 1);
+        polygonSelectedIndex = -1; polygonHoverIndex = -1; render();
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
 
     backdrop.querySelectorAll<HTMLButtonElement>('[data-close]').forEach((button) => button.onclick = () => close(false));
     backdrop.querySelector<HTMLButtonElement>('#pro-save-config')!.onclick = () => { saveAssetPreset(entry.id, preset); close(true); };

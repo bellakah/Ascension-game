@@ -12,7 +12,10 @@ export type AssetHitboxCircle = {
   type: 'circle';
   x: number;
   y: number;
-  radius: number;
+  /** Legacy single radius kept for presets saved before oval support. */
+  radius?: number;
+  radiusX?: number;
+  radiusY?: number;
 };
 
 export type AssetHitboxPolygon = {
@@ -69,6 +72,14 @@ function loadAll() {
   } catch {
     return {} as Record<string, MapAssetPreset>;
   }
+}
+
+export function circleHitboxRadii(hitbox: AssetHitboxCircle) {
+  const legacy = Math.max(.02, Number(hitbox.radius ?? .2));
+  return {
+    radiusX: Math.max(.02, Number(hitbox.radiusX ?? legacy)),
+    radiusY: Math.max(.02, Number(hitbox.radiusY ?? legacy)),
+  };
 }
 
 export function defaultAssetPreset(entry?: MapPaletteEntry): MapAssetPreset {
@@ -163,8 +174,10 @@ export function objectPresetBlocksPoint(entry: MapPaletteEntry, object: MapObjec
   const hitbox = preset.hitbox;
   if (hitbox.type === 'rectangle') return nx >= hitbox.x && ny >= hitbox.y && nx <= hitbox.x + hitbox.width && ny <= hitbox.y + hitbox.height;
   if (hitbox.type === 'circle') {
-    const dx = nx - hitbox.x, dy = ny - hitbox.y;
-    return dx * dx + dy * dy <= hitbox.radius * hitbox.radius;
+    const { radiusX, radiusY } = circleHitboxRadii(hitbox);
+    const dx = (nx - hitbox.x) / radiusX;
+    const dy = (ny - hitbox.y) / radiusY;
+    return dx * dx + dy * dy <= 1;
   }
   return hitbox.points.length >= 3 && pointInPolygon(nx, ny, hitbox.points);
 }

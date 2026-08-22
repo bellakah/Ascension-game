@@ -2,13 +2,14 @@ import { AnimatedSprite, Container, Graphics, Sprite, Texture } from 'pixi.js';
 import { getMapAssetImage } from '../editor/map/mapAssetRenderer';
 import { hydrateAssetLibraryV2 } from '../editor/map/mapAssetLibraryV2';
 import { getPaletteEntry, MAP_PALETTE_ENTRIES } from '../editor/map/mapEditorCatalog';
-import { getAssetPreset, objectVisualBounds } from '../editor/map/mapAssetPresets';
+import { circleHitboxRadii, getAssetPreset, objectVisualBounds } from '../editor/map/mapAssetPresets';
 import type { AscensionMapDocument, MapAnimationFrame, MapObject, MapPaletteEntry, MapSpriteRect } from '../editor/map/mapEditorTypes';
 import { parseTileKey, tileKey } from '../editor/map/mapEditorTypes';
 import { loadPublishedMap } from './publishedMapStore';
 
 export type PublishedObstacle =
   | { kind?: 'circle'; x: number; y: number; radius: number }
+  | { kind: 'ellipse'; x: number; y: number; radiusX: number; radiusY: number }
   | { kind: 'rect'; x: number; y: number; width: number; height: number }
   | { kind: 'polygon'; points: Array<{ x: number; y: number }> };
 
@@ -172,11 +173,14 @@ function buildObstacles(map: AscensionMapDocument) {
           height: hitbox.height * bh,
         });
       } else if (hitbox.type === 'circle') {
-        addCircle(
-          bx + hitbox.x * bw,
-          by + hitbox.y * bh,
-          hitbox.radius * Math.min(bw, bh),
-        );
+        const { radiusX, radiusY } = circleHitboxRadii(hitbox);
+        obstacles.push({
+          kind: 'ellipse',
+          x: bx + hitbox.x * bw,
+          y: by + hitbox.y * bh,
+          radiusX: radiusX * bw,
+          radiusY: radiusY * bh,
+        });
       } else if (hitbox.points.length >= 3) {
         obstacles.push({
           kind: 'polygon',
