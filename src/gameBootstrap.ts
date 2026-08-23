@@ -13,12 +13,16 @@ import './game/responsive.css';
 import { installResponsiveUi } from './game/responsive';
 import { preparePublishedWorldRuntime } from './map/publishedMapRuntime';
 import { subscribePublishedMap } from './map/publishedMapStore';
+import { hydrateNpcDefinitionsIntoPalette } from './npc/npcStore';
+import { installPublishedNpcRuntime } from './npc/npcRuntime';
 
 export async function startGameApp() {
   installResponsiveUi();
   const chatBootstrap = prepareChatBootstrap();
   const guildBootstrap = prepareGuildBootstrap();
+  hydrateNpcDefinitionsIntoPalette();
   await preparePublishedWorldRuntime();
+  await installPublishedNpcRuntime();
   const unsubscribePublished = subscribePublishedMap(() => {
     sessionStorage.setItem('ascension.map.just-published.v1', '1');
     window.location.reload();
