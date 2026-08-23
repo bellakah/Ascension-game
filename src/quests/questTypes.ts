@@ -1,6 +1,6 @@
 import type { ClassId } from '../classes/classCatalog';
 
-export type MonsterKind = 'wolf' | 'sludge';
+export type MonsterKind = string;
 export type QuestStatus = 'not_started' | 'active' | 'ready' | 'completed';
 export type QuestMode = 'sequential' | 'parallel';
 export type QuestObjectiveType = 'kill' | 'boss' | 'collect' | 'deliver' | 'talk' | 'visit' | 'interact' | 'gather' | 'craft';
