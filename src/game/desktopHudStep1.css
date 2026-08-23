@@ -1,0 +1,55 @@
+/* Desktop HUD – etapa 1: notificações e barras de vida opcionais. */
+html[data-ui-mode='desktop'] #dialog-box{
+  position:fixed!important;
+  z-index:70!important;
+  left:auto!important;
+  right:14px!important;
+  bottom:112px!important;
+  width:min(330px,calc(100vw - 28px))!important;
+  min-height:44px!important;
+  padding:11px 14px 11px 38px!important;
+  transform:none!important;
+  border:1px solid rgba(213,177,87,.38)!important;
+  border-left:3px solid #d9ae4f!important;
+  border-radius:7px!important;
+  background:linear-gradient(180deg,rgba(13,34,42,.98),rgba(5,18,24,.98))!important;
+  box-shadow:0 14px 34px rgba(0,0,0,.44),inset 0 1px 0 rgba(255,255,255,.035)!important;
+  color:#e9eee9!important;
+  text-align:left!important;
+  font-size:10px!important;
+  line-height:1.45!important;
+  pointer-events:none!important;
+  opacity:1!important;
+  transition:opacity .16s ease,transform .16s ease!important;
+}
+html[data-ui-mode='desktop'] #dialog-box::before{
+  content:'!';
+  position:absolute;
+  left:12px;
+  top:50%;
+  width:16px;
+  height:16px;
+  display:grid;
+  place-items:center;
+  transform:translateY(-50%);
+  border:1px solid rgba(230,193,101,.55);
+  border-radius:50%;
+  color:#e6c165;
+  font-size:9px;
+  font-weight:900;
+}
+html[data-ui-mode='desktop'] #dialog-box.hidden{
+  opacity:0!important;
+  transform:translateY(8px)!important;
+  visibility:hidden!important;
+}
+
+/* Quando habilitadas nas configurações, as barras sobre o mundo são deliberadamente compactas. */
+html[data-ui-mode='desktop'][data-hide-player-health-bar='true'] #player-overhead-health,
+html[data-ui-mode='desktop'][data-hide-monster-health-bars='true'] .monster-overhead-health{
+  display:none!important;
+}
+
+@media(max-width:1279px){
+  html[data-ui-mode='desktop'] #dialog-box{right:10px!important;bottom:104px!important;width:292px!important}
+}

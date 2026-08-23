@@ -43,8 +43,6 @@ export function installTabTargetRuntime(options: Options) {
     const scale = Math.max(.7, monster.definition?.appearance.scale ?? 1);
     markerBaseY = -72 * Math.max(1, Math.min(1.8, scale));
 
-    // Compact gold orb + downward pointer. The target indication now lives above
-    // the enemy instead of painting a large ring over the terrain.
     marker.circle(0, -5, 7)
       .fill({ color: 0xd7a83f, alpha: .98 })
       .stroke({ width: 2, color: 0xffe49a, alpha: .98 });
@@ -84,8 +82,6 @@ export function installTabTargetRuntime(options: Options) {
     setSelectedMonsterId(selected?.id ?? null);
     if (selected) {
       drawMarker(selected);
-      // Last child keeps the marker above the monster sprite/name without
-      // changing the monster's depth sorting in the world.
       selected.view.addChild(marker);
     } else drawMarker(null);
     syncPanel();
@@ -153,7 +149,10 @@ export function installTabTargetRuntime(options: Options) {
     options.attack();
   };
 
+  const onClearTarget = () => setTarget(null);
+
   window.addEventListener('keydown', onKeyDown, true);
+  window.addEventListener('ascension-clear-target', onClearTarget);
   app.canvas.addEventListener('pointerdown', onPointerDown);
 
   const tick = () => {
@@ -177,6 +176,7 @@ export function installTabTargetRuntime(options: Options) {
     dispose: () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('keydown', onKeyDown, true);
+      window.removeEventListener('ascension-clear-target', onClearTarget);
       app.canvas.removeEventListener('pointerdown', onPointerDown);
       if (marker.parent) marker.parent.removeChild(marker);
       marker.destroy();

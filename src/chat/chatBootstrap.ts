@@ -56,28 +56,31 @@ function currentChatCode() {
   try {
     const file = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}') as { profiles?: Record<string, { controls?: Record<string, string> }> };
     return file.profiles?.[accountId]?.controls?.chat || 'Enter';
-  } catch {
-    return 'Enter';
-  }
+  } catch { return 'Enter'; }
 }
 
 function actualGameMenuOpen() {
   const menu = document.querySelector<HTMLElement>('#game-menu-overlay');
   if (!menu || menu.classList.contains('game-menu-hidden')) return false;
-  // O proxy do próprio chat não conta como menu; o proxy da Guilda deve bloquear o Chat.
   return !menu.classList.contains('chat-pause-proxy');
 }
 
 /**
- * Registra o atalho antes do runtime para que uma tecla remapeada para Chat nunca vaze
- * para movimento/combate. A UI é anexada apenas depois que startGame termina o boot.
+ * Registra os atalhos antes do runtime para que Chat e ESC tenham prioridade
+ * sobre movimentação/combate. A UI é anexada após startGame terminar o boot.
  */
 export function prepareChatBootstrap() {
   let chat: ChatSystem | null = null;
 
   const onKeyDown = (event: KeyboardEvent) => {
-    if (!chat || event.repeat || chat.isTyping() || actualGameMenuOpen()) return;
-    if (event.code !== currentChatCode()) return;
+    if (!chat || event.repeat || actualGameMenuOpen()) return;
+    if (event.code === 'Escape' && chat.isOpen()) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      chat.close();
+      return;
+    }
+    if (chat.isTyping() || event.code !== currentChatCode()) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     chat.focusInput();

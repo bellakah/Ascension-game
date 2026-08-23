@@ -30,6 +30,8 @@ export type GameSettings = {
     showDesktopShortcuts: boolean;
     showNames: boolean;
     showFloatingDamage: boolean;
+    showPlayerHealthBar: boolean;
+    showMonsterHealthBars: boolean;
   };
   gameplay: {
     tutorials: boolean;
@@ -57,6 +59,7 @@ export function createDefaultSettings(): GameSettings {
     interface: {
       showMinimap: true, showQuestTracker: true, showDesktopShortcuts: true,
       showNames: true, showFloatingDamage: true,
+      showPlayerHealthBar: false, showMonsterHealthBars: false,
     },
     gameplay: { tutorials: true, confirmRareDiscard: true, confirmRareSell: true },
   };
@@ -111,6 +114,8 @@ function normalizeSettings(value?: Partial<GameSettings>): GameSettings {
       showDesktopShortcuts: Boolean(ui.showDesktopShortcuts),
       showNames: Boolean(ui.showNames),
       showFloatingDamage: Boolean(ui.showFloatingDamage),
+      showPlayerHealthBar: Boolean(ui.showPlayerHealthBar),
+      showMonsterHealthBars: Boolean(ui.showMonsterHealthBars),
     },
     gameplay: {
       tutorials: Boolean(gameplay.tutorials),
