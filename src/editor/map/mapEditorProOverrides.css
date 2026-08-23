@@ -17,7 +17,8 @@
 .mep-stage>.mep-render-layer{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
 .mep-stage>.mep-terrain-layer{z-index:0;pointer-events:none;will-change:transform}
 .mep-stage>.mep-object-layer{z-index:1;pointer-events:none;will-change:transform}
-.mep-stage>.mep-interaction-layer{z-index:2;pointer-events:auto}
+.mep-stage>.mep-lighting-layer{z-index:2;pointer-events:none}
+.mep-stage>.mep-interaction-layer{z-index:3;pointer-events:auto}
 .mep-chip{z-index:6}
 
 .mep-stage-wrap:has(.mep-panel:not(.hidden)) .mep-chip{left:calc(var(--panel) + 18px)}
@@ -34,6 +35,10 @@
 .mep-card{padding:3px}
 .mep-card strong{font-size:8px}
 .mep-card small{display:none}
+
+/* Controles de iluminação usam o mesmo visual compacto dos demais controles. */
+.mep-lighting-readout{min-width:44px;text-align:center;font-size:10px;color:#d8edff;font-weight:700}
+.mep-light-color{height:31px;padding:2px!important}
 
 /* Notebook: painel fica temporariamente sobre o mapa, mas menor. */
 @media (max-width:1100px){
