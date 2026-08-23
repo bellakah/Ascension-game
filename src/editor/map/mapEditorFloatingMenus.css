@@ -1,0 +1,32 @@
+.mep-floating-menu{
+  position:fixed!important;
+  right:auto!important;
+  bottom:auto!important;
+  z-index:100000!important;
+  max-width:min(260px,calc(100vw - 16px));
+  max-height:calc(100vh - 16px);
+  overflow:auto;
+  overscroll-behavior:contain;
+  box-shadow:0 16px 38px rgba(0,0,0,.58)!important;
+}
+
+.mep-floating-menu.hidden{display:none!important}
+
+body>.mep-card-menu-popover.mep-floating-menu{
+  min-width:132px;
+}
+
+body>.mep-card-menu-popover.mep-floating-menu.open{
+  display:flex!important;
+  flex-direction:column;
+}
+
+body>.mep-more-menu.mep-floating-menu{
+  min-width:168px;
+}
+
+body>.mep-more-menu.mep-floating-menu button,
+body>.mep-card-menu-popover.mep-floating-menu button{
+  position:relative;
+  z-index:1;
+}
