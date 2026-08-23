@@ -1,0 +1,185 @@
+/* Stage 2 — desktop character unit-frame. Mobile remains untouched. */
+html[data-ui-mode='desktop'] .topbar{
+  width:326px!important;
+  min-height:144px!important;
+  padding:13px 14px 13px 96px!important;
+  display:grid!important;
+  grid-template-columns:1fr!important;
+  grid-template-rows:auto auto auto!important;
+  gap:6px!important;
+  border-color:rgba(202,160,73,.62)!important;
+  background:
+    linear-gradient(180deg,rgba(15,40,49,.985),rgba(5,18,24,.985))!important;
+}
+
+html[data-ui-mode='desktop'] .player-portrait{
+  left:13px!important;
+  top:13px!important;
+  width:68px!important;
+  height:96px!important;
+  border-color:rgba(221,181,83,.72)!important;
+  border-radius:6px!important;
+  background:
+    radial-gradient(circle at 50% 25%,rgba(79,123,137,.44),transparent 50%),
+    linear-gradient(180deg,#173640,#071a21)!important;
+}
+html[data-ui-mode='desktop'] .player-portrait::after{
+  content:'PERSONAGEM';
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:-19px;
+  color:#a6aaa0;
+  font-size:6px;
+  font-weight:900;
+  letter-spacing:.12em;
+  text-align:center;
+}
+html[data-ui-mode='desktop'] .player-portrait img{
+  position:absolute;
+  inset:3px;
+  width:calc(100% - 6px);
+  height:calc(100% - 6px);
+  object-fit:contain;
+  object-position:center 24%;
+  image-rendering:pixelated;
+  filter:drop-shadow(0 4px 4px rgba(0,0,0,.55));
+  transform:scale(1.32);
+  transform-origin:center 32%;
+}
+html[data-ui-mode='desktop'] .player-portrait img[hidden]{display:none!important}
+html[data-ui-mode='desktop'] #player-portrait-fallback{
+  font-size:29px!important;
+  color:#e0bd66;
+}
+
+html[data-ui-mode='desktop'] .topbar .brand{
+  min-width:0;
+  padding-right:2px;
+}
+html[data-ui-mode='desktop'] .player-hud-name{
+  max-width:214px!important;
+  font-size:17px!important;
+  line-height:1.08;
+}
+html[data-ui-mode='desktop'] .topbar .brand span{
+  display:flex!important;
+  align-items:center;
+  gap:6px;
+  margin-top:4px!important;
+  min-width:0;
+}
+html[data-ui-mode='desktop'] .topbar .brand span i{
+  flex:none;
+  color:#d9bd73!important;
+  font-size:9px;
+}
+html[data-ui-mode='desktop'] .topbar .brand span em{
+  min-width:0;
+  overflow:hidden;
+  color:#879b9a;
+  font-size:8px;
+  font-style:normal;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+html[data-ui-mode='desktop'] .topbar .brand span em::before{
+  content:'•';
+  margin-right:6px;
+  color:#5e7778;
+}
+
+html[data-ui-mode='desktop'] .player-meta-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  min-width:0;
+}
+html[data-ui-mode='desktop'] .player-progression{
+  display:flex!important;
+  align-items:center!important;
+  gap:8px!important;
+  min-width:0;
+}
+html[data-ui-mode='desktop'] .player-progression #exp-text{
+  overflow:hidden;
+  color:#b9c0b8!important;
+  font-size:8px!important;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+html[data-ui-mode='desktop'] .coins{
+  position:static!important;
+  display:flex!important;
+  gap:4px;
+  flex:none;
+  color:#e5b849!important;
+  font-size:9px!important;
+}
+
+html[data-ui-mode='desktop'] .player-vitals{
+  display:grid;
+  gap:4px;
+  width:100%;
+}
+html[data-ui-mode='desktop'] .hp-shell,
+html[data-ui-mode='desktop'] .resource-shell{
+  position:relative;
+  width:100%;
+  height:17px!important;
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:3px;
+  background:#10181b;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.48),0 1px 0 rgba(255,255,255,.025);
+}
+html[data-ui-mode='desktop'] #hp-fill,
+html[data-ui-mode='desktop'] #resource-fill{
+  position:absolute;
+  inset:0 auto 0 0;
+  width:100%;
+  transition:width .14s linear;
+}
+html[data-ui-mode='desktop'] #hp-fill{
+  background:linear-gradient(180deg,#d9554f,#9e2c30)!important;
+}
+html[data-ui-mode='desktop'] .resource-shell{
+  border-color:rgba(86,151,205,.36);
+  background:#071725;
+}
+html[data-ui-mode='desktop'] #resource-fill{
+  background:linear-gradient(180deg,#3d8fca,#205a94);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18);
+}
+html[data-ui-mode='desktop'] #hp-text,
+html[data-ui-mode='desktop'] #resource-text{
+  position:absolute;
+  inset:0;
+  display:grid;
+  place-items:center;
+  z-index:1;
+  color:#f5f0e6;
+  font-family:Georgia,'Times New Roman',serif;
+  font-size:8px!important;
+  font-weight:900;
+  line-height:1;
+  text-shadow:0 1px 2px #000,0 0 3px rgba(0,0,0,.7);
+  pointer-events:none;
+}
+
+/* Quest panel follows the taller unit frame without floating awkwardly. */
+html[data-ui-mode='desktop'] #quest-box{
+  top:169px!important;
+  width:326px!important;
+}
+
+/* The old generated portrait label from the reference theme is replaced by the real portrait. */
+html[data-ui-mode='desktop'] .topbar::after{display:none!important}
+
+@media(max-width:1279px){
+  html[data-ui-mode='desktop'] .topbar{width:298px!important;padding-left:88px!important}
+  html[data-ui-mode='desktop'] .player-portrait{width:60px!important;height:88px!important}
+  html[data-ui-mode='desktop'] #quest-box{width:298px!important}
+  html[data-ui-mode='desktop'] .player-hud-name{max-width:188px!important}
+}
