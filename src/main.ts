@@ -27,6 +27,8 @@ if (playtest === 'map') {
     installMapEditorInteractionPerf();
     const { installMapEditorVisualPolish } = await import('./editor/map/mapEditorVisualPolish');
     installMapEditorVisualPolish();
+    const { installMapEditorFloatingMenus } = await import('./editor/map/mapEditorFloatingMenus');
+    installMapEditorFloatingMenus();
     const { installNpcEditorIntegration } = await import('./npc/npcEditorIntegration');
     installNpcEditorIntegration();
     const { installMonsterEditorIntegration } = await import('./monsterEditor/monsterEditorIntegration');
