@@ -6,6 +6,7 @@ import './settings/gameMenuHud.css';
 import './chat/chatPauseProxy.css';
 import './guild/guildPauseProxy.css';
 import './guild/guildHud.css';
+import './map/mapAutoRoute.css';
 import { prepareChatBootstrap } from './chat/chatBootstrap';
 import { prepareGuildBootstrap } from './guild/guildBootstrap';
 import { startGame } from './game/runtime';
@@ -22,6 +23,7 @@ import { installResponsiveUi } from './game/responsive';
 import { installDesktopViewportMetrics } from './game/desktopViewport';
 import { installDesktopPartyHudBridge } from './game/partyHudBridge';
 import { installDesktopHudStage3 } from './game/desktopHudStage3';
+import { installMapAutoRoute } from './map/mapAutoRoute';
 import { installMapSystemStage4Polish } from './map/mapSystemStage4Polish';
 import { preparePublishedWorldRuntime } from './map/publishedMapRuntime';
 import { subscribePublishedMap } from './map/publishedMapStore';
@@ -51,5 +53,6 @@ export async function startGameApp() {
     installDesktopPartyHudBridge();
     installDesktopHudStage3();
     installMapSystemStage4Polish();
+    installMapAutoRoute();
   });
 }

@@ -1,0 +1,144 @@
+/* Etapa 4 — limpeza dos marcadores e auto-rota. */
+
+html[data-ui-mode='desktop'] .map-poi{
+  width:42px!important;
+  height:42px!important;
+  margin:-21px 0 0 -21px!important;
+  border-width:1px!important;
+  box-shadow:0 0 0 3px rgba(3,12,16,.5),0 5px 13px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.055)!important;
+  transition:none!important;
+  transform:none!important;
+  filter:none!important;
+}
+html[data-ui-mode='desktop'] .map-poi::before{inset:3px!important}
+html[data-ui-mode='desktop'] .map-poi::after{
+  bottom:-4px!important;
+  width:7px!important;
+  height:7px!important;
+}
+html[data-ui-mode='desktop'] .map-poi>span:first-child{
+  width:26px!important;
+  height:26px!important;
+  font-size:20px!important;
+  pointer-events:none!important;
+}
+html[data-ui-mode='desktop'] .map-poi:hover{
+  transform:none!important;
+  filter:none!important;
+  border-color:color-mix(in srgb,var(--poi-accent) 68%,white 8%)!important;
+  box-shadow:0 0 0 3px rgba(3,12,16,.5),0 5px 13px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.055)!important;
+}
+html[data-ui-mode='desktop'] .map-poi.selected{
+  transform:none!important;
+  border-color:color-mix(in srgb,var(--poi-accent) 92%,white 8%)!important;
+  box-shadow:0 0 0 4px color-mix(in srgb,var(--poi-accent) 20%,transparent),0 7px 16px rgba(0,0,0,.4)!important;
+}
+html[data-ui-mode='desktop'] .map-poi-label{
+  top:48px!important;
+  max-width:180px!important;
+  padding:3px 6px!important;
+  font-size:13px!important;
+  line-height:1.12!important;
+}
+html[data-ui-mode='desktop'] .map-player-marker{
+  width:46px!important;
+  height:46px!important;
+  margin:-23px 0 0 -23px!important;
+}
+html[data-ui-mode='desktop'] .map-player-marker::before{
+  width:16px!important;
+  height:21px!important;
+}
+html[data-ui-mode='desktop'] .map-player-marker::after{
+  top:52px!important;
+  font-size:14px!important;
+}
+
+html[data-ui-mode='desktop'] #map-auto-route-button{
+  min-width:70px!important;
+  padding:0 10px!important;
+  color:#e0c56f!important;
+  border-color:rgba(203,166,77,.38)!important;
+}
+html[data-ui-mode='desktop'] #map-auto-route-button:hover:not(:disabled){
+  color:#fff0b8!important;
+  border-color:rgba(224,184,86,.72)!important;
+  background:#173c43!important;
+}
+html[data-ui-mode='desktop'] #map-auto-route-button:disabled{
+  opacity:.34!important;
+  cursor:not-allowed!important;
+}
+
+#map-auto-route-status{
+  position:fixed;
+  z-index:108;
+  left:50%;
+  top:76px;
+  min-width:260px;
+  max-width:min(460px,82vw);
+  min-height:42px;
+  display:grid;
+  grid-template-columns:30px minmax(0,1fr) 28px;
+  align-items:center;
+  gap:8px;
+  padding:7px 8px 7px 10px;
+  border:1px solid rgba(202,165,75,.48);
+  border-radius:6px;
+  background:linear-gradient(180deg,rgba(8,31,38,.97),rgba(3,17,22,.97));
+  box-shadow:0 10px 28px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.035);
+  color:#e7e3d7;
+  transform:translateX(-50%);
+  transition:opacity .16s ease,transform .16s ease;
+}
+#map-auto-route-status.map-auto-route-hidden{
+  opacity:0;
+  pointer-events:none;
+  transform:translate(-50%,-8px);
+}
+#map-auto-route-status .map-auto-route-icon{
+  width:27px;
+  height:27px;
+  display:grid;
+  place-items:center;
+  border:1px solid rgba(215,178,87,.45);
+  border-radius:50%;
+  background:#183841;
+  color:#e3c56b;
+  font-weight:900;
+}
+#map-auto-route-status div{display:grid;gap:1px;min-width:0}
+#map-auto-route-status strong{
+  color:#e9d18a;
+  font:700 11px Georgia,'Times New Roman',serif;
+}
+#map-auto-route-status small{
+  overflow:hidden;
+  color:#91a5a1;
+  font-size:9px;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+#map-auto-route-status button{
+  width:26px;
+  height:26px;
+  border:1px solid rgba(130,158,158,.22);
+  border-radius:4px;
+  background:#0c2931;
+  color:#aebdb9;
+  cursor:pointer;
+}
+#map-auto-route-status button:hover{
+  border-color:rgba(209,171,80,.52);
+  color:#f0d783;
+}
+
+html[data-ui-mode='desktop'] .map-footer span:first-child::after{
+  content:' · duplo clique no mapa: auto-rota';
+  color:#b9a465;
+}
+
+html[data-ui-mode='mobile-portrait'] #map-auto-route-status,
+html[data-ui-mode='mobile-landscape'] #map-auto-route-status{
+  top:max(10px,env(safe-area-inset-top));
+}
