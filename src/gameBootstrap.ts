@@ -15,12 +15,14 @@ import { preparePublishedWorldRuntime } from './map/publishedMapRuntime';
 import { subscribePublishedMap } from './map/publishedMapStore';
 import { hydrateNpcDefinitionsIntoPalette } from './npc/npcStore';
 import { installPublishedNpcRuntime } from './npc/npcRuntime';
+import { hydrateMonsterDefinitionsIntoPalette } from './monsterEditor/monsterStore';
 
 export async function startGameApp() {
   installResponsiveUi();
   const chatBootstrap = prepareChatBootstrap();
   const guildBootstrap = prepareGuildBootstrap();
   hydrateNpcDefinitionsIntoPalette();
+  hydrateMonsterDefinitionsIntoPalette();
   await preparePublishedWorldRuntime();
   await installPublishedNpcRuntime();
   const unsubscribePublished = subscribePublishedMap(() => {
