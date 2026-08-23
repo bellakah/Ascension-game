@@ -1,0 +1,99 @@
+/* Stage 2 hotfix — explicitly neutralizes legacy grid placement from desktopHudV2. */
+html[data-ui-mode='desktop'] .topbar{
+  box-sizing:border-box!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  grid-template-rows:auto auto auto!important;
+  grid-auto-columns:0!important;
+  grid-auto-flow:row!important;
+  align-content:start!important;
+  overflow:visible!important;
+}
+
+html[data-ui-mode='desktop'] .topbar .brand{
+  grid-column:1!important;
+  grid-row:1!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:100%!important;
+}
+
+html[data-ui-mode='desktop'] .topbar .player-meta-row{
+  grid-column:1!important;
+  grid-row:2!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:100%!important;
+}
+
+html[data-ui-mode='desktop'] .topbar .player-vitals{
+  grid-column:1!important;
+  grid-row:3!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:100%!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  grid-template-rows:17px 17px!important;
+  grid-auto-columns:0!important;
+  grid-auto-flow:row!important;
+  gap:4px!important;
+}
+
+html[data-ui-mode='desktop'] .topbar .player-vitals .hp-shell,
+html[data-ui-mode='desktop'] .topbar .player-vitals .resource-shell{
+  grid-column:1!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:100%!important;
+  height:17px!important;
+  margin:0!important;
+}
+
+html[data-ui-mode='desktop'] .topbar .player-vitals .hp-shell{
+  grid-row:1!important;
+}
+
+html[data-ui-mode='desktop'] .topbar .player-vitals .resource-shell{
+  grid-row:2!important;
+}
+
+html[data-ui-mode='desktop'] .topbar .player-progression{
+  grid-column:auto!important;
+  grid-row:auto!important;
+  flex:1 1 auto!important;
+  min-width:0!important;
+  overflow:hidden!important;
+}
+
+html[data-ui-mode='desktop'] .topbar .player-progression #exp-text{
+  display:block!important;
+  min-width:0!important;
+  max-width:100%!important;
+}
+
+html[data-ui-mode='desktop'] .topbar .coins{
+  grid-column:auto!important;
+  grid-row:auto!important;
+  flex:0 0 auto!important;
+  margin-left:auto!important;
+}
+
+html[data-ui-mode='desktop'] .topbar #hp-fill,
+html[data-ui-mode='desktop'] .topbar #resource-fill{
+  height:100%!important;
+  transform:none!important;
+  transform-origin:left center!important;
+}
+
+html[data-ui-mode='desktop'] .topbar #hp-text,
+html[data-ui-mode='desktop'] .topbar #resource-text{
+  width:100%!important;
+  height:100%!important;
+}
+
+@media(max-width:1279px){
+  html[data-ui-mode='desktop'] .topbar{
+    min-height:144px!important;
+  }
+}
