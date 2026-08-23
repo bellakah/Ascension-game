@@ -1,0 +1,73 @@
+/* Desktop MMO HUD v2. Mobile keeps the existing responsive rules. */
+html[data-ui-mode='desktop'] body{overflow:hidden;background:#08100d}
+html[data-ui-mode='desktop'] #hud{--hud-bg:rgba(7,19,23,.94);--hud-bg2:rgba(11,29,34,.94);--hud-line:rgba(172,205,196,.22);--hud-gold:#d8b75f;--hud-text:#e7f0ed;--hud-muted:#8ea4a2;pointer-events:none}
+html[data-ui-mode='desktop'] #hud button,html[data-ui-mode='desktop'] #hud input,html[data-ui-mode='desktop'] #hud select{pointer-events:auto}
+
+html[data-ui-mode='desktop'] .topbar{position:fixed!important;z-index:46;top:12px!important;left:12px!important;right:auto!important;width:296px!important;max-width:none!important;min-height:102px;display:grid!important;grid-template-columns:1fr auto!important;grid-template-rows:auto auto auto!important;gap:7px 10px!important;padding:12px!important;border:1px solid var(--hud-line);border-radius:12px;background:linear-gradient(180deg,var(--hud-bg2),var(--hud-bg));box-shadow:0 14px 34px rgba(0,0,0,.36),inset 0 0 0 1px rgba(255,255,255,.025);backdrop-filter:blur(8px)}
+html[data-ui-mode='desktop'] .topbar .brand{grid-column:1/3!important;min-height:0!important;padding:0!important;background:transparent!important;border:0!important;color:var(--hud-text)!important;font-size:13px!important;letter-spacing:.02em!important}
+html[data-ui-mode='desktop'] .topbar .brand span{color:var(--hud-muted)!important;font-size:10px!important}
+html[data-ui-mode='desktop'] .player-progression{grid-column:1!important;grid-row:2!important;min-height:0!important;padding:0!important;display:flex!important;gap:8px!important;background:transparent!important;border:0!important;color:#f0d783!important;font-size:10px!important}
+html[data-ui-mode='desktop'] .coins{grid-column:2!important;grid-row:2!important;min-height:0!important;padding:0!important;background:transparent!important;border:0!important;color:#f5d784!important;font-size:10px!important}
+html[data-ui-mode='desktop'] .hp-shell{grid-column:1/3!important;grid-row:3!important;width:100%!important;height:20px!important;border:1px solid rgba(255,255,255,.14)!important;border-radius:6px!important;background:#35191a!important;overflow:hidden!important}
+html[data-ui-mode='desktop'] #hp-fill{background:linear-gradient(90deg,#9d2f35,#d95155)!important}
+html[data-ui-mode='desktop'] #hp-text{font-size:10px!important;letter-spacing:.02em!important}
+
+html[data-ui-mode='desktop'] #quest-toggle{display:none!important}
+html[data-ui-mode='desktop'] #quest-box{position:fixed!important;z-index:44;top:128px!important;left:12px!important;width:296px!important;max-height:220px!important;overflow:auto!important;padding:12px 13px!important;border:1px solid var(--hud-line)!important;border-radius:11px!important;background:linear-gradient(180deg,var(--hud-bg2),var(--hud-bg))!important;box-shadow:0 12px 30px rgba(0,0,0,.32)!important;backdrop-filter:blur(8px)!important;color:var(--hud-text)!important}
+html[data-ui-mode='desktop'] #quest-box strong{display:block;margin-bottom:7px;color:var(--hud-gold)!important;font-size:10px!important;letter-spacing:.08em;text-transform:uppercase}
+html[data-ui-mode='desktop'] #quest-text{font-size:10px!important;line-height:1.45!important;color:#c6d2cf!important}
+
+html[data-ui-mode='desktop'] #target-frame{position:fixed;z-index:47;top:12px;left:calc(var(--desktop-hud-left,320px) + (100vw - var(--desktop-hud-left,320px) - var(--desktop-hud-right,250px))/2);transform:translateX(-50%);width:330px;padding:9px 11px;border:1px solid rgba(224,192,105,.38);border-radius:10px;background:linear-gradient(180deg,rgba(19,31,32,.96),rgba(7,17,20,.95));box-shadow:0 10px 26px rgba(0,0,0,.38);color:var(--hud-text);pointer-events:none;transition:opacity .15s,transform .15s}
+html[data-ui-mode='desktop'] #target-frame.target-hidden{opacity:0;transform:translate(-50%,-8px);visibility:hidden}
+html[data-ui-mode='desktop'] .target-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+html[data-ui-mode='desktop'] #target-name{font-size:12px;color:#f0e5c0}
+html[data-ui-mode='desktop'] #target-meta{font-size:8px;color:#b89c5c;letter-spacing:.08em}
+html[data-ui-mode='desktop'] .target-hp{position:relative;height:14px;border:1px solid rgba(255,255,255,.14);border-radius:4px;overflow:hidden;background:#311617}
+html[data-ui-mode='desktop'] #target-hp-fill{position:absolute;inset:0 auto 0 0;width:100%;background:linear-gradient(90deg,#9e2f35,#d64e50);transition:width .08s linear}
+html[data-ui-mode='desktop'] #target-hp-text{position:relative;z-index:1;display:grid;place-items:center;height:100%;font-size:8px;font-weight:800;text-shadow:0 1px 2px #000}
+
+html[data-ui-mode='desktop'] #minimap-shell{top:12px!important;right:12px!important;width:224px!important;height:222px!important;padding:9px!important;border-radius:11px!important;border:1px solid var(--hud-line)!important;background:linear-gradient(180deg,var(--hud-bg2),var(--hud-bg))!important;box-shadow:0 14px 34px rgba(0,0,0,.34)!important}
+html[data-ui-mode='desktop'] #minimap-canvas{width:204px!important;height:158px!important;border-radius:7px!important}
+
+html[data-ui-mode='desktop'] #party-panel{position:fixed;z-index:45;top:246px;right:12px;width:224px;padding:10px;border:1px solid var(--hud-line);border-radius:11px;background:linear-gradient(180deg,var(--hud-bg2),var(--hud-bg));box-shadow:0 12px 30px rgba(0,0,0,.32);color:var(--hud-text);pointer-events:auto;backdrop-filter:blur(8px)}
+html[data-ui-mode='desktop'] #party-panel.party-hidden{display:none!important}
+html[data-ui-mode='desktop'] .party-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;color:var(--hud-gold);font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}
+html[data-ui-mode='desktop'] #party-members{display:grid;gap:6px}
+html[data-ui-mode='desktop'] .party-member{display:grid;grid-template-columns:34px 1fr;gap:8px;align-items:center;padding:6px;border-radius:8px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.05)}
+html[data-ui-mode='desktop'] .party-member-avatar{width:34px;height:34px;display:grid;place-items:center;border-radius:7px;background:#19333a;color:#e7efe9;font-size:12px;font-weight:900}
+html[data-ui-mode='desktop'] .party-member-copy>div:first-child{display:flex;justify-content:space-between;gap:6px;font-size:9px}.party-member-copy span{color:var(--hud-muted);font-size:8px}.party-hp{height:5px;margin-top:5px;border-radius:99px;overflow:hidden;background:#38191a}.party-hp i{display:block;height:100%;background:#c94a4e}
+
+html[data-ui-mode='desktop'] #chat-shell{left:12px!important;bottom:94px!important;width:296px!important;height:254px!important;border-radius:11px!important;border-color:var(--hud-line)!important;background:linear-gradient(180deg,var(--hud-bg2),var(--hud-bg))!important;box-shadow:0 14px 34px rgba(0,0,0,.34)!important}
+html[data-ui-mode='desktop'] #chat-shell.chat-collapsed{height:42px!important}
+
+html[data-ui-mode='desktop'] #skill-bar{left:calc(var(--desktop-hud-left,320px) + (100vw - var(--desktop-hud-left,320px) - var(--desktop-hud-right,250px))/2)!important;bottom:24px!important;transform:translateX(-50%)!important;z-index:48!important;gap:5px!important}
+html[data-ui-mode='desktop'] .skill-energy{width:330px!important;border-radius:7px!important;background:rgba(7,17,20,.92)!important;border-color:rgba(224,192,105,.22)!important}
+html[data-ui-mode='desktop'] .skill-buttons{gap:5px!important;padding:5px;border:1px solid rgba(224,192,105,.22);border-radius:10px;background:rgba(7,17,20,.92);box-shadow:0 10px 28px rgba(0,0,0,.36)}
+html[data-ui-mode='desktop'] .skill-button{width:54px!important;height:54px!important;border-radius:7px!important;border-color:rgba(224,192,105,.2)!important;background:linear-gradient(160deg,#24302a,#101917)!important}
+html[data-ui-mode='desktop'] .skill-icon{font-size:25px!important}
+
+html[data-ui-mode='desktop'] .utility-dock{position:fixed!important;z-index:48;top:auto!important;right:12px!important;bottom:24px!important;display:flex!important;gap:5px!important;align-items:end!important;pointer-events:auto!important}
+html[data-ui-mode='desktop'] .utility-dock button{position:relative!important;static:auto;width:54px!important;height:58px!important;padding:5px 4px 16px!important;border:1px solid rgba(224,192,105,.2)!important;border-radius:8px!important;background:linear-gradient(180deg,rgba(21,38,39,.96),rgba(8,18,20,.96))!important;color:#edf4ef!important;font-size:19px!important;box-shadow:0 8px 22px rgba(0,0,0,.3)!important}
+html[data-ui-mode='desktop'] .utility-dock button::after{content:attr(data-label);position:absolute;left:2px;right:2px;bottom:4px;font-size:7px;line-height:1;color:#c8d1ce;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html[data-ui-mode='desktop'] .utility-dock button:hover{border-color:rgba(232,201,118,.55)!important;background:linear-gradient(180deg,#23484c,#10282c)!important}
+html[data-ui-mode='desktop'] .desktop-shortcuts{display:none!important}
+
+html[data-ui-mode='desktop'] #desktop-exp-rail{position:fixed;z-index:49;left:10px;right:10px;bottom:4px;height:10px;border:1px solid rgba(224,192,105,.26);border-radius:3px;overflow:hidden;background:rgba(4,11,13,.94);box-shadow:0 4px 12px rgba(0,0,0,.28);pointer-events:none}
+html[data-ui-mode='desktop'] #desktop-exp-fill{position:absolute;inset:0 auto 0 0;width:0;background:linear-gradient(90deg,#8c661f,#d6a943);transition:width .12s linear}
+html[data-ui-mode='desktop'] #desktop-exp-text{position:relative;z-index:1;display:grid;place-items:center;height:100%;color:#ece4cf;font-size:7px;font-weight:900;text-shadow:0 1px 2px #000}
+
+html[data-ui-mode='desktop'] #dialog-box{bottom:102px!important;left:calc(var(--desktop-hud-left,320px) + (100vw - var(--desktop-hud-left,320px) - var(--desktop-hud-right,250px))/2)!important;transform:translateX(-50%)!important;width:min(520px,42vw)!important}
+
+@media (max-width:1279px){
+  html[data-ui-mode='desktop'] .topbar,html[data-ui-mode='desktop'] #quest-box,html[data-ui-mode='desktop'] #chat-shell{width:262px!important}
+  html[data-ui-mode='desktop'] #minimap-shell,html[data-ui-mode='desktop'] #party-panel{width:204px!important}
+  html[data-ui-mode='desktop'] #minimap-canvas{width:184px!important}
+  html[data-ui-mode='desktop'] .utility-dock button{width:48px!important;height:54px!important}
+  html[data-ui-mode='desktop'] .skill-button{width:49px!important;height:49px!important}
+}
+
+@media (max-height:700px){
+  html[data-ui-mode='desktop'] #quest-box{max-height:130px!important}
+  html[data-ui-mode='desktop'] #chat-shell{height:205px!important}
+  html[data-ui-mode='desktop'] #skill-bar{bottom:20px!important}
+}
