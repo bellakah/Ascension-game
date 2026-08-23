@@ -22,6 +22,7 @@ import { installResponsiveUi } from './game/responsive';
 import { installDesktopViewportMetrics } from './game/desktopViewport';
 import { installDesktopPartyHudBridge } from './game/partyHudBridge';
 import { installDesktopHudStage3 } from './game/desktopHudStage3';
+import { installMapSystemStage4Polish } from './map/mapSystemStage4Polish';
 import { preparePublishedWorldRuntime } from './map/publishedMapRuntime';
 import { subscribePublishedMap } from './map/publishedMapStore';
 import { hydrateNpcDefinitionsIntoPalette } from './npc/npcStore';
@@ -49,5 +50,6 @@ export async function startGameApp() {
     guildBootstrap.attach({ beforeOpen: () => chatBootstrap.chat?.close() });
     installDesktopPartyHudBridge();
     installDesktopHudStage3();
+    installMapSystemStage4Polish();
   });
 }
