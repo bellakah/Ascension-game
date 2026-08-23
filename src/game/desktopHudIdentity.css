@@ -1,0 +1,46 @@
+/* Character identity overrides for the reference desktop HUD. */
+html[data-ui-mode='desktop'] .topbar::before{display:none!important}
+html[data-ui-mode='desktop'] .player-portrait{
+  position:absolute;
+  left:12px;
+  top:12px;
+  width:62px;
+  height:82px;
+  display:grid;
+  place-items:center;
+  border:1px solid rgba(220,183,91,.58);
+  border-radius:6px;
+  background:radial-gradient(circle at 50% 32%,rgba(78,119,128,.48),transparent 46%),linear-gradient(180deg,#15323d,#071920);
+  box-shadow:inset 0 0 0 2px rgba(0,0,0,.34),0 4px 12px rgba(0,0,0,.34);
+  overflow:hidden;
+}
+html[data-ui-mode='desktop'] .player-portrait::before{
+  content:'';
+  position:absolute;
+  inset:6px;
+  border:1px solid rgba(230,199,119,.12);
+  border-radius:4px;
+}
+html[data-ui-mode='desktop'] .player-portrait span{
+  position:relative;
+  z-index:1;
+  font-size:30px;
+  filter:drop-shadow(0 3px 5px rgba(0,0,0,.6));
+}
+html[data-ui-mode='desktop'] .player-hud-name{
+  display:block;
+  overflow:hidden;
+  max-width:176px;
+  color:#f2eee1;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+html[data-ui-mode='desktop'] .topbar .brand span i{
+  color:#d9bd73;
+  font-style:normal;
+  font-weight:700;
+}
+@media(max-width:1279px){
+  html[data-ui-mode='desktop'] .player-portrait{width:54px;height:76px}
+  html[data-ui-mode='desktop'] .player-hud-name{max-width:148px}
+}
