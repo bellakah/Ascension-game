@@ -2,6 +2,7 @@ import { Container, Graphics, Text, type Ticker } from 'pixi.js';
 import type { CharacterProgress } from '../character/characterCreator';
 import type { MonsterKind } from '../game/quests';
 import { distance } from '../game/world';
+import { getMonsterDefinition } from '../monsterEditor/monsterStore';
 import { addItem, getItem } from './itemCatalog';
 
 export type GroundLoot = {
@@ -44,7 +45,8 @@ const SLUDGE_DROPS: MonsterDropRoll[] = [
 ];
 
 function roll(kind: MonsterKind, customDrops?: MonsterDropRoll[]) {
-  const table = customDrops ?? (kind === 'wolf' ? WOLF_DROPS : kind === 'sludge' ? SLUDGE_DROPS : []);
+  const editorDrops = customDrops ?? getMonsterDefinition(kind)?.drops;
+  const table = editorDrops ?? (kind === 'wolf' ? WOLF_DROPS : kind === 'sludge' ? SLUDGE_DROPS : []);
   return table.flatMap((drop) => {
     if (!drop.itemId || Math.random() > Math.max(0, Math.min(1, drop.chance))) return [];
     const min = Math.max(1, Math.floor(drop.min ?? 1)), max = Math.max(min, Math.floor(drop.max ?? min));
