@@ -92,6 +92,34 @@ html[data-ui-mode='desktop'] .topbar #resource-text{
   height:100%!important;
 }
 
+/* Bottom HUD cleanup: resource now lives only in the character frame. */
+html[data-ui-mode='desktop'] #skill-bar .skill-energy{
+  display:none!important;
+}
+
+/* Remove the large decorative strip behind the hotbar while preserving camera safe-area logic. */
+html[data-ui-mode='desktop'] #hud::after,
+html[data-ui-mode='desktop'] #hud::before{
+  display:none!important;
+}
+
+html[data-ui-mode='desktop'] #skill-bar{
+  bottom:22px!important;
+  gap:0!important;
+}
+
+html[data-ui-mode='desktop'] #skill-bar .skill-buttons{
+  margin:0!important;
+}
+
+html[data-ui-mode='desktop'] .utility-dock{
+  bottom:22px!important;
+}
+
+html[data-ui-mode='desktop'] #desktop-exp-rail{
+  bottom:4px!important;
+}
+
 @media(max-width:1279px){
   html[data-ui-mode='desktop'] .topbar{
     min-height:144px!important;
