@@ -1,14 +1,33 @@
 import type { CharacterProgress } from '../character/characterCreator';
 import { getQuestState, getTrackedQuest, NPC_NAMES, questObjectiveProgress } from '../quests/questEngine';
 
+type HudIdentity = {
+  name?: string;
+  className?: string;
+  classIcon?: string;
+};
+
+const escapeHtml = (value: unknown) => String(value ?? '')
+  .replaceAll('&', '&amp;')
+  .replaceAll('<', '&lt;')
+  .replaceAll('>', '&gt;')
+  .replaceAll('"', '&quot;')
+  .replaceAll("'", '&#039;');
+
 export type Hud = ReturnType<typeof createHud>;
 
-export function createHud(progress: CharacterProgress) {
+export function createHud(progress: CharacterProgress, identity: HudIdentity = {}) {
+  const playerName = escapeHtml(identity.name || 'Aventureiro');
+  const className = escapeHtml(identity.className || 'Aventureiro');
+  const classIcon = escapeHtml(identity.classIcon || '✦');
+  const mapName = escapeHtml(progress.map || 'Mundo');
+
   const root = document.createElement('div');
   root.id = 'hud';
   root.innerHTML = `
     <div class="topbar">
-      <div class="brand">ASCENSION <span>• ${progress.map}</span></div>
+      <div class="player-portrait" aria-hidden="true"><span>${classIcon}</span></div>
+      <div class="brand"><b class="player-hud-name">${playerName}</b><span><i>${className}</i> • ${mapName}</span></div>
       <div class="player-progression"><strong id="level-text"></strong><span id="exp-text"></span></div>
       <div class="hp-shell"><div id="hp-fill"></div><span id="hp-text"></span></div>
       <div class="coins">🪙 <span id="coins"></span></div>
@@ -26,14 +45,14 @@ export function createHud(progress: CharacterProgress) {
     <div id="dialog-box" class="hidden"></div>
     <div id="stick"><div id="knob"></div></div>
     <div class="utility-dock">
-      <button id="menu-button" data-label="Menu" title="Menu do Jogo" aria-label="Menu do Jogo">☰</button>
-      <button id="chat-button" data-label="Chat" title="Chat" aria-label="Chat">💬</button>
-      <button id="guild-button" data-label="Guilda" title="Guilda" aria-label="Guilda">🛡</button>
-      <button id="map-button" data-label="Mapa" title="Mapa Mundial" aria-label="Mapa Mundial">🗺️</button>
-      <button id="quest-journal-button" data-label="Missões" title="Diário de Missões" aria-label="Diário de Missões">📖</button>
-      <button id="pet-button" data-label="Mascote" title="Mascote" aria-label="Mascote">🐾</button>
-      <button id="character-button" data-label="Personagem" title="Personagem" aria-label="Personagem">👤</button>
-      <button id="inventory-button" data-label="Inventário" title="Inventário" aria-label="Inventário">🎒</button>
+      <button id="inventory-button" data-label="Inventário" title="Inventário" aria-label="Inventário">▣</button>
+      <button id="character-button" data-label="Personagem" title="Personagem" aria-label="Personagem">♙</button>
+      <button id="guild-button" data-label="Guilda" title="Guilda" aria-label="Guilda">♜</button>
+      <button id="quest-journal-button" data-label="Missões" title="Diário de Missões" aria-label="Diário de Missões">▤</button>
+      <button id="map-button" data-label="Mapa" title="Mapa Mundial" aria-label="Mapa Mundial">⌖</button>
+      <button id="pet-button" data-label="Mascote" title="Mascote" aria-label="Mascote">♞</button>
+      <button id="chat-button" data-label="Chat" title="Chat" aria-label="Chat">✉</button>
+      <button id="menu-button" data-label="Config." title="Menu do Jogo" aria-label="Menu do Jogo">⚙</button>
     </div>
     <div class="action-dock">
       <button id="interact-btn" aria-label="Interagir">💬</button>
@@ -92,7 +111,7 @@ export function updateHud(hud: Hud, progress: CharacterProgress, playerHp: numbe
 
   const quest = getTrackedQuest(progress);
   if (!quest) {
-    hud.questTitle.textContent = 'Missões';
+    hud.questTitle.textContent = 'Missões Ativas';
     hud.questText.textContent = 'Nenhuma missão rastreada. Abra o Diário para ver missões disponíveis.';
     hud.questToggle.classList.remove('quest-ready');
     return;

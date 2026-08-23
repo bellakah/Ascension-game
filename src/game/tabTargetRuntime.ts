@@ -23,9 +23,10 @@ const cssPx = (name: string, fallback: number) => {
 
 export function installTabTargetRuntime(options: Options) {
   const { app, world, player, monsters } = options;
-  const ring = new Graphics();
-  ring.eventMode = 'none';
-  ring.visible = false;
+  const marker = new Graphics();
+  marker.eventMode = 'none';
+  marker.visible = false;
+  let markerBaseY = -72;
   let selected: Monster | null = null;
   let raf = 0;
 
@@ -35,14 +36,27 @@ export function installTabTargetRuntime(options: Options) {
   const hpFill = panel?.querySelector<HTMLElement>('#target-hp-fill') ?? null;
   const hpText = panel?.querySelector<HTMLElement>('#target-hp-text') ?? null;
 
-  const drawRing = (monster: Monster | null) => {
-    ring.clear();
-    if (!monster) { ring.visible = false; return; }
+  const drawMarker = (monster: Monster | null) => {
+    marker.clear();
+    if (!monster) { marker.visible = false; return; }
+
     const scale = Math.max(.7, monster.definition?.appearance.scale ?? 1);
-    const radiusX = 28 * Math.min(1.7, scale);
-    const radiusY = 11 * Math.min(1.45, scale);
-    ring.ellipse(0, 7, radiusX, radiusY).fill({ color: 0xc89736, alpha: .12 }).stroke({ width: 3, color: 0xf4c75a, alpha: .96 });
-    ring.visible = true;
+    markerBaseY = -72 * Math.max(1, Math.min(1.8, scale));
+
+    // Compact gold orb + downward pointer. The target indication now lives above
+    // the enemy instead of painting a large ring over the terrain.
+    marker.circle(0, -5, 7)
+      .fill({ color: 0xd7a83f, alpha: .98 })
+      .stroke({ width: 2, color: 0xffe49a, alpha: .98 });
+    marker.moveTo(-4, 4)
+      .lineTo(4, 4)
+      .lineTo(0, 11)
+      .closePath()
+      .fill({ color: 0xd7a83f, alpha: .98 })
+      .stroke({ width: 1.5, color: 0xffe49a, alpha: .92 });
+    marker.circle(0, -5, 2).fill({ color: 0xfff3c2, alpha: .9 });
+    marker.position.set(0, markerBaseY);
+    marker.visible = true;
   };
 
   const syncPanel = () => {
@@ -65,13 +79,15 @@ export function installTabTargetRuntime(options: Options) {
 
   const setTarget = (monster: Monster | null) => {
     if (selected === monster) { syncPanel(); return; }
-    if (ring.parent) ring.parent.removeChild(ring);
+    if (marker.parent) marker.parent.removeChild(marker);
     selected = monster && monster.alive ? monster : null;
     setSelectedMonsterId(selected?.id ?? null);
     if (selected) {
-      drawRing(selected);
-      selected.view.addChildAt(ring, 0);
-    } else drawRing(null);
+      drawMarker(selected);
+      // Last child keeps the marker above the monster sprite/name without
+      // changing the monster's depth sorting in the world.
+      selected.view.addChild(marker);
+    } else drawMarker(null);
     syncPanel();
   };
 
@@ -142,7 +158,14 @@ export function installTabTargetRuntime(options: Options) {
 
   const tick = () => {
     if (selected && !selected.alive) setTarget(null);
-    else if (selected) syncPanel();
+    else if (selected) {
+      syncPanel();
+      const pulse = performance.now() / 180;
+      marker.position.y = markerBaseY + Math.sin(pulse) * 3;
+      const markerScale = 1 + Math.sin(pulse) * .035;
+      marker.scale.set(markerScale);
+      marker.alpha = .88 + (Math.sin(pulse) + 1) * .06;
+    }
     raf = requestAnimationFrame(tick);
   };
   raf = requestAnimationFrame(tick);
@@ -155,8 +178,8 @@ export function installTabTargetRuntime(options: Options) {
       cancelAnimationFrame(raf);
       window.removeEventListener('keydown', onKeyDown, true);
       app.canvas.removeEventListener('pointerdown', onPointerDown);
-      if (ring.parent) ring.parent.removeChild(ring);
-      ring.destroy();
+      if (marker.parent) marker.parent.removeChild(marker);
+      marker.destroy();
       setSelectedMonsterId(null);
     },
   };
