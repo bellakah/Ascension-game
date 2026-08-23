@@ -1,4 +1,4 @@
-export type ChatChannelId = 'general' | 'global' | 'trade' | 'guild' | 'private';
+export type ChatChannelId = 'general' | 'global' | 'party' | 'trade' | 'guild' | 'private' | 'system';
 
 export type ChatSender = {
   accountId: string;
