@@ -9,6 +9,8 @@ if (playtest === 'map') {
     await startMapEditor();
     const { installMapEditorInteractionPerf } = await import('./editor/map/mapEditorInteractionPerf');
     installMapEditorInteractionPerf();
+    const { installMapEditorVisualPolish } = await import('./editor/map/mapEditorVisualPolish');
+    installMapEditorVisualPolish();
   });
 } else {
   void import('./gameBootstrap').then(({ startGameApp }) => startGameApp());
