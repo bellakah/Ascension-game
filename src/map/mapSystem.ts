@@ -1,11 +1,14 @@
 import './mapSystem.css';
+import './mapSystemStage4.css';
 import type { Container } from 'pixi.js';
 import type { CharacterProgress } from '../character/characterCreator';
 import type { Monster } from '../game/monsterSystem';
 import type { VillageMerchant } from '../game/villageNpcs';
 import { VILLAGES, WORLD_H, WORLD_W } from '../game/world';
 import { getMapPois, type MapPoi } from './mapCatalog';
+import { getPreparedPublishedWorldRuntime } from './publishedMapRuntime';
 import { ensureMapState, MAP_FILTER_KEYS, setMapFilter, setMapZoom, setMinimapRange, type MapFilterKey } from './mapState';
+import { createMapWorldRaster, drawMapWorldCrop } from './mapWorldRaster';
 
 type MapSystemOptions = {
   player: Container;
@@ -14,6 +17,8 @@ type MapSystemOptions = {
   monsters: Monster[];
   onChanged: () => void;
 };
+
+type UiSafeZone = { id: string; name: string; x: number; y: number; width: number; height: number };
 
 const FILTER_META: Record<MapFilterKey, { icon: string; label: string; description: string }> = {
   npc: { icon: '◆', label: 'NPCs', description: 'Guias e personagens sem loja.' },
@@ -37,39 +42,43 @@ function esc(value: string) {
   return value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] ?? char));
 }
 
-function terrainSvg() {
-  const forest = Array.from({ length: 42 }, (_, i) => {
-    const x = 90 + (i * 197) % 2020;
-    const y = 95 + (i * 263) % 1410;
-    const r = 34 + (i % 4) * 9;
-    return `<circle cx="${x}" cy="${y}" r="${r}" fill="${i % 3 === 0 ? '#345f40' : '#2f563a'}" opacity=".32"/>`;
-  }).join('');
-  return `<svg class="map-base" viewBox="0 0 ${WORLD_W} ${WORLD_H}" aria-hidden="true">
-    <defs>
-      <pattern id="map-grid" width="80" height="80" patternUnits="userSpaceOnUse"><path d="M80 0H0V80" fill="none" stroke="#d7e5c7" stroke-opacity=".045" stroke-width="2"/></pattern>
-      <linearGradient id="road" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#826e4c"/><stop offset=".5" stop-color="#aa8b5b"/><stop offset="1" stop-color="#826e4c"/></linearGradient>
-    </defs>
-    <rect width="2200" height="1600" fill="#31583d"/>
-    ${forest}
-    <rect x="760" y="0" width="420" height="1600" rx="90" fill="url(#road)" opacity=".72"/>
-    <path d="M970 0V1600" stroke="#d7b879" stroke-width="16" stroke-opacity=".12" stroke-dasharray="38 42"/>
-    <rect width="2200" height="1600" fill="url(#map-grid)"/>
-    <rect x="16" y="16" width="2168" height="1568" rx="42" fill="none" stroke="#d9e8c9" stroke-opacity=".18" stroke-width="8"/>
-  </svg>`;
-}
-
 export function createMapSystem(progress: CharacterProgress, options: MapSystemOptions) {
   const state = ensureMapState(progress);
+  const publishedRuntime = getPreparedPublishedWorldRuntime();
+  const fallbackMapName = progress.map || 'Floresta Inicial';
+  const raster = createMapWorldRaster(WORLD_W, WORLD_H, fallbackMapName);
+  const worldWidth = raster.worldWidth;
+  const worldHeight = raster.worldHeight;
   let selectedId: string | null = null;
   let zoom = state.fullZoom;
   let panX = 0, panY = 0;
   let updateMs = 0;
 
+  const currentMap = () => raster.mapName || fallbackMapName;
+  const safeZones = (): UiSafeZone[] => {
+    if (publishedRuntime) {
+      const map = publishedRuntime.document;
+      return map.zones.filter((zone) => zone.kind === 'safe').map((zone) => ({
+        id: zone.id,
+        name: zone.name || map.name,
+        x: zone.x * map.tileSize,
+        y: zone.y * map.tileSize,
+        width: zone.width * map.tileSize,
+        height: zone.height * map.tileSize,
+      }));
+    }
+    return VILLAGES.filter((entry) => entry.map === fallbackMapName).map((village) => ({
+      id: village.id,
+      name: village.name,
+      ...village.safeZone,
+    }));
+  };
+
   const minimap = document.createElement('button');
   minimap.id = 'minimap-shell';
   minimap.type = 'button';
   minimap.title = 'Abrir mapa (M)';
-  minimap.innerHTML = `<div class="minimap-heading"><b id="minimap-name">${esc(progress.map || 'Floresta Inicial')}</b><span class="minimap-north">N</span></div><canvas id="minimap-canvas" width="400" height="352"></canvas><div class="minimap-footer"><span id="minimap-coords"></span><strong>M · MAPA</strong></div>`;
+  minimap.innerHTML = `<div class="minimap-heading"><b id="minimap-name">${esc(currentMap())}</b><span class="minimap-north">N</span></div><canvas id="minimap-canvas" width="400" height="352"></canvas><div class="minimap-footer"><span id="minimap-coords"></span><strong>M · MAPA</strong></div>`;
   document.body.appendChild(minimap);
 
   const root = document.createElement('div');
@@ -78,11 +87,11 @@ export function createMapSystem(progress: CharacterProgress, options: MapSystemO
   root.innerHTML = `<section class="map-window" role="dialog" aria-modal="true" aria-label="Mapa Mundial">
     <header class="map-header">
       <div class="map-title-block"><span class="map-kicker">CARTOGRAFIA DE ASCENSION</span><h2>Mapa Mundial</h2></div>
-      <div class="map-header-center"><select class="map-select" aria-label="Mapa"><option>${esc(progress.map || 'Floresta Inicial')}</option></select><button class="map-tool map-filter-toggle" data-map-action="filters" title="Filtros">☷</button><button class="map-tool" data-map-action="zoom-out" title="Diminuir zoom">−</button><button class="map-tool" data-map-action="zoom-in" title="Aumentar zoom">＋</button><button class="map-tool" data-map-action="center" title="Centralizar no personagem">◎</button><button class="map-tool map-close" data-map-action="close" title="Fechar">×</button></div>
+      <div class="map-header-center"><select class="map-select" aria-label="Mapa"><option>${esc(currentMap())}</option></select><button class="map-tool map-filter-toggle" data-map-action="filters" title="Filtros">☷</button><button class="map-tool" data-map-action="zoom-out" title="Diminuir zoom">−</button><button class="map-tool" data-map-action="zoom-in" title="Aumentar zoom">＋</button><button class="map-tool" data-map-action="center" title="Centralizar no personagem">◎</button><button class="map-tool map-close" data-map-action="close" title="Fechar">×</button></div>
     </header>
     <div class="map-main">
       <aside class="map-sidebar left"><h3>O que mostrar</h3><p class="map-sidebar-intro">Escolha quais informações aparecem no mapa e no minimapa.</p><div class="map-filter-list">${MAP_FILTER_KEYS.map((key) => `<label class="map-filter"><input type="checkbox" data-map-filter="${key}" ${state.filters[key] ? 'checked' : ''}><span class="map-filter-icon">${FILTER_META[key].icon}</span><span class="map-filter-copy"><b>${FILTER_META[key].label}</b><small>${FILTER_META[key].description}</small></span></label>`).join('')}</div></aside>
-      <div class="map-viewport" id="map-viewport"><div class="map-world" id="map-world">${terrainSvg()}<div class="map-zone-layer" id="map-zone-layer"></div><div class="map-marker-layer" id="map-marker-layer"></div></div></div>
+      <div class="map-viewport" id="map-viewport"><div class="map-world" id="map-world"><div class="map-zone-layer" id="map-zone-layer"></div><div class="map-marker-layer" id="map-marker-layer"></div></div></div>
       <aside class="map-sidebar right" id="map-details"><div class="map-details-empty"><span>⌖</span><strong>Selecione um ponto</strong><p>Toque em um marcador para ver os detalhes.</p></div></aside>
     </div>
     <footer class="map-footer"><span>Arraste para navegar · roda/pinça para zoom · <strong>M</strong> fechar</span><span id="map-footer-position"></span><span id="map-footer-zoom"></span></footer>
@@ -101,15 +110,20 @@ export function createMapSystem(progress: CharacterProgress, options: MapSystemO
   const footerPosition = root.querySelector<HTMLElement>('#map-footer-position')!;
   const footerZoom = root.querySelector<HTMLElement>('#map-footer-zoom')!;
 
-  const currentMap = () => progress.map || 'Floresta Inicial';
+  world.style.width = `${worldWidth}px`;
+  world.style.height = `${worldHeight}px`;
+  raster.canvas.style.width = `${worldWidth}px`;
+  raster.canvas.style.height = `${worldHeight}px`;
+  world.prepend(raster.canvas);
+
   const allPois = () => getMapPois({ progress, elandra: options.elandra, merchants: options.merchants, monsters: options.monsters });
   const visiblePois = () => allPois().filter((poi) => poi.map === currentMap() && state.filters[poi.filter]);
 
-  const baseScale = () => Math.max(.08, Math.min((viewport.clientWidth - 18) / WORLD_W, (viewport.clientHeight - 18) / WORLD_H));
+  const baseScale = () => Math.max(.08, Math.min((viewport.clientWidth - 18) / worldWidth, (viewport.clientHeight - 18) / worldHeight));
   const scale = () => baseScale() * zoom;
 
   const clampPan = () => {
-    const scaledW = WORLD_W * scale(), scaledH = WORLD_H * scale();
+    const scaledW = worldWidth * scale(), scaledH = worldHeight * scale();
     panX = scaledW <= viewport.clientWidth ? (viewport.clientWidth - scaledW) / 2 : Math.max(viewport.clientWidth - scaledW, Math.min(0, panX));
     panY = scaledH <= viewport.clientHeight ? (viewport.clientHeight - scaledH) / 2 : Math.max(viewport.clientHeight - scaledH, Math.min(0, panY));
   };
@@ -144,12 +158,12 @@ export function createMapSystem(progress: CharacterProgress, options: MapSystemO
   const renderZones = () => {
     zoneLayer.replaceChildren();
     if (!state.filters.safeZones) return;
-    for (const village of VILLAGES.filter((entry) => entry.map === currentMap())) {
+    for (const zone of safeZones()) {
       const node = document.createElement('div');
       node.className = 'map-safe-zone';
-      node.style.left = `${village.safeZone.x}px`; node.style.top = `${village.safeZone.y}px`;
-      node.style.width = `${village.safeZone.width}px`; node.style.height = `${village.safeZone.height}px`;
-      node.innerHTML = `<span>🛡 ${esc(village.name)}</span>`;
+      node.style.left = `${zone.x}px`; node.style.top = `${zone.y}px`;
+      node.style.width = `${zone.width}px`; node.style.height = `${zone.height}px`;
+      node.innerHTML = `<span>🛡 ${esc(zone.name)}</span>`;
       zoneLayer.appendChild(node);
     }
   };
@@ -197,19 +211,14 @@ export function createMapSystem(progress: CharacterProgress, options: MapSystemO
     const toX = (x: number) => cx + (x - options.player.x) * pixelsPerWorld;
     const toY = (y: number) => cy + (y - options.player.y) * pixelsPerWorld;
     ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = '#31583d'; ctx.fillRect(0, 0, w, h);
-
-    const roadLeft = toX(760), roadRight = toX(1180), roadTop = toY(0), roadBottom = toY(WORLD_H);
-    ctx.fillStyle = 'rgba(174,142,91,.72)'; ctx.fillRect(roadLeft, roadTop, roadRight - roadLeft, roadBottom - roadTop);
-    ctx.strokeStyle = 'rgba(238,216,163,.12)'; ctx.lineWidth = 3; ctx.setLineDash([12, 12]);
-    ctx.beginPath(); ctx.moveTo(toX(970), roadTop); ctx.lineTo(toX(970), roadBottom); ctx.stroke(); ctx.setLineDash([]);
+    drawMapWorldCrop(ctx, raster, options.player.x, options.player.y, range * 2, w, h);
 
     if (state.filters.safeZones) {
-      for (const village of VILLAGES.filter((entry) => entry.map === currentMap())) {
-        const x = toX(village.safeZone.x), y = toY(village.safeZone.y);
-        const width = village.safeZone.width * pixelsPerWorld, height = village.safeZone.height * pixelsPerWorld;
-        ctx.fillStyle = 'rgba(128,185,104,.2)'; ctx.fillRect(x, y, width, height);
-        ctx.strokeStyle = 'rgba(203,238,180,.58)'; ctx.lineWidth = 3; ctx.strokeRect(x, y, width, height);
+      for (const zone of safeZones()) {
+        const x = toX(zone.x), y = toY(zone.y);
+        const width = zone.width * pixelsPerWorld, height = zone.height * pixelsPerWorld;
+        ctx.fillStyle = 'rgba(107,177,113,.14)'; ctx.fillRect(x, y, width, height);
+        ctx.strokeStyle = 'rgba(204,224,164,.62)'; ctx.lineWidth = 3; ctx.strokeRect(x, y, width, height);
       }
     }
 
@@ -219,13 +228,17 @@ export function createMapSystem(progress: CharacterProgress, options: MapSystemO
       const x = toX(poi.x), y = toY(poi.y);
       if (x < -20 || x > w + 20 || y < -20 || y > h + 20) continue;
       ctx.beginPath(); ctx.arc(x, y, 13, 0, Math.PI * 2);
-      ctx.fillStyle = poi.tone === 'danger' ? 'rgba(112,45,48,.92)' : poi.tone === 'quest' ? 'rgba(131,94,22,.94)' : poi.tone === 'resource' ? 'rgba(34,79,50,.94)' : 'rgba(13,31,25,.9)';
-      ctx.fill(); ctx.fillStyle = '#f4f8ed'; ctx.fillText(poi.icon, x, y + 1);
+      ctx.fillStyle = poi.tone === 'danger' ? 'rgba(112,45,48,.92)' : poi.tone === 'quest' ? 'rgba(131,94,22,.94)' : poi.tone === 'resource' ? 'rgba(34,79,50,.94)' : 'rgba(8,25,32,.92)';
+      ctx.fill(); ctx.strokeStyle = 'rgba(225,195,116,.45)'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = '#f4f2e9'; ctx.fillText(poi.icon, x, y + 1);
     }
 
-    ctx.save(); ctx.translate(cx, cy); ctx.fillStyle = '#8ed9ff'; ctx.strokeStyle = '#eaffff'; ctx.lineWidth = 3;
+    ctx.save(); ctx.translate(cx, cy); ctx.fillStyle = '#d9b85e'; ctx.strokeStyle = '#fff4c9'; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.moveTo(0, -15); ctx.lineTo(12, 12); ctx.lineTo(0, 7); ctx.lineTo(-12, 12); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
-    ctx.strokeStyle = 'rgba(238,246,226,.25)'; ctx.lineWidth = 3; ctx.strokeRect(1.5, 1.5, w - 3, h - 3);
+    const vignette = ctx.createRadialGradient(cx, cy, Math.min(w, h) * .24, cx, cy, Math.max(w, h) * .7);
+    vignette.addColorStop(0, 'rgba(0,0,0,0)'); vignette.addColorStop(1, 'rgba(1,8,11,.34)');
+    ctx.fillStyle = vignette; ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = 'rgba(218,184,96,.38)'; ctx.lineWidth = 3; ctx.strokeRect(1.5, 1.5, w - 3, h - 3);
     miniCoords.textContent = `${Math.round(options.player.x)}, ${Math.round(options.player.y)} · ${Math.round(range)}m`;
     miniName.textContent = currentMap();
   };
