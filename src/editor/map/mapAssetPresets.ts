@@ -24,6 +24,7 @@ export type AssetHitboxPolygon = {
 };
 
 export type AssetHitbox = AssetHitboxRect | AssetHitboxCircle | AssetHitboxPolygon;
+export type AssetLightActivation = 'night' | 'always';
 
 export type AssetLightPreset = {
   enabled: boolean;
@@ -31,6 +32,9 @@ export type AssetLightPreset = {
   y: number;
   radius: number;
   intensity: number;
+  color: string;
+  softness: number;
+  activation: AssetLightActivation;
 };
 
 export type AssetStretchPreset = {
@@ -61,7 +65,7 @@ const defaults: MapAssetPreset = {
   scale: 1,
   shadow: false,
   hitbox: null,
-  light: { enabled: false, x: .5, y: .55, radius: 1.6, intensity: .7 },
+  light: { enabled: false, x: .5, y: .55, radius: 1.6, intensity: .7, color: '#ffd88a', softness: .72, activation: 'night' },
   stretch: { enabled: false, axis: 'horizontal', cap: .2 },
 };
 
