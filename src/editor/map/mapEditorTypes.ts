@@ -31,6 +31,13 @@ export type MapZone = {
   properties?: Record<string, string | number | boolean>;
 };
 
+export type DayNightMetadata = {
+  enabled?: boolean;
+  dayLengthMinutes?: number;
+  nightDarkness?: number;
+  startHour?: number;
+};
+
 export type AscensionMapDocument = {
   version: 1;
   id: string;
@@ -50,6 +57,7 @@ export type AscensionMapDocument = {
     ambientId?: string;
     recommendedLevel?: string;
     notes?: string;
+    dayNight?: DayNightMetadata;
   };
 };
 
