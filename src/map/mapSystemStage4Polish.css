@@ -1,0 +1,180 @@
+/* Etapa 4 — acabamento: direção do player, POIs e scrollbars desktop. */
+
+/* Scrollbars modernas e discretas para todas as janelas desktop. */
+html[data-ui-mode='desktop'] *{
+  scrollbar-width:thin;
+  scrollbar-color:rgba(176,148,79,.58) rgba(4,18,23,.28);
+}
+html[data-ui-mode='desktop'] *::-webkit-scrollbar{
+  width:8px;
+  height:8px;
+}
+html[data-ui-mode='desktop'] *::-webkit-scrollbar-track{
+  background:rgba(3,15,20,.22);
+  border-radius:999px;
+}
+html[data-ui-mode='desktop'] *::-webkit-scrollbar-thumb{
+  min-height:34px;
+  border:2px solid transparent;
+  border-radius:999px;
+  background:linear-gradient(180deg,rgba(194,160,78,.72),rgba(95,120,116,.58)) padding-box;
+}
+html[data-ui-mode='desktop'] *::-webkit-scrollbar-thumb:hover{
+  background:linear-gradient(180deg,rgba(224,187,94,.88),rgba(117,145,139,.72)) padding-box;
+}
+html[data-ui-mode='desktop'] *::-webkit-scrollbar-corner{background:transparent}
+html[data-ui-mode='desktop'] *::-webkit-scrollbar-button{
+  width:0;
+  height:0;
+  display:none;
+}
+html[data-ui-mode='desktop'] .map-sidebar{
+  scrollbar-gutter:stable;
+}
+
+/* POIs: menos bloco técnico, mais marcador de MMORPG. */
+html[data-ui-mode='desktop'] .map-poi{
+  --poi-accent:#8aa9a3;
+  --poi-core:#0d2b33;
+  width:58px!important;
+  height:58px!important;
+  margin:-29px 0 0 -29px!important;
+  overflow:visible!important;
+  border:1px solid color-mix(in srgb,var(--poi-accent) 54%,transparent)!important;
+  background:radial-gradient(circle at 42% 34%,color-mix(in srgb,var(--poi-accent) 28%,var(--poi-core)),var(--poi-core) 68%)!important;
+  box-shadow:0 0 0 4px rgba(3,12,16,.52),0 8px 20px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.07)!important;
+  color:#f1eee4!important;
+  transition:transform .14s ease,border-color .14s ease,box-shadow .14s ease,filter .14s ease!important;
+}
+html[data-ui-mode='desktop'] .map-poi[data-tone='quest']{--poi-accent:#e4b64f;--poi-core:#553f12}
+html[data-ui-mode='desktop'] .map-poi[data-tone='resource']{--poi-accent:#7cb78b;--poi-core:#1d4230}
+html[data-ui-mode='desktop'] .map-poi[data-tone='danger']{--poi-accent:#d06a6e;--poi-core:#52282d}
+html[data-ui-mode='desktop'] .map-poi[data-tone='service']{--poi-accent:#79a9c5;--poi-core:#203845}
+html[data-ui-mode='desktop'] .map-poi[data-tone='friendly']{--poi-accent:#95bd90;--poi-core:#244331}
+html[data-ui-mode='desktop'] .map-poi::before{
+  content:'';
+  position:absolute;
+  inset:4px;
+  border:1px solid color-mix(in srgb,var(--poi-accent) 32%,transparent);
+  border-radius:50%;
+  pointer-events:none;
+  box-shadow:inset 0 0 10px rgba(255,255,255,.025);
+}
+html[data-ui-mode='desktop'] .map-poi::after{
+  content:'';
+  position:absolute;
+  left:50%;
+  bottom:-5px;
+  width:9px;
+  height:9px;
+  transform:translateX(-50%) rotate(45deg);
+  border-right:1px solid color-mix(in srgb,var(--poi-accent) 58%,transparent);
+  border-bottom:1px solid color-mix(in srgb,var(--poi-accent) 58%,transparent);
+  background:var(--poi-core);
+  box-shadow:3px 3px 5px rgba(0,0,0,.18);
+  pointer-events:none;
+}
+html[data-ui-mode='desktop'] .map-poi>span:first-child{
+  width:34px;
+  height:34px;
+  display:grid;
+  place-items:center;
+  border-radius:50%;
+  background:rgba(2,12,16,.28);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.035);
+  font-size:28px;
+  line-height:1;
+  text-shadow:0 2px 4px rgba(0,0,0,.55);
+  pointer-events:none;
+}
+html[data-ui-mode='desktop'] .map-poi:hover{
+  transform:scale(1.08)!important;
+  border-color:color-mix(in srgb,var(--poi-accent) 88%,white 12%)!important;
+  box-shadow:0 0 0 5px color-mix(in srgb,var(--poi-accent) 16%,transparent),0 10px 24px rgba(0,0,0,.44),0 0 16px color-mix(in srgb,var(--poi-accent) 18%,transparent)!important;
+  filter:brightness(1.08);
+}
+html[data-ui-mode='desktop'] .map-poi.selected{
+  transform:scale(1.1)!important;
+  border-color:color-mix(in srgb,var(--poi-accent) 90%,white 10%)!important;
+  box-shadow:0 0 0 6px color-mix(in srgb,var(--poi-accent) 18%,transparent),0 10px 25px rgba(0,0,0,.45),0 0 20px color-mix(in srgb,var(--poi-accent) 22%,transparent)!important;
+}
+html[data-ui-mode='desktop'] .map-poi-label{
+  top:65px!important;
+  min-width:0!important;
+  max-width:210px!important;
+  padding:4px 8px!important;
+  border:1px solid rgba(177,151,85,.28)!important;
+  border-radius:4px!important;
+  background:linear-gradient(180deg,rgba(8,29,35,.96),rgba(3,15,20,.96))!important;
+  box-shadow:0 5px 14px rgba(0,0,0,.32),inset 0 1px 0 rgba(255,255,255,.035)!important;
+  color:#ece8dc!important;
+  font-size:18px!important;
+  font-weight:750!important;
+  letter-spacing:.01em!important;
+  text-shadow:0 1px 2px rgba(0,0,0,.65);
+}
+html[data-ui-mode='desktop'] .map-poi.selected .map-poi-label{
+  border-color:color-mix(in srgb,var(--poi-accent) 48%,rgba(177,151,85,.28))!important;
+  color:#f5ebc9!important;
+}
+
+/* Player no mapa mundial: a moldura fica estável e somente a seta gira. */
+html[data-ui-mode='desktop'] .map-player-marker{
+  width:58px!important;
+  height:58px!important;
+  margin:-29px 0 0 -29px!important;
+  border:1px solid rgba(244,216,137,.85)!important;
+  background:radial-gradient(circle at 44% 38%,#c69b42,#76571d 72%)!important;
+  box-shadow:0 0 0 5px rgba(218,174,74,.18),0 0 18px rgba(224,180,77,.32),0 8px 18px rgba(0,0,0,.35)!important;
+  color:transparent!important;
+  font-size:0!important;
+}
+html[data-ui-mode='desktop'] .map-player-marker::before{
+  content:'';
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:20px;
+  height:25px;
+  transform:translate(-50%,-50%) rotate(var(--map-player-heading,0rad));
+  transform-origin:50% 50%;
+  clip-path:polygon(50% 0,100% 100%,50% 76%,0 100%);
+  background:linear-gradient(180deg,#fff3be,#e8c869 58%,#b8892d);
+  filter:drop-shadow(0 2px 2px rgba(0,0,0,.5));
+  transition:transform .11s linear;
+}
+html[data-ui-mode='desktop'] .map-player-marker::after{
+  top:65px!important;
+  border:1px solid rgba(204,170,82,.26);
+  box-shadow:0 4px 12px rgba(0,0,0,.28);
+}
+
+/* Seta sobre o minimapa cobre o marcador estático desenhado no canvas. */
+html[data-ui-mode='desktop'] .minimap-direction-marker{
+  position:absolute;
+  z-index:8;
+  width:32px;
+  height:32px;
+  display:grid;
+  place-items:center;
+  transform:translate(-50%,-50%);
+  border:1px solid rgba(246,220,151,.88);
+  border-radius:50%;
+  background:radial-gradient(circle at 42% 38%,#bb9140,#73551d 72%);
+  box-shadow:0 0 0 4px rgba(214,171,74,.16),0 0 14px rgba(224,180,77,.27),0 3px 8px rgba(0,0,0,.42);
+  pointer-events:none;
+}
+html[data-ui-mode='desktop'] .minimap-direction-arrow{
+  width:12px;
+  height:17px;
+  transform:rotate(var(--map-player-heading,0rad));
+  transform-origin:50% 50%;
+  clip-path:polygon(50% 0,100% 100%,50% 76%,0 100%);
+  background:linear-gradient(180deg,#fff3be,#e4c361 62%,#aa7f28);
+  filter:drop-shadow(0 1px 1px rgba(0,0,0,.55));
+  transition:transform .11s linear;
+}
+
+@media(max-width:1279px){
+  html[data-ui-mode='desktop'] .map-poi-label{font-size:17px!important}
+}
