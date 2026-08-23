@@ -73,10 +73,17 @@ export type MapAnimationFrame = MapSpriteRect & {
   durationMs?: number;
 };
 
+export type MapAnimationPlayback = 'loop' | 'once' | 'pingpong' | 'random';
+export type MapAnimationSync = 'global' | 'random';
+
 export type MapAnimationDefinition = {
   frames: MapAnimationFrame[];
   fps: number;
+  /** Compatibilidade com animações antigas. `playback` é a configuração preferida. */
   loop: boolean;
+  playback?: MapAnimationPlayback;
+  /** `global` mantém todas as instâncias no mesmo frame; `random` aplica uma fase estável por instância. */
+  sync?: MapAnimationSync;
 };
 
 export type MapSpriteDefinition = {
@@ -85,7 +92,7 @@ export type MapSpriteDefinition = {
   nativeHeight: number;
   /** Recorte estático dentro do PNG/spritesheet. */
   sourceRect?: MapSpriteRect;
-  /** Sequência visual usada pelo Editor, Playtest e futuramente pelo jogo. */
+  /** Sequência visual usada pelo Editor, Playtest e jogo publicado. */
   animation?: MapAnimationDefinition;
   /** Tamanho visual em tiles. Se omitido, usa 1x1. */
   widthTiles?: number;
