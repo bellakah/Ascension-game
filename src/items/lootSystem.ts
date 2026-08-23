@@ -22,9 +22,9 @@ export type GroundLootCollectResult = {
   reason?: 'not_owner' | 'inventory_full';
 };
 
-type DropRoll = { itemId: string; chance: number; min?: number; max?: number };
+export type MonsterDropRoll = { itemId: string; chance: number; min?: number; max?: number };
 
-const WOLF_DROPS: DropRoll[] = [
+const WOLF_DROPS: MonsterDropRoll[] = [
   { itemId: 'wolf_pelt', chance: 1 },
   { itemId: 'wolf_fang', chance: .46 },
   { itemId: 'small_health_potion', chance: .18 },
@@ -34,7 +34,7 @@ const WOLF_DROPS: DropRoll[] = [
   { itemId: 'shadow_fang_blade', chance: .009 },
 ];
 
-const SLUDGE_DROPS: DropRoll[] = [
+const SLUDGE_DROPS: MonsterDropRoll[] = [
   { itemId: 'toxic_sludge', chance: 1 },
   { itemId: 'sludge_core', chance: .36 },
   { itemId: 'small_health_potion', chance: .2 },
@@ -43,11 +43,11 @@ const SLUDGE_DROPS: DropRoll[] = [
   { itemId: 'amber_ring', chance: .025 },
 ];
 
-function roll(kind: MonsterKind) {
-  const table = kind === 'wolf' ? WOLF_DROPS : SLUDGE_DROPS;
+function roll(kind: MonsterKind, customDrops?: MonsterDropRoll[]) {
+  const table = customDrops ?? (kind === 'wolf' ? WOLF_DROPS : kind === 'sludge' ? SLUDGE_DROPS : []);
   return table.flatMap((drop) => {
-    if (Math.random() > drop.chance) return [];
-    const min = drop.min ?? 1, max = drop.max ?? min;
+    if (!drop.itemId || Math.random() > Math.max(0, Math.min(1, drop.chance))) return [];
+    const min = Math.max(1, Math.floor(drop.min ?? 1)), max = Math.max(min, Math.floor(drop.max ?? min));
     return [{ itemId: drop.itemId, quantity: min + Math.floor(Math.random() * (max - min + 1)) }];
   });
 }
@@ -74,8 +74,8 @@ function destroyLoot(loots: GroundLoot[], loot: GroundLoot) {
   if (index >= 0) loots.splice(index, 1);
 }
 
-export function spawnMonsterLoot(world: Container, kind: MonsterKind, x: number, y: number, target: GroundLoot[], ownerCharacterId: string) {
-  const drops = roll(kind);
+export function spawnMonsterLoot(world: Container, kind: MonsterKind, x: number, y: number, target: GroundLoot[], ownerCharacterId: string, customDrops?: MonsterDropRoll[]) {
+  const drops = roll(kind, customDrops);
   drops.forEach((drop, index) => {
     const angle = (index / Math.max(1, drops.length)) * Math.PI * 2 + Math.random() * .35;
     const radius = 18 + Math.random() * 18;
@@ -112,18 +112,11 @@ export function updateGroundLoot(
     loot.view.y += Math.sin(loot.phase) * .07 * ticker.deltaTime;
     loot.view.rotation = Math.sin(loot.phase * .45) * .04;
 
-    if (loot.ageMs > 90000) {
-      destroyLoot(loots, loot);
-      continue;
-    }
-
+    if (loot.ageMs > 90000) { destroyLoot(loots, loot); continue; }
     if (loot.ownerCharacterId !== collectorCharacterId) continue;
     if (distance(player.x, player.y, loot.view.x, loot.view.y) > 62) continue;
     const result = collectGroundLoot(loots, loot, progress, collectorCharacterId);
     if (result.added > 0) onCollected(result.itemId, result.added);
-    if (result.reason === 'inventory_full' && !loot.fullWarned) {
-      loot.fullWarned = true;
-      onInventoryFull();
-    }
+    if (result.reason === 'inventory_full' && !loot.fullWarned) { loot.fullWarned = true; onInventoryFull(); }
   }
 }
