@@ -1,19 +1,22 @@
+import type { NpcDefinition, NpcRole } from '../npc/npcTypes';
+import type { MonsterDefinition, MonsterDrop } from '../monsterEditor/monsterTypes';
+
 const NPC_STORAGE_KEY = 'ascension.npc.definitions.v1';
 const MONSTER_STORAGE_KEY = 'ascension.monster.definitions.v1';
 const MIGRATION_KEY = 'ascension.studio.legacy-content-imported.v2';
 
-type DefinitionFile = { version: 1; definitions: any[] };
+type DefinitionFile<T> = { version: 1; definitions: T[] };
 
-function readFile(key: string): DefinitionFile {
+function readFile<T>(key: string): DefinitionFile<T> {
   try {
-    const parsed = JSON.parse(localStorage.getItem(key) ?? '') as Partial<DefinitionFile>;
+    const parsed = JSON.parse(localStorage.getItem(key) ?? '') as Partial<DefinitionFile<T>>;
     return { version: 1, definitions: Array.isArray(parsed.definitions) ? parsed.definitions : [] };
   } catch {
     return { version: 1, definitions: [] };
   }
 }
 
-function legacyNpc(id: string, name: string, title: string, role: string, assetId: string) {
+function legacyNpc(id: string, name: string, title: string, role: NpcRole, assetId: string): NpcDefinition {
   const now = Date.now();
   return {
     version: 1,
@@ -70,8 +73,8 @@ function legacyMonster(
   title: string,
   assetId: string,
   stats: { maxHp: number; attack: number; moveSpeed: number; expReward: number; coinReward: number; respawnMs: number },
-  drops: Array<{ itemId: string; chance: number; min: number; max: number }>,
-) {
+  drops: MonsterDrop[],
+): MonsterDefinition {
   const now = Date.now();
   return {
     version: 1,
@@ -122,19 +125,19 @@ function legacyMonster(
 export function ensureLegacyStudioDefinitions() {
   if (localStorage.getItem(MIGRATION_KEY) === '1') return;
 
-  const npcFile = readFile(NPC_STORAGE_KEY);
-  const npcSeeds = [
+  const npcFile = readFile<NpcDefinition>(NPC_STORAGE_KEY);
+  const npcSeeds: NpcDefinition[] = [
     legacyNpc('elandra', 'Elandra', 'Guia de missões', 'quest', 'elandra'),
     legacyNpc('rowan', 'Rowan', 'Ferreiro', 'merchant', 'rowan'),
     legacyNpc('mira', 'Mira', 'Alquimista', 'merchant', 'mira'),
     legacyNpc('silas', 'Silas', 'Banqueiro', 'merchant', 'silas'),
     legacyNpc('theo', 'Theo', 'Comerciante', 'merchant', 'theo'),
   ];
-  const npcIds = new Set(npcFile.definitions.map((entry) => entry?.id));
+  const npcIds = new Set(npcFile.definitions.map((entry) => entry.id));
   for (const seed of npcSeeds) if (!npcIds.has(seed.id)) npcFile.definitions.push(seed);
 
-  const monsterFile = readFile(MONSTER_STORAGE_KEY);
-  const monsterSeeds = [
+  const monsterFile = readFile<MonsterDefinition>(MONSTER_STORAGE_KEY);
+  const monsterSeeds: MonsterDefinition[] = [
     legacyMonster('wolf', 'Lobo Sombrio', 'Predador da floresta', 'wolf', {
       maxHp: 90, attack: 12, moveSpeed: 2.05, expReward: 25, coinReward: 3, respawnMs: 7000,
     }, [
@@ -151,7 +154,7 @@ export function ensureLegacyStudioDefinitions() {
       { itemId: 'small_health_potion', chance: .2, min: 1, max: 1 },
     ]),
   ];
-  const monsterIds = new Set(monsterFile.definitions.map((entry) => entry?.id));
+  const monsterIds = new Set(monsterFile.definitions.map((entry) => entry.id));
   for (const seed of monsterSeeds) if (!monsterIds.has(seed.id)) monsterFile.definitions.push(seed);
 
   localStorage.setItem(NPC_STORAGE_KEY, JSON.stringify(npcFile));
