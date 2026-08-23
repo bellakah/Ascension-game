@@ -4,6 +4,8 @@ import { createNpcStudio } from './npcStudio';
 import { getNpcDefinition, NPC_ASSET_PREFIX, npcAssetId, npcIdFromAssetId, saveNpcDefinition, syncNpcDefinitionsIntoPalette } from './npcStore';
 import { openNpcRouteStudio } from './npcRouteStudio';
 
+const STUDIO_OPEN_EVENT = 'ascension-editor-studio-open';
+
 function normalizeAnimatedPreviewRects() {
   for (const entry of MAP_PALETTE_ENTRIES) {
     const sprite = entry.sprite;
@@ -29,7 +31,23 @@ export function installNpcEditorIntegration() {
   npcMode.textContent = 'NPCs';
   npcMode.title = 'Criador e editor profissional de NPCs';
   mode.appendChild(npcMode);
-  npcMode.onclick = () => studio.open();
+
+  const closeStudio = () => {
+    studio.close();
+    npcMode.classList.remove('active');
+  };
+  const openStudio = (npcId?: string) => {
+    window.dispatchEvent(new CustomEvent(STUDIO_OPEN_EVENT, { detail: { kind: 'npc' } }));
+    studio.open(npcId);
+  };
+
+  npcMode.onclick = () => openStudio();
+  root.querySelector<HTMLButtonElement>('#mep-mode-map')?.addEventListener('click', closeStudio, { capture: true });
+  root.querySelector<HTMLButtonElement>('#mep-mode-world')?.addEventListener('click', closeStudio, { capture: true });
+  window.addEventListener(STUDIO_OPEN_EVENT, (event) => {
+    const kind = (event as CustomEvent<{ kind?: string }>).detail?.kind;
+    if (kind && kind !== 'npc') closeStudio();
+  });
 
   const place = document.createElement('button');
   place.className = 'npc-primary';
@@ -42,7 +60,7 @@ export function installNpcEditorIntegration() {
     const activeId = studio.element.querySelector<HTMLButtonElement>('.npc-list-card.active')?.dataset.npc;
     if (!activeId) return;
     const definition = getNpcDefinition(activeId); if (!definition) return;
-    studio.close();
+    closeStudio();
     root.querySelector<HTMLButtonElement>('[data-rail="objects"]')?.click();
     const search = root.querySelector<HTMLInputElement>('#mep-search');
     if (search) {
@@ -67,7 +85,7 @@ export function installNpcEditorIntegration() {
     actions.className = 'npc-editor-integration-actions';
     actions.innerHTML = '<button data-npc-edit>♟ Editar NPC</button><button data-npc-route>⌁ Editar rota</button>';
     inspectorBody.appendChild(actions);
-    actions.querySelector<HTMLButtonElement>('[data-npc-edit]')!.onclick = () => studio.open(npcId);
+    actions.querySelector<HTMLButtonElement>('[data-npc-edit]')!.onclick = () => openStudio(npcId);
     actions.querySelector<HTMLButtonElement>('[data-npc-route]')!.onclick = () => {
       root.querySelector<HTMLButtonElement>('#mep-save')?.click();
       window.setTimeout(() => {
