@@ -1,0 +1,532 @@
+/* Desktop reference-theme polish. Intentionally desktop-only; mobile keeps the current HUD. */
+html[data-ui-mode='desktop'] #hud{
+  --ref-panel:#07161d;
+  --ref-panel-2:#0b222b;
+  --ref-panel-3:#102d36;
+  --ref-line:rgba(103,145,149,.52);
+  --ref-line-soft:rgba(125,166,166,.22);
+  --ref-gold:#c99a42;
+  --ref-gold-bright:#e6c16d;
+  --ref-red:#a63632;
+  --ref-red-bright:#d04b45;
+  --ref-blue:#1d68a2;
+  --ref-text:#e7ede9;
+  --ref-muted:#9baaa8;
+  --ref-shadow:0 14px 38px rgba(0,0,0,.46);
+}
+
+/* Make the world slightly deeper so the dark-blue/gold HUD reads like the reference. */
+html[data-ui-mode='desktop'] #app>canvas{
+  filter:saturate(.93) contrast(1.055) brightness(.955);
+}
+
+/* Shared premium panel language. */
+html[data-ui-mode='desktop'] .topbar,
+html[data-ui-mode='desktop'] #quest-box,
+html[data-ui-mode='desktop'] #target-frame,
+html[data-ui-mode='desktop'] #minimap-shell,
+html[data-ui-mode='desktop'] #party-panel,
+html[data-ui-mode='desktop'] #chat-shell{
+  border-color:var(--ref-line)!important;
+  background:
+    linear-gradient(180deg,rgba(14,39,47,.97),rgba(5,18,24,.97))!important;
+  box-shadow:
+    var(--ref-shadow),
+    inset 0 0 0 1px rgba(239,202,108,.055),
+    inset 0 1px 0 rgba(255,255,255,.035)!important;
+  backdrop-filter:blur(7px) saturate(1.1)!important;
+}
+
+/* Character frame — closer to the visual hierarchy of the reference. */
+html[data-ui-mode='desktop'] .topbar{
+  width:302px!important;
+  min-height:126px!important;
+  padding:13px 13px 12px 88px!important;
+  grid-template-rows:auto auto 20px!important;
+  border-radius:8px!important;
+  overflow:hidden!important;
+}
+html[data-ui-mode='desktop'] .topbar::before{
+  content:'✦';
+  position:absolute;
+  left:12px;
+  top:12px;
+  width:62px;
+  height:82px;
+  display:grid;
+  place-items:center;
+  border:1px solid rgba(220,183,91,.58);
+  border-radius:6px;
+  color:#e1ba5e;
+  font-size:29px;
+  text-shadow:0 2px 12px rgba(226,181,76,.35);
+  background:
+    radial-gradient(circle at 50% 33%,rgba(82,121,124,.34),transparent 47%),
+    linear-gradient(180deg,#142d35,#081920);
+  box-shadow:inset 0 0 0 2px rgba(0,0,0,.34),0 4px 12px rgba(0,0,0,.34);
+}
+html[data-ui-mode='desktop'] .topbar::after{
+  content:'PERSONAGEM';
+  position:absolute;
+  left:16px;
+  top:99px;
+  width:54px;
+  color:#9aa9a7;
+  font-size:6px;
+  font-weight:900;
+  letter-spacing:.13em;
+  text-align:center;
+}
+html[data-ui-mode='desktop'] .topbar .brand{
+  font-family:Georgia,'Times New Roman',serif!important;
+  font-size:16px!important;
+  font-weight:700!important;
+  color:#f1eee4!important;
+  text-shadow:0 1px 2px #000!important;
+}
+html[data-ui-mode='desktop'] .topbar .brand span{
+  display:block!important;
+  margin-top:1px!important;
+  font-family:inherit!important;
+  font-size:9px!important;
+  color:#a8b2ae!important;
+}
+html[data-ui-mode='desktop'] .player-progression{
+  align-items:center!important;
+  gap:8px!important;
+  color:var(--ref-gold-bright)!important;
+  font-size:9px!important;
+}
+html[data-ui-mode='desktop'] .player-progression strong{
+  padding:2px 5px;
+  border-radius:3px;
+  background:rgba(201,154,66,.12);
+  color:#f4d582;
+}
+html[data-ui-mode='desktop'] .coins{
+  align-items:center!important;
+  color:#edc25e!important;
+  font-size:10px!important;
+}
+html[data-ui-mode='desktop'] .hp-shell{
+  height:18px!important;
+  border-color:rgba(221,120,109,.34)!important;
+  border-radius:3px!important;
+  background:#351314!important;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.44)!important;
+}
+html[data-ui-mode='desktop'] #hp-fill{
+  background:linear-gradient(180deg,#d24b45,#9e2d2d)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18)!important;
+}
+html[data-ui-mode='desktop'] #hp-text{
+  font-family:Georgia,'Times New Roman',serif!important;
+  font-size:9px!important;
+  font-weight:800!important;
+}
+
+/* Quest tracker. */
+html[data-ui-mode='desktop'] #quest-box{
+  top:151px!important;
+  width:302px!important;
+  min-height:116px!important;
+  max-height:260px!important;
+  padding:0 13px 13px!important;
+  border-radius:7px!important;
+}
+html[data-ui-mode='desktop'] #quest-box strong{
+  margin:0 -13px 11px!important;
+  padding:9px 12px!important;
+  border-bottom:1px solid rgba(198,157,67,.24)!important;
+  color:#e2bd67!important;
+  background:linear-gradient(90deg,rgba(192,143,50,.12),transparent 72%)!important;
+  font-family:Georgia,'Times New Roman',serif!important;
+  font-size:12px!important;
+  letter-spacing:.02em!important;
+  text-transform:none!important;
+}
+html[data-ui-mode='desktop'] #quest-text{
+  position:relative;
+  padding-left:14px;
+  color:#b9c5c1!important;
+  font-size:10px!important;
+  line-height:1.55!important;
+}
+html[data-ui-mode='desktop'] #quest-text::before{
+  content:'›';
+  position:absolute;
+  left:1px;
+  top:-1px;
+  color:var(--ref-gold-bright);
+  font-size:15px;
+  line-height:1;
+}
+
+/* Target frame: stronger, less flat, like a compact enemy unit-frame. */
+html[data-ui-mode='desktop'] #target-frame{
+  width:360px!important;
+  min-height:54px!important;
+  padding:8px 11px 9px 65px!important;
+  border-color:rgba(202,156,67,.62)!important;
+  border-radius:7px!important;
+  background:linear-gradient(180deg,#102830,#07171d)!important;
+}
+html[data-ui-mode='desktop'] #target-frame::before{
+  content:'✦';
+  position:absolute;
+  left:9px;
+  top:8px;
+  width:43px;
+  height:38px;
+  display:grid;
+  place-items:center;
+  border:1px solid rgba(209,167,74,.52);
+  border-radius:5px;
+  color:#d9ae52;
+  font-size:18px;
+  background:linear-gradient(180deg,#193943,#0a2027);
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.45);
+}
+html[data-ui-mode='desktop'] .target-head{
+  margin-bottom:5px!important;
+}
+html[data-ui-mode='desktop'] #target-name{
+  font-family:Georgia,'Times New Roman',serif!important;
+  font-size:13px!important;
+  color:#f3efe1!important;
+  text-shadow:0 1px 2px #000;
+}
+html[data-ui-mode='desktop'] #target-meta{
+  color:#c9a75b!important;
+  font-size:7px!important;
+  font-weight:900!important;
+}
+html[data-ui-mode='desktop'] .target-hp{
+  height:13px!important;
+  border-radius:2px!important;
+  border-color:rgba(216,113,105,.34)!important;
+  background:#2e1113!important;
+}
+html[data-ui-mode='desktop'] #target-hp-fill{
+  background:linear-gradient(180deg,#d74945,#a62d2f)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.14)!important;
+}
+html[data-ui-mode='desktop'] #target-hp-text{
+  font-size:7px!important;
+  letter-spacing:.02em;
+}
+
+/* Minimap. */
+html[data-ui-mode='desktop'] #minimap-shell{
+  width:226px!important;
+  height:220px!important;
+  padding:8px!important;
+  border-radius:7px!important;
+}
+html[data-ui-mode='desktop'] .minimap-heading{
+  height:27px!important;
+  padding:0 4px 6px!important;
+  border-bottom:1px solid rgba(198,157,67,.18);
+  color:#b6c3bf!important;
+}
+html[data-ui-mode='desktop'] .minimap-heading b{
+  font-family:Georgia,'Times New Roman',serif!important;
+  color:#eee9dc!important;
+  font-size:12px!important;
+}
+html[data-ui-mode='desktop'] .minimap-north{
+  width:19px!important;
+  height:19px!important;
+  border-color:rgba(202,163,74,.43)!important;
+  color:#ddb965!important;
+  font-size:8px!important;
+}
+html[data-ui-mode='desktop'] #minimap-canvas{
+  width:208px!important;
+  height:153px!important;
+  margin-top:7px;
+  border-radius:4px!important;
+  border-color:rgba(149,180,177,.28)!important;
+  filter:saturate(.88) brightness(.86) contrast(1.06);
+}
+html[data-ui-mode='desktop'] .minimap-footer{
+  color:#829592!important;
+  font-size:8px!important;
+}
+html[data-ui-mode='desktop'] .minimap-footer strong{
+  color:#c9b177!important;
+}
+
+/* Party appears only when the multiplayer bridge supplies real members. */
+html[data-ui-mode='desktop'] #party-panel{
+  top:244px!important;
+  width:226px!important;
+  padding:0 9px 9px!important;
+  border-radius:7px!important;
+}
+html[data-ui-mode='desktop'] .party-title{
+  min-height:35px;
+  margin:0 -9px 7px!important;
+  padding:0 10px!important;
+  border-bottom:1px solid rgba(198,157,67,.2);
+  color:#e6ddd0!important;
+  font-family:Georgia,'Times New Roman',serif!important;
+  font-size:12px!important;
+  letter-spacing:.01em!important;
+  text-transform:none!important;
+}
+html[data-ui-mode='desktop'] .party-member{
+  grid-template-columns:39px 1fr!important;
+  padding:5px!important;
+  border-radius:4px!important;
+  background:rgba(12,31,37,.9)!important;
+  border-color:rgba(104,143,145,.2)!important;
+}
+html[data-ui-mode='desktop'] .party-member-avatar{
+  width:39px!important;
+  height:39px!important;
+  border:1px solid rgba(194,153,64,.32);
+  border-radius:4px!important;
+  background:linear-gradient(180deg,#25414a,#10262d)!important;
+  color:#e7c873!important;
+}
+html[data-ui-mode='desktop'] .party-hp{
+  height:6px!important;
+  border:1px solid rgba(130,64,63,.45);
+  background:#261214!important;
+}
+html[data-ui-mode='desktop'] .party-hp i{
+  background:linear-gradient(180deg,#d34c47,#9e2c2e)!important;
+}
+
+/* Chat: use the same dark navy/gold language as the reference. */
+html[data-ui-mode='desktop'] #chat-shell{
+  left:12px!important;
+  bottom:88px!important;
+  width:302px!important;
+  height:282px!important;
+  border-radius:7px!important;
+}
+html[data-ui-mode='desktop'] .chat-header{
+  min-height:38px!important;
+  border-bottom-color:rgba(198,157,67,.2)!important;
+  background:linear-gradient(90deg,rgba(198,157,67,.08),rgba(12,34,41,.9))!important;
+}
+html[data-ui-mode='desktop'] .chat-header>div:first-child>span{
+  color:#cfa954!important;
+}
+html[data-ui-mode='desktop'] .chat-header strong{
+  font-family:Georgia,'Times New Roman',serif!important;
+  font-size:12px!important;
+  color:#eae8df!important;
+}
+html[data-ui-mode='desktop'] .chat-tabs{
+  gap:0!important;
+  padding:0!important;
+  border-bottom-color:rgba(94,131,136,.25)!important;
+  background:#071820!important;
+}
+html[data-ui-mode='desktop'] .chat-tab{
+  min-height:31px!important;
+  padding:0 12px!important;
+  border-radius:0!important;
+  border-right:1px solid rgba(95,132,136,.2)!important;
+  color:#98aaa7!important;
+}
+html[data-ui-mode='desktop'] .chat-tab.active{
+  border-color:transparent!important;
+  border-bottom:2px solid #c79b45!important;
+  background:#0d2b36!important;
+  color:#f0eee6!important;
+}
+html[data-ui-mode='desktop'] .chat-messages{
+  padding:8px 9px!important;
+  scrollbar-color:#31525a #08191f!important;
+}
+html[data-ui-mode='desktop'] .chat-message{
+  border-bottom-color:rgba(89,127,131,.1)!important;
+}
+html[data-ui-mode='desktop'] .chat-message-body{
+  color:#c2cfcc!important;
+}
+html[data-ui-mode='desktop'] .chat-time{
+  color:#657c7c!important;
+}
+html[data-ui-mode='desktop'] .chat-composer{
+  border-top-color:rgba(198,157,67,.16)!important;
+  background:#07171d!important;
+}
+html[data-ui-mode='desktop'] .chat-composer input{
+  border-radius:3px!important;
+  border-color:rgba(106,145,148,.34)!important;
+  background:#091d24!important;
+}
+html[data-ui-mode='desktop'] .chat-composer input:focus{
+  border-color:rgba(207,169,84,.55)!important;
+  box-shadow:0 0 0 1px rgba(207,169,84,.11)!important;
+}
+html[data-ui-mode='desktop'] .chat-composer button{
+  border-radius:3px!important;
+  border-color:rgba(189,151,65,.4)!important;
+  background:#17363c!important;
+  color:#e5c66e!important;
+}
+
+/* Hotbar becomes the strongest element at the bottom center. */
+html[data-ui-mode='desktop'] #skill-bar{
+  bottom:22px!important;
+  gap:4px!important;
+}
+html[data-ui-mode='desktop'] #skill-bar::before{
+  content:'✦';
+  position:absolute;
+  left:50%;
+  top:-21px;
+  z-index:3;
+  width:38px;
+  height:29px;
+  display:grid;
+  place-items:center;
+  transform:translateX(-50%);
+  border:1px solid rgba(215,176,79,.55);
+  border-radius:50% 50% 6px 6px;
+  background:linear-gradient(180deg,#173740,#081a20);
+  color:#e1b957;
+  font-size:16px;
+  box-shadow:0 5px 14px rgba(0,0,0,.4),inset 0 0 0 2px rgba(0,0,0,.35);
+}
+html[data-ui-mode='desktop'] .skill-energy{
+  width:344px!important;
+  height:18px;
+  padding:4px 7px!important;
+  border-radius:3px!important;
+  border-color:rgba(106,145,148,.34)!important;
+  background:#07171d!important;
+}
+html[data-ui-mode='desktop'] .skill-energy-track{
+  height:6px!important;
+  background:#112930!important;
+}
+html[data-ui-mode='desktop'] #skill-energy-fill{
+  background:linear-gradient(90deg,#226eaa,#55a6d1)!important;
+}
+html[data-ui-mode='desktop'] .skill-buttons{
+  gap:4px!important;
+  padding:7px 8px 6px!important;
+  border:1px solid rgba(198,157,67,.42)!important;
+  border-radius:6px!important;
+  background:linear-gradient(180deg,#0d2830,#06171d)!important;
+  box-shadow:0 12px 32px rgba(0,0,0,.46),inset 0 0 0 1px rgba(255,255,255,.025)!important;
+}
+html[data-ui-mode='desktop'] .skill-button{
+  width:58px!important;
+  height:58px!important;
+  border-radius:4px!important;
+  border-color:rgba(207,167,77,.42)!important;
+  background:linear-gradient(145deg,#213640,#0b1d24)!important;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.58),0 2px 6px rgba(0,0,0,.3)!important;
+}
+html[data-ui-mode='desktop'] .skill-button:hover:not(:disabled){
+  border-color:#deb45c!important;
+  box-shadow:inset 0 0 0 1px rgba(238,194,96,.18),0 0 12px rgba(214,164,63,.18)!important;
+}
+html[data-ui-mode='desktop'] .skill-key{
+  top:auto!important;
+  left:0!important;
+  right:0!important;
+  bottom:-1px!important;
+  min-width:0!important;
+  height:14px!important;
+  border-radius:0!important;
+  background:rgba(2,8,10,.68)!important;
+  color:#e7d09a!important;
+  font-size:7px!important;
+}
+html[data-ui-mode='desktop'] .skill-name{
+  display:none!important;
+}
+html[data-ui-mode='desktop'] .skill-cost{
+  top:3px!important;
+  right:4px!important;
+  color:#93d7ff!important;
+}
+
+/* Utility action strip, inspired by the large labeled buttons on the reference. */
+html[data-ui-mode='desktop'] .utility-dock{
+  right:12px!important;
+  bottom:22px!important;
+  gap:4px!important;
+  padding:5px;
+  border:1px solid rgba(198,157,67,.34);
+  border-radius:6px;
+  background:linear-gradient(180deg,#0c252d,#06171d);
+  box-shadow:0 11px 30px rgba(0,0,0,.42);
+}
+html[data-ui-mode='desktop'] .utility-dock button{
+  width:58px!important;
+  height:64px!important;
+  padding:6px 3px 18px!important;
+  border-radius:4px!important;
+  border-color:rgba(125,160,157,.28)!important;
+  background:linear-gradient(180deg,#18343c,#0a2027)!important;
+  color:#e6d4a1!important;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.45)!important;
+}
+html[data-ui-mode='desktop'] .utility-dock button:hover{
+  border-color:rgba(221,181,85,.58)!important;
+  background:linear-gradient(180deg,#214651,#0d2931)!important;
+}
+html[data-ui-mode='desktop'] .utility-dock button::after{
+  bottom:4px!important;
+  color:#c2ceca!important;
+  font-size:7px!important;
+}
+
+/* XP rail. */
+html[data-ui-mode='desktop'] #desktop-exp-rail{
+  left:8px!important;
+  right:8px!important;
+  bottom:3px!important;
+  height:10px!important;
+  border-color:rgba(198,157,67,.5)!important;
+  border-radius:2px!important;
+  background:#06151a!important;
+}
+html[data-ui-mode='desktop'] #desktop-exp-fill{
+  background:linear-gradient(90deg,#86601e,#d6a746)!important;
+  box-shadow:inset 0 1px 0 rgba(255,230,166,.24);
+}
+html[data-ui-mode='desktop'] #desktop-exp-text{
+  color:#d8d5ca!important;
+  font-size:7px!important;
+}
+
+/* Dialogs stay above the hotbar but visually join the same theme. */
+html[data-ui-mode='desktop'] #dialog-box{
+  bottom:108px!important;
+  border:1px solid rgba(198,157,67,.38)!important;
+  border-radius:6px!important;
+  background:rgba(6,19,24,.96)!important;
+  color:#edeae0!important;
+  box-shadow:0 10px 28px rgba(0,0,0,.38)!important;
+}
+
+/* Keep smaller desktop windows usable without collapsing the visual hierarchy. */
+@media(max-width:1279px){
+  html[data-ui-mode='desktop'] .topbar,
+  html[data-ui-mode='desktop'] #quest-box,
+  html[data-ui-mode='desktop'] #chat-shell{width:270px!important}
+  html[data-ui-mode='desktop'] .topbar{padding-left:78px!important}
+  html[data-ui-mode='desktop'] .topbar::before{width:54px;height:76px}
+  html[data-ui-mode='desktop'] #minimap-shell,
+  html[data-ui-mode='desktop'] #party-panel{width:204px!important}
+  html[data-ui-mode='desktop'] #minimap-canvas{width:186px!important}
+  html[data-ui-mode='desktop'] #target-frame{width:318px!important}
+  html[data-ui-mode='desktop'] .skill-button{width:51px!important;height:51px!important}
+  html[data-ui-mode='desktop'] .utility-dock button{width:49px!important;height:58px!important}
+}
+
+@media(max-height:720px){
+  html[data-ui-mode='desktop'] #chat-shell{height:220px!important}
+  html[data-ui-mode='desktop'] #quest-box{max-height:150px!important}
+}
