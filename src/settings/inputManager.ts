@@ -2,7 +2,7 @@ import { INPUT_ACTIONS, type InputActionId } from './settingsCatalog';
 import type { SettingsStore } from './settingsState';
 
 const FRIENDLY_CODES: Record<string, string> = {
-  Space: 'Espaço', Escape: 'Esc', Enter: 'Enter', Tab: 'Tab', Backspace: 'Backspace',
+  Mouse0: 'Mouse 1', Space: 'Espaço', Escape: 'Esc', Enter: 'Enter', Tab: 'Tab', Backspace: 'Backspace',
   ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→',
   ShiftLeft: 'Shift E', ShiftRight: 'Shift D', ControlLeft: 'Ctrl E', ControlRight: 'Ctrl D',
   AltLeft: 'Alt E', AltRight: 'Alt D',

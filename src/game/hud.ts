@@ -13,27 +13,36 @@ export function createHud(progress: CharacterProgress) {
       <div class="hp-shell"><div id="hp-fill"></div><span id="hp-text"></span></div>
       <div class="coins">🪙 <span id="coins"></span></div>
     </div>
+    <div id="target-frame" class="target-frame target-hidden" aria-live="polite">
+      <div class="target-head"><strong id="target-name">Alvo</strong><span id="target-meta">INIMIGO</span></div>
+      <div class="target-hp"><div id="target-hp-fill"></div><span id="target-hp-text"></span></div>
+    </div>
     <button id="quest-toggle" type="button" aria-label="Mostrar missão" aria-expanded="false" title="Missão rastreada">📜<span>Missão</span></button>
     <div id="quest-box"><strong id="quest-title">Missão</strong><div id="quest-text"></div></div>
+    <aside id="party-panel" class="party-panel party-hidden" aria-label="Grupo">
+      <div class="party-title"><span>Grupo</span><small>Party</small></div>
+      <div id="party-members"></div>
+    </aside>
     <div id="dialog-box" class="hidden"></div>
     <div id="stick"><div id="knob"></div></div>
     <div class="utility-dock">
-      <button id="menu-button" title="Menu do Jogo" aria-label="Menu do Jogo">☰</button>
-      <button id="chat-button" title="Chat" aria-label="Chat">💬</button>
-      <button id="guild-button" title="Guilda" aria-label="Guilda">🛡</button>
-      <button id="map-button" title="Mapa Mundial" aria-label="Mapa Mundial" style="pointer-events:auto;width:42px;height:42px;border:2px solid rgba(121,190,216,.35);border-radius:12px;background:rgba(37,77,91,.94);color:#fff;font-size:18px;box-shadow:0 4px 12px rgba(0,0,0,.25);-webkit-tap-highlight-color:transparent">🗺️</button>
-      <button id="quest-journal-button" title="Diário de Missões" aria-label="Diário de Missões">📖</button>
-      <button id="pet-button" title="Mascote" aria-label="Mascote">🐾</button>
-      <button id="character-button" title="Personagem" aria-label="Personagem">👤</button>
-      <button id="inventory-button" title="Inventário" aria-label="Inventário">🎒</button>
+      <button id="menu-button" data-label="Menu" title="Menu do Jogo" aria-label="Menu do Jogo">☰</button>
+      <button id="chat-button" data-label="Chat" title="Chat" aria-label="Chat">💬</button>
+      <button id="guild-button" data-label="Guilda" title="Guilda" aria-label="Guilda">🛡</button>
+      <button id="map-button" data-label="Mapa" title="Mapa Mundial" aria-label="Mapa Mundial">🗺️</button>
+      <button id="quest-journal-button" data-label="Missões" title="Diário de Missões" aria-label="Diário de Missões">📖</button>
+      <button id="pet-button" data-label="Mascote" title="Mascote" aria-label="Mascote">🐾</button>
+      <button id="character-button" data-label="Personagem" title="Personagem" aria-label="Personagem">👤</button>
+      <button id="inventory-button" data-label="Inventário" title="Inventário" aria-label="Inventário">🎒</button>
     </div>
     <div class="action-dock">
       <button id="interact-btn" aria-label="Interagir">💬</button>
       <button id="attack-btn" aria-label="Atacar">⚔</button>
     </div>
     <div class="desktop-shortcuts" aria-hidden="true">
-      <span><kbd>WASD</kbd>Mover</span><span><kbd>Espaço</kbd>Atacar</span><span><kbd>E</kbd>Interagir</span><span><kbd>Enter</kbd>Chat</span><span><kbd>G</kbd>Guilda</span><span><kbd>M</kbd>Mapa</span><span><kbd>J</kbd>Missões</span><span><kbd>P</kbd>Mascote</span><span><kbd>I</kbd>Inventário</span><span><kbd>C</kbd>Personagem</span><span><kbd>ESC</kbd>Menu</span>
-    </div>`;
+      <span><kbd>WASD</kbd>Mover</span><span><kbd>Mouse 1</kbd>Atacar</span><span><kbd>Tab</kbd>Selecionar alvo</span><span><kbd>E</kbd>Interagir</span><span><kbd>Enter</kbd>Chat</span><span><kbd>G</kbd>Guilda</span><span><kbd>M</kbd>Mapa</span><span><kbd>J</kbd>Missões</span><span><kbd>P</kbd>Mascote</span><span><kbd>I</kbd>Inventário</span><span><kbd>C</kbd>Personagem</span><span><kbd>ESC</kbd>Menu</span>
+    </div>
+    <div id="desktop-exp-rail"><div id="desktop-exp-fill"></div><span id="desktop-exp-text"></span></div>`;
   document.body.appendChild(root);
 
   const questToggle = root.querySelector<HTMLButtonElement>('#quest-toggle')!;
@@ -50,6 +59,8 @@ export function createHud(progress: CharacterProgress) {
     coinText: root.querySelector<HTMLSpanElement>('#coins')!,
     levelText: root.querySelector<HTMLElement>('#level-text')!,
     expText: root.querySelector<HTMLElement>('#exp-text')!,
+    desktopExpFill: root.querySelector<HTMLElement>('#desktop-exp-fill')!,
+    desktopExpText: root.querySelector<HTMLElement>('#desktop-exp-text')!,
     questTitle: root.querySelector<HTMLElement>('#quest-title')!,
     questText: root.querySelector<HTMLDivElement>('#quest-text')!,
     questToggle,
@@ -75,6 +86,9 @@ export function updateHud(hud: Hud, progress: CharacterProgress, playerHp: numbe
   hud.coinText.textContent = String(coins);
   hud.levelText.textContent = `Nv. ${progress.level}`;
   hud.expText.textContent = `EXP ${progress.exp}/${progress.expToNext}`;
+  const expPct = Math.max(0, Math.min(100, progress.exp / Math.max(1, progress.expToNext) * 100));
+  hud.desktopExpFill.style.width = `${expPct}%`;
+  hud.desktopExpText.textContent = `EXP ${progress.exp} / ${progress.expToNext} (${Math.round(expPct)}%)`;
 
   const quest = getTrackedQuest(progress);
   if (!quest) {

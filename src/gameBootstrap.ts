@@ -10,7 +10,10 @@ import { prepareChatBootstrap } from './chat/chatBootstrap';
 import { prepareGuildBootstrap } from './guild/guildBootstrap';
 import { startGame } from './game/runtime';
 import './game/responsive.css';
+import './game/desktopHudV2.css';
 import { installResponsiveUi } from './game/responsive';
+import { installDesktopViewportMetrics } from './game/desktopViewport';
+import { installDesktopPartyHudBridge } from './game/partyHudBridge';
 import { preparePublishedWorldRuntime } from './map/publishedMapRuntime';
 import { subscribePublishedMap } from './map/publishedMapStore';
 import { hydrateNpcDefinitionsIntoPalette } from './npc/npcStore';
@@ -19,6 +22,7 @@ import { hydrateMonsterDefinitionsIntoPalette } from './monsterEditor/monsterSto
 
 export async function startGameApp() {
   installResponsiveUi();
+  installDesktopViewportMetrics();
   const chatBootstrap = prepareChatBootstrap();
   const guildBootstrap = prepareGuildBootstrap();
   hydrateNpcDefinitionsIntoPalette();
@@ -35,5 +39,6 @@ export async function startGameApp() {
     if (!document.querySelector('#hud')) return;
     chatBootstrap.attach();
     guildBootstrap.attach({ beforeOpen: () => chatBootstrap.chat?.close() });
+    installDesktopPartyHudBridge();
   });
 }

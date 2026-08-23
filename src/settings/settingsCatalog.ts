@@ -18,7 +18,7 @@ export const INPUT_ACTIONS: InputActionDefinition[] = [
   { id: 'moveDown', group: 'Movimento', label: 'Mover para baixo', description: 'Movimenta o personagem para o sul.', defaultCode: 'KeyS' },
   { id: 'moveLeft', group: 'Movimento', label: 'Mover para esquerda', description: 'Movimenta o personagem para oeste.', defaultCode: 'KeyA' },
   { id: 'moveRight', group: 'Movimento', label: 'Mover para direita', description: 'Movimenta o personagem para leste.', defaultCode: 'KeyD' },
-  { id: 'basicAttack', group: 'Combate', label: 'Ataque básico', description: 'Executa o ataque básico da classe.', defaultCode: 'Space' },
+  { id: 'basicAttack', group: 'Combate', label: 'Ataque básico', description: 'Executa o ataque básico da classe com o botão esquerdo do mouse.', defaultCode: 'Mouse0' },
   { id: 'interact', group: 'Combate', label: 'Interagir / coletar', description: 'Conversa, usa objetos e coleta recursos.', defaultCode: 'KeyE' },
   { id: 'skill1', group: 'Combate', label: 'Habilidade 1', description: 'Usa a habilidade do slot 1.', defaultCode: 'Digit1' },
   { id: 'skill2', group: 'Combate', label: 'Habilidade 2', description: 'Usa a habilidade do slot 2.', defaultCode: 'Digit2' },
