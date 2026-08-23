@@ -1,14 +1,33 @@
 import type { CharacterProgress } from '../character/characterCreator';
 import { getQuestState, getTrackedQuest, NPC_NAMES, questObjectiveProgress } from '../quests/questEngine';
 
+type HudIdentity = {
+  name?: string;
+  className?: string;
+  classIcon?: string;
+};
+
+const escapeHtml = (value: unknown) => String(value ?? '')
+  .replaceAll('&', '&amp;')
+  .replaceAll('<', '&lt;')
+  .replaceAll('>', '&gt;')
+  .replaceAll('"', '&quot;')
+  .replaceAll("'", '&#039;');
+
 export type Hud = ReturnType<typeof createHud>;
 
-export function createHud(progress: CharacterProgress) {
+export function createHud(progress: CharacterProgress, identity: HudIdentity = {}) {
+  const playerName = escapeHtml(identity.name || 'Aventureiro');
+  const className = escapeHtml(identity.className || 'Aventureiro');
+  const classIcon = escapeHtml(identity.classIcon || '✦');
+  const mapName = escapeHtml(progress.map || 'Mundo');
+
   const root = document.createElement('div');
   root.id = 'hud';
   root.innerHTML = `
     <div class="topbar">
-      <div class="brand">ASCENSION <span>• ${progress.map}</span></div>
+      <div class="player-portrait" aria-hidden="true"><span>${classIcon}</span></div>
+      <div class="brand"><b class="player-hud-name">${playerName}</b><span><i>${className}</i> • ${mapName}</span></div>
       <div class="player-progression"><strong id="level-text"></strong><span id="exp-text"></span></div>
       <div class="hp-shell"><div id="hp-fill"></div><span id="hp-text"></span></div>
       <div class="coins">🪙 <span id="coins"></span></div>
@@ -92,7 +111,7 @@ export function updateHud(hud: Hud, progress: CharacterProgress, playerHp: numbe
 
   const quest = getTrackedQuest(progress);
   if (!quest) {
-    hud.questTitle.textContent = 'Missões';
+    hud.questTitle.textContent = 'Missões Ativas';
     hud.questText.textContent = 'Nenhuma missão rastreada. Abra o Diário para ver missões disponíveis.';
     hud.questToggle.classList.remove('quest-ready');
     return;
