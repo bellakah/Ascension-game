@@ -31,7 +31,7 @@ export const INPUT_ACTIONS: InputActionDefinition[] = [
   { id: 'map', group: 'Interfaces', label: 'Mapa', description: 'Abre ou fecha o mapa mundial.', defaultCode: 'KeyM' },
   { id: 'guild', group: 'Interfaces', label: 'Guilda', description: 'Abre ou fecha a janela de guilda e descoberta.', defaultCode: 'KeyG' },
   { id: 'chat', group: 'Interfaces', label: 'Abrir Chat', description: 'Abre o chat e posiciona o cursor no campo de mensagem.', defaultCode: 'Enter' },
-  { id: 'menu', group: 'Interfaces', label: 'Menu do jogo', description: 'Abre o menu de pausa. ESC continua funcionando como tecla de segurança.', defaultCode: 'Escape' },
+  { id: 'menu', group: 'Interfaces', label: 'Fechar janela / limpar alvo', description: 'ESC fecha a janela aberta; sem janela aberta, remove o alvo atual. O menu de configurações abre somente pelo botão do HUD.', defaultCode: 'Escape' },
 ];
 
 export type SettingsCategoryId = 'controls' | 'graphics' | 'audio' | 'interface' | 'gameplay';
@@ -85,8 +85,10 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
   { id: 'interface.showMinimap', category: 'interface', label: 'Mostrar minimapa no PC', description: 'Exibe o minimapa permanente no desktop.', type: 'toggle' },
   { id: 'interface.showQuestTracker', category: 'interface', label: 'Rastreador de missão', description: 'Mostra a missão rastreada no HUD.', type: 'toggle' },
   { id: 'interface.showDesktopShortcuts', category: 'interface', label: 'Dicas de atalhos', description: 'Mostra a faixa de atalhos na parte inferior do PC.', type: 'toggle' },
-  { id: 'interface.showNames', category: 'interface', label: 'Nomes de personagens e monstros', description: 'Base para controle de nomes do mundo.', type: 'toggle' },
+  { id: 'interface.showNames', category: 'interface', label: 'Nomes de personagens e monstros', description: 'Controla os nomes exibidos sobre personagens e criaturas.', type: 'toggle' },
   { id: 'interface.showFloatingDamage', category: 'interface', label: 'Números flutuantes', description: 'Mostra dano, cura, EXP e coleta acima do mundo.', type: 'toggle' },
+  { id: 'interface.showPlayerHealthBar', category: 'interface', label: 'Vida sobre meu personagem', description: 'Mostra uma barra compacta de HP acima do seu personagem. Desligada por padrão para deixar a tela limpa.', type: 'toggle' },
+  { id: 'interface.showMonsterHealthBars', category: 'interface', label: 'Vida sobre monstros', description: 'Mostra barras compactas de HP sobre monstros. O target frame continua sendo a fonte principal de vida do alvo.', type: 'toggle' },
 
   { id: 'gameplay.tutorials', category: 'gameplay', label: 'Dicas e tutoriais', description: 'Permite mensagens de orientação para sistemas novos.', type: 'toggle' },
   { id: 'gameplay.confirmRareDiscard', category: 'gameplay', label: 'Confirmar descarte raro', description: 'Preparado para exigir confirmação ao descartar itens valiosos.', type: 'toggle', future: true },
