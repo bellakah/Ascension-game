@@ -32,6 +32,10 @@ function rasterSize(worldWidth: number, worldHeight: number) {
   };
 }
 
+function isFunctionalObject(object: MapObject) {
+  return object.kind === 'npc' || object.kind === 'monster' || FUNCTIONAL_ASSETS.has(object.assetId);
+}
+
 function drawPublishedTerrain(ctx: CanvasRenderingContext2D, map: AscensionMapDocument, scaleX: number, scaleY: number) {
   const now = performance.now();
   ctx.fillStyle = map.metadata.background || '#527b45';
@@ -69,7 +73,7 @@ function drawPublishedTerrain(ctx: CanvasRenderingContext2D, map: AscensionMapDo
 }
 
 function drawPublishedObject(ctx: CanvasRenderingContext2D, map: AscensionMapDocument, object: MapObject, scaleX: number, scaleY: number) {
-  if (FUNCTIONAL_ASSETS.has(object.assetId)) return;
+  if (isFunctionalObject(object)) return;
   const entry = getPaletteEntry(object.assetId);
   const x = (object.x + .5) * map.tileSize * scaleX;
   const y = (object.y + 1) * map.tileSize * scaleY;
@@ -100,7 +104,7 @@ function buildPublishedRaster(map: AscensionMapDocument, worldWidth: number, wor
   const scaleY = canvas.height / Math.max(1, worldHeight);
 
   drawPublishedTerrain(ctx, map, scaleX, scaleY);
-  const objects = map.objects.filter((object) => !FUNCTIONAL_ASSETS.has(object.assetId)).sort((a, b) => a.y - b.y);
+  const objects = map.objects.filter((object) => !isFunctionalObject(object)).sort((a, b) => a.y - b.y);
   for (const object of objects) drawPublishedObject(ctx, map, object, scaleX, scaleY);
 
   return { canvas, worldWidth, worldHeight, scaleX, scaleY, mapName: map.name, published: true };
