@@ -128,13 +128,17 @@ export function setHudPortrait(hud: Hud, src: string) {
   hud.root.classList.add('has-character-portrait');
 }
 
-export function updateHud(hud: Hud, progress: CharacterProgress, playerHp: number, coins: number, resource?: HudResource) {
-  hud.hpFill.style.width = `${Math.max(0, Math.min(100, playerHp / progress.maxHp * 100))}%`;
-  hud.hpText.textContent = `HP ${Math.max(0, Math.ceil(playerHp))}/${progress.maxHp}`;
+export function updateHudResource(hud: Hud, resource?: HudResource) {
   const resourceCurrent = Math.max(0, Number(resource?.current ?? 0));
   const resourceMax = Math.max(1, Number(resource?.max ?? 1));
   hud.resourceFill.style.width = `${Math.max(0, Math.min(100, resourceCurrent / resourceMax * 100))}%`;
   hud.resourceText.textContent = `${resource?.label || 'Recurso'} ${Math.ceil(resourceCurrent)}/${Math.ceil(resourceMax)}`;
+}
+
+export function updateHud(hud: Hud, progress: CharacterProgress, playerHp: number, coins: number, resource?: HudResource) {
+  hud.hpFill.style.width = `${Math.max(0, Math.min(100, playerHp / progress.maxHp * 100))}%`;
+  hud.hpText.textContent = `HP ${Math.max(0, Math.ceil(playerHp))}/${progress.maxHp}`;
+  updateHudResource(hud, resource);
   hud.coinText.textContent = String(coins);
   hud.levelText.textContent = `Nv. ${progress.level}`;
   hud.expText.textContent = `EXP ${progress.exp}/${progress.expToNext}`;
