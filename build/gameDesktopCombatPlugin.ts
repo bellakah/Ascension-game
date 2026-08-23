@@ -39,6 +39,13 @@ function patchRuntime(code: string) {
   return next;
 }
 
+function patchSettingsState(code: string) {
+  const anchor = "  const controls = { ...base.controls, ...(source.controls ?? {}) };";
+  if (code.includes("controls.basicAttack === 'Space'")) return code;
+  if (!code.includes(anchor)) return code;
+  return code.replace(anchor, `${anchor}\n  if (controls.basicAttack === 'Space') controls.basicAttack = 'Mouse0';`);
+}
+
 export function gameDesktopCombatPlugin(): Plugin {
   return {
     name: 'ascension-game-desktop-combat',
@@ -47,6 +54,7 @@ export function gameDesktopCombatPlugin(): Plugin {
       const clean = id.replace(/\\/g, '/').split('?')[0];
       if (clean.endsWith('/src/game/monsterSystem.ts')) return { code: patchMonsterSystem(code), map: null };
       if (clean.endsWith('/src/game/runtime.ts')) return { code: patchRuntime(code), map: null };
+      if (clean.endsWith('/src/settings/settingsState.ts')) return { code: patchSettingsState(code), map: null };
       return null;
     },
   };
