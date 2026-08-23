@@ -1,5 +1,33 @@
-/* Character identity overrides for the reference desktop HUD. */
+/* Character identity and desktop-frame overrides for the reference HUD. */
 html[data-ui-mode='desktop'] .topbar::before{display:none!important}
+
+/* A deliberate bottom frame replaces the accidental-looking empty safe-area band. */
+html[data-ui-mode='desktop'] #hud::after{
+  content:'';
+  position:fixed;
+  z-index:17;
+  left:0;
+  right:0;
+  bottom:0;
+  height:var(--desktop-hud-bottom,120px);
+  pointer-events:none;
+  border-top:1px solid rgba(193,151,62,.36);
+  background:
+    linear-gradient(180deg,rgba(8,27,33,.86),rgba(3,14,18,.985) 46%,rgba(2,11,14,.995));
+  box-shadow:0 -10px 30px rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.025);
+}
+html[data-ui-mode='desktop'] #hud::before{
+  content:'';
+  position:fixed;
+  z-index:18;
+  left:0;
+  right:0;
+  bottom:var(--desktop-hud-bottom,120px);
+  height:18px;
+  pointer-events:none;
+  background:linear-gradient(180deg,transparent,rgba(2,12,15,.2));
+}
+
 html[data-ui-mode='desktop'] .player-portrait{
   position:absolute;
   left:12px;
@@ -25,7 +53,7 @@ html[data-ui-mode='desktop'] .player-portrait span{
   position:relative;
   z-index:1;
   font-size:30px;
-  filter:drop-shadow(0 3px 5px rgba(0,0,0,.6));
+  filter:drop-shadow(0 3px 5px rgba(0,0,0,.6)) saturate(.75);
 }
 html[data-ui-mode='desktop'] .player-hud-name{
   display:block;
@@ -40,6 +68,19 @@ html[data-ui-mode='desktop'] .topbar .brand span i{
   font-style:normal;
   font-weight:700;
 }
+
+/* Keep all actionable bottom HUD elements above the frame. */
+html[data-ui-mode='desktop'] #skill-bar,
+html[data-ui-mode='desktop'] .utility-dock,
+html[data-ui-mode='desktop'] #desktop-exp-rail,
+html[data-ui-mode='desktop'] #dialog-box{z-index:48!important}
+html[data-ui-mode='desktop'] #desktop-exp-rail{z-index:49!important}
+html[data-ui-mode='desktop'] .utility-dock button{
+  font-family:Georgia,'Times New Roman',serif!important;
+  font-size:24px!important;
+  line-height:1!important;
+}
+
 @media(max-width:1279px){
   html[data-ui-mode='desktop'] .player-portrait{width:54px;height:76px}
   html[data-ui-mode='desktop'] .player-hud-name{max-width:148px}
