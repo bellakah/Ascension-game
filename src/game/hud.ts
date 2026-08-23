@@ -13,6 +13,21 @@ export type HudResource = {
   label: string;
 };
 
+type UtilityIcon = 'inventory' | 'character' | 'guild' | 'quests' | 'map' | 'pet' | 'chat' | 'settings';
+
+const UTILITY_ICON_PATHS: Record<UtilityIcon, string> = {
+  inventory: '<rect x="3.5" y="6" width="17" height="14.5" rx="2"/><path d="M8 6V4.5h8V6M8 10h8M8 14h8M8 18h5"/>',
+  character: '<circle cx="12" cy="7" r="3.4"/><path d="M5.5 20c.8-4.3 3-6.4 6.5-6.4s5.7 2.1 6.5 6.4M8.5 14.8 7 19M15.5 14.8 17 19"/>',
+  guild: '<path d="M12 3.2 19 6v5.2c0 4.4-2.6 7.6-7 9.8-4.4-2.2-7-5.4-7-9.8V6l7-2.8Z"/><path d="m9 11 2 2 4-4"/>',
+  quests: '<path d="M6 3.5h9l3 3V20H6z"/><path d="M15 3.5V7h3M9 11h6M9 14h6M9 17h4"/>',
+  map: '<path d="m4 5 5-2 6 2 5-2v16l-5 2-6-2-5 2z"/><path d="M9 3v16M15 5v16"/>',
+  pet: '<circle cx="8" cy="8" r="2"/><circle cx="16" cy="8" r="2"/><circle cx="5.5" cy="12.5" r="1.7"/><circle cx="18.5" cy="12.5" r="1.7"/><path d="M8.2 18.5c0-3 1.6-5 3.8-5s3.8 2 3.8 5c-1.1 1.3-2.4 2-3.8 2s-2.7-.7-3.8-2Z"/>',
+  chat: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>',
+  settings: '<circle cx="12" cy="12" r="3.2"/><path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6"/>',
+};
+
+const utilityIcon = (name: UtilityIcon) => `<span class="utility-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round">${UTILITY_ICON_PATHS[name]}</svg></span>`;
+
 const escapeHtml = (value: unknown) => String(value ?? '')
   .replaceAll('&', '&amp;')
   .replaceAll('<', '&lt;')
@@ -61,15 +76,16 @@ export function createHud(progress: CharacterProgress, identity: HudIdentity = {
     </aside>
     <div id="dialog-box" class="hidden"></div>
     <div id="stick"><div id="knob"></div></div>
-    <div class="utility-dock">
-      <button id="inventory-button" data-label="Inventário" title="Inventário" aria-label="Inventário">▣</button>
-      <button id="character-button" data-label="Personagem" title="Personagem" aria-label="Personagem">♙</button>
-      <button id="guild-button" data-label="Guilda" title="Guilda" aria-label="Guilda">♜</button>
-      <button id="quest-journal-button" data-label="Missões" title="Diário de Missões" aria-label="Diário de Missões">▤</button>
-      <button id="map-button" data-label="Mapa" title="Mapa Mundial" aria-label="Mapa Mundial">⌖</button>
-      <button id="pet-button" data-label="Mascote" title="Mascote" aria-label="Mascote">♞</button>
-      <button id="chat-button" data-label="Chat" title="Chat" aria-label="Chat">✉</button>
-      <button id="menu-button" data-label="Config." title="Menu do Jogo" aria-label="Menu do Jogo">⚙</button>
+    <div class="utility-dock" aria-label="Menu de atalhos">
+      <span class="utility-dock-caption">ATALHOS</span>
+      <button id="inventory-button" data-label="Inventário" data-key="I" title="Inventário (I)" aria-label="Inventário">${utilityIcon('inventory')}<span class="utility-label">Inventário</span><kbd>I</kbd></button>
+      <button id="character-button" data-label="Personagem" data-key="C" title="Personagem (C)" aria-label="Personagem">${utilityIcon('character')}<span class="utility-label">Personagem</span><kbd>C</kbd></button>
+      <button id="quest-journal-button" data-label="Missões" data-key="J" title="Diário de Missões (J)" aria-label="Diário de Missões">${utilityIcon('quests')}<span class="utility-label">Missões</span><kbd>J</kbd></button>
+      <button id="map-button" data-label="Mapa" data-key="M" title="Mapa Mundial (M)" aria-label="Mapa Mundial">${utilityIcon('map')}<span class="utility-label">Mapa</span><kbd>M</kbd></button>
+      <button id="pet-button" data-label="Mascote" data-key="P" title="Mascote (P)" aria-label="Mascote">${utilityIcon('pet')}<span class="utility-label">Mascote</span><kbd>P</kbd></button>
+      <button id="guild-button" data-label="Guilda" data-key="G" title="Guilda (G)" aria-label="Guilda">${utilityIcon('guild')}<span class="utility-label">Guilda</span><kbd>G</kbd></button>
+      <button id="chat-button" data-label="Chat" data-key="Enter" title="Chat (Enter)" aria-label="Chat">${utilityIcon('chat')}<span class="utility-label">Chat</span><kbd>↵</kbd></button>
+      <button id="menu-button" data-label="Config." data-key="" title="Configurações" aria-label="Configurações">${utilityIcon('settings')}<span class="utility-label">Config.</span><kbd>•</kbd></button>
     </div>
     <div class="action-dock">
       <button id="interact-btn" aria-label="Interagir">💬</button>

@@ -1,5 +1,5 @@
 import './chat.css';
-import { CHAT_CHANNELS, getChatChannel } from './chatCatalog';
+import { PRIMARY_CHAT_CHANNELS, getChatChannel } from './chatCatalog';
 import { createLocalChatTransport } from './localChatTransport';
 import type { ChatChannelId, ChatMessage, ChatTransport, ChatTransportContext } from './chatTypes';
 
@@ -16,12 +16,24 @@ const MEMORY_LIMIT = 200;
 const CHANNEL_COOLDOWN: Record<ChatChannelId, number> = {
   general: 450,
   global: 900,
+  party: 450,
   trade: 1500,
   guild: 450,
   private: 350,
+  system: 0,
 };
 
-function systemMessage(text: string, channel: ChatChannelId = 'general'): ChatMessage {
+const emptyCounter = (): Record<ChatChannelId, number> => ({
+  general: 0,
+  global: 0,
+  party: 0,
+  trade: 0,
+  guild: 0,
+  private: 0,
+  system: 0,
+});
+
+function systemMessage(text: string, channel: ChatChannelId = 'system'): ChatMessage {
   return {
     id: `system-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     channel,
@@ -44,8 +56,9 @@ function normalizeCommand(raw: string, currentChannel: ChatChannelId, currentRec
   const command = parts.shift()?.toLowerCase() ?? '';
   if (command === '/geral') return { channel: 'general' as const, recipient: '', text: parts.join(' ') };
   if (command === '/global') return { channel: 'global' as const, recipient: '', text: parts.join(' ') };
+  if (command === '/grupo' || command === '/party') return { channel: 'party' as const, recipient: '', text: parts.join(' ') };
   if (command === '/comercio' || command === '/trade') return { channel: 'trade' as const, recipient: '', text: parts.join(' ') };
-  if (command === '/guild') return { channel: 'guild' as const, recipient: '', text: parts.join(' ') };
+  if (command === '/guild' || command === '/guilda') return { channel: 'guild' as const, recipient: '', text: parts.join(' ') };
   if (command === '/p' || command === '/w' || command === '/pm') {
     const recipient = parts.shift() ?? '';
     return { channel: 'private' as const, recipient, text: parts.join(' ') };
@@ -56,9 +69,9 @@ function normalizeCommand(raw: string, currentChannel: ChatChannelId, currentRec
 export function createChatSystem(options: ChatSystemOptions) {
   const transport = options.transport ?? createLocalChatTransport();
   const messages: ChatMessage[] = [];
-  const unread: Record<ChatChannelId, number> = { general: 0, global: 0, trade: 0, guild: 0, private: 0 };
-  const lastSent: Record<ChatChannelId, number> = { general: 0, global: 0, trade: 0, guild: 0, private: 0 };
-  let activeChannel: ChatChannelId = 'general';
+  const unread = emptyCounter();
+  const lastSent = emptyCounter();
+  let activeChannel: ChatChannelId = 'global';
   let statusTimer = 0;
 
   const root = document.createElement('section');
@@ -66,24 +79,25 @@ export function createChatSystem(options: ChatSystemOptions) {
   root.className = 'chat-collapsed';
   root.innerHTML = `
     <header class="chat-header">
-      <div><span>ASCENSION</span><strong>Chat</strong><small id="chat-mode">● Protótipo local</small></div>
-      <div class="chat-header-actions"><button id="chat-minimize" type="button" title="Minimizar chat">−</button></div>
+      <div class="chat-heading"><span>ASCENSION</span><strong>Comunicação</strong><small id="chat-mode">Canal social</small></div>
+      <div class="chat-header-actions"><button id="chat-minimize" type="button" title="Recolher chat" aria-label="Recolher chat">−</button></div>
     </header>
-    <nav class="chat-tabs" id="chat-tabs"></nav>
+    <nav class="chat-tabs" id="chat-tabs" aria-label="Canais do chat"></nav>
     <div class="chat-private-target chat-private-hidden" id="chat-private-target"><span>Para</span><input id="chat-recipient" maxlength="20" placeholder="Nome do personagem" autocomplete="off" /></div>
     <div class="chat-messages" id="chat-messages" aria-live="polite"></div>
     <div class="chat-status" id="chat-status"></div>
     <form class="chat-composer" id="chat-form">
-      <input id="chat-input" maxlength="240" autocomplete="off" placeholder="Digite uma mensagem..." />
-      <button type="submit" title="Enviar">➤</button>
+      <input id="chat-input" maxlength="240" autocomplete="off" placeholder="Digite uma mensagem..." aria-label="Mensagem" />
+      <button id="chat-send" type="submit" title="Enviar mensagem">Enviar</button>
     </form>
-    <footer class="chat-footer"><span><kbd>Enter</kbd> conversar</span><span>/p Nome mensagem</span></footer>`;
+    <footer class="chat-footer"><span><kbd>Enter</kbd> conversar</span><span>/p Nome · /grupo · /global</span></footer>`;
   document.body.appendChild(root);
 
   const tabs = root.querySelector<HTMLElement>('#chat-tabs')!;
   const messageList = root.querySelector<HTMLElement>('#chat-messages')!;
   const form = root.querySelector<HTMLFormElement>('#chat-form')!;
   const input = root.querySelector<HTMLInputElement>('#chat-input')!;
+  const submit = root.querySelector<HTMLButtonElement>('#chat-send')!;
   const recipient = root.querySelector<HTMLInputElement>('#chat-recipient')!;
   const recipientWrap = root.querySelector<HTMLElement>('#chat-private-target')!;
   const status = root.querySelector<HTMLElement>('#chat-status')!;
@@ -178,13 +192,22 @@ export function createChatSystem(options: ChatSystemOptions) {
 
   const visibleMessages = () => messages.filter((message) => message.channel === activeChannel);
 
+  const syncComposerState = () => {
+    const channel = getChatChannel(activeChannel);
+    const readOnly = Boolean(channel.readOnly);
+    input.disabled = readOnly;
+    submit.disabled = readOnly;
+    input.placeholder = readOnly ? 'Canal de sistema — somente leitura' : 'Digite uma mensagem...';
+    root.classList.toggle('chat-readonly', readOnly);
+  };
+
   const renderMessages = () => {
     messageList.replaceChildren();
     const guild = options.getGuild?.() ?? null;
     if (activeChannel === 'guild' && !guild) {
       const empty = document.createElement('div');
       empty.className = 'chat-empty';
-      empty.innerHTML = '<span>🛡</span><strong>Você ainda não pertence a uma guilda.</strong><small>Quando o sistema de guildas entrar, este canal será liberado automaticamente.</small>';
+      empty.innerHTML = '<span>♢</span><strong>Você ainda não pertence a uma guilda.</strong><small>Quando entrar em uma guilda, este canal será liberado automaticamente.</small>';
       messageList.appendChild(empty);
     } else {
       const entries = visibleMessages();
@@ -199,20 +222,26 @@ export function createChatSystem(options: ChatSystemOptions) {
       }
     }
     recipientWrap.classList.toggle('chat-private-hidden', activeChannel !== 'private');
+    syncComposerState();
     requestAnimationFrame(() => { messageList.scrollTop = messageList.scrollHeight; });
   };
 
   const renderTabs = () => {
     tabs.replaceChildren();
-    for (const channel of CHAT_CHANNELS) {
+    const activeDefinition = getChatChannel(activeChannel);
+    const channels = activeDefinition.primaryTab ? PRIMARY_CHAT_CHANNELS : [...PRIMARY_CHAT_CHANNELS, activeDefinition];
+    for (const channel of channels) {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = `chat-tab${activeChannel === channel.id ? ' active' : ''}`;
       button.dataset.channel = channel.id;
       button.title = channel.description;
+      const icon = document.createElement('i');
+      icon.textContent = channel.icon;
+      icon.setAttribute('aria-hidden', 'true');
       const label = document.createElement('span');
-      label.textContent = `${channel.icon} ${channel.shortLabel}`;
-      button.appendChild(label);
+      label.textContent = channel.shortLabel;
+      button.append(icon, label);
       if (unread[channel.id] > 0) {
         const count = document.createElement('b');
         count.textContent = unread[channel.id] > 9 ? '9+' : String(unread[channel.id]);
@@ -245,6 +274,11 @@ export function createChatSystem(options: ChatSystemOptions) {
     activeChannel = parsed.channel;
     if (parsed.channel === 'private' && parsed.recipient) recipient.value = parsed.recipient;
     const channel = getChatChannel(parsed.channel);
+    if (channel.readOnly) {
+      setStatus('Este canal é reservado para mensagens do sistema.', 'warn');
+      renderTabs(); renderMessages();
+      return;
+    }
     const guild = options.getGuild?.() ?? null;
     if (channel.requiresGuild && !guild) {
       setStatus('Você precisa pertencer a uma guilda para falar neste canal.', 'warn');
@@ -280,19 +314,22 @@ export function createChatSystem(options: ChatSystemOptions) {
     if (event.key === 'Escape') { event.preventDefault(); recipient.blur(); }
   });
 
+  const announceState = () => window.dispatchEvent(new CustomEvent('ascension-hud-state'));
   const open = () => {
     root.classList.remove('chat-collapsed');
     minimize.textContent = '−';
+    minimize.setAttribute('aria-label', 'Recolher chat');
     unread[activeChannel] = 0;
-    renderTabs(); renderMessages(); syncPauseProxy();
+    renderTabs(); renderMessages(); syncPauseProxy(); announceState();
   };
   const close = () => {
     root.classList.add('chat-collapsed');
     minimize.textContent = '+';
-    input.blur(); recipient.blur(); setPauseProxy(false);
+    minimize.setAttribute('aria-label', 'Expandir chat');
+    input.blur(); recipient.blur(); setPauseProxy(false); announceState();
   };
   const toggle = () => isOpen() ? close() : open();
-  const focusInput = () => { open(); input.focus(); input.select(); syncPauseProxy(); };
+  const focusInput = () => { open(); if (!input.disabled) { input.focus(); input.select(); } syncPauseProxy(); };
 
   minimize.onclick = toggle;
   root.addEventListener('pointerdown', (event) => event.stopPropagation());
@@ -301,7 +338,7 @@ export function createChatSystem(options: ChatSystemOptions) {
 
   const unsubscribe = transport.subscribe(receive);
   void transport.connect(context());
-  receive(systemMessage('Chat iniciado em modo local. A interface já usa um transporte substituível por WebSocket quando o multiplayer entrar.'));
+  receive(systemMessage('Comunicação pronta. Avisos importantes do jogo aparecerão neste canal.'));
   renderTabs(); renderMessages();
 
   // No desktop o chat começa visível; no mobile fica apenas o botão do HUD.
