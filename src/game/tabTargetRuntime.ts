@@ -16,6 +16,11 @@ const isTyping = () => {
   return node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement || node instanceof HTMLSelectElement || (node instanceof HTMLElement && node.isContentEditable);
 };
 
+const cssPx = (name: string, fallback: number) => {
+  const value = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name));
+  return Number.isFinite(value) ? value : fallback;
+};
+
 export function installTabTargetRuntime(options: Options) {
   const { app, world, player, monsters } = options;
   const ring = new Graphics();
@@ -75,14 +80,25 @@ export function installTabTargetRuntime(options: Options) {
     return id ? monsters.find((monster) => monster.id === id && monster.alive) ?? null : null;
   };
 
+  const insideSafeViewport = (monster: Monster) => {
+    const left = cssPx('--desktop-hud-left', 320);
+    const right = cssPx('--desktop-hud-right', 250);
+    const top = cssPx('--desktop-hud-top', 88);
+    const bottom = cssPx('--desktop-hud-bottom', 120);
+    const screenX = monster.view.x + world.x;
+    const screenY = monster.view.y + world.y;
+    return screenX >= left && screenX <= app.screen.width - right && screenY >= top && screenY <= app.screen.height - bottom;
+  };
+
   const cycle = (reverse = false) => {
     const candidates = monsters
       .filter((monster) => monster.alive)
       .filter((monster) => Math.hypot(monster.view.x - player.x, monster.view.y - player.y) <= 900)
+      .filter(insideSafeViewport)
       .sort((a, b) => Math.hypot(a.view.x - player.x, a.view.y - player.y) - Math.hypot(b.view.x - player.x, b.view.y - player.y));
     if (!candidates.length) { setTarget(null); return; }
     const current = selected ?? currentFromGlobal();
-    const index = current ? candidates.findIndex((monster) => monster.id === current!.id) : -1;
+    const index = current ? candidates.findIndex((monster) => monster.id === current.id) : -1;
     const nextIndex = reverse
       ? (index <= 0 ? candidates.length - 1 : index - 1)
       : (index < 0 || index >= candidates.length - 1 ? 0 : index + 1);
@@ -108,14 +124,14 @@ export function installTabTargetRuntime(options: Options) {
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
-    if (event.code !== 'Tab' || options.uiOpen() || isTyping()) return;
+    if (document.documentElement.dataset.uiMode !== 'desktop' || event.code !== 'Tab' || options.uiOpen() || isTyping()) return;
     event.preventDefault();
     event.stopPropagation();
     cycle(event.shiftKey);
   };
 
   const onPointerDown = (event: PointerEvent) => {
-    if (event.button !== 0 || options.uiOpen() || isTyping()) return;
+    if (document.documentElement.dataset.uiMode !== 'desktop' || event.button !== 0 || options.uiOpen() || isTyping()) return;
     const clicked = monsterAtPointer(event);
     if (clicked) setTarget(clicked);
     options.attack();
