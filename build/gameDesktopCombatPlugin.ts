@@ -26,6 +26,13 @@ function patchRuntime(code: string) {
 
   next = next.replace("      if (event.code === 'Space') attack();", "      if (event.code === 'Space') event.preventDefault();");
 
+  if (!next.includes("createHud(progress, { name: config.name, className: classDef.name, classIcon: classDef.icon })")) {
+    next = next.replace(
+      "    const hud = createHud(progress);",
+      "    const hud = createHud(progress, { name: config.name, className: classDef.name, classIcon: classDef.icon });",
+    );
+  }
+
   if (!next.includes('installTabTargetRuntime({ app, world, player, monsters, attack, uiOpen })')) {
     next = next.replace(
       "    hud.attack.addEventListener('pointerdown', attack);",
