@@ -14,6 +14,7 @@ import './game/desktopHudV2.css';
 import './game/desktopHudReference.css';
 import './game/desktopHudIdentity.css';
 import './game/desktopHudStep1.css';
+import './game/desktopHudStage2.css';
 import { installResponsiveUi } from './game/responsive';
 import { installDesktopViewportMetrics } from './game/desktopViewport';
 import { installDesktopPartyHudBridge } from './game/partyHudBridge';
