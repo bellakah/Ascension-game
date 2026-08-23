@@ -1,0 +1,88 @@
+/* Desktop HUD — hotfix visual da Etapa 3. Mobile permanece intocado. */
+
+/*
+ * CHAT
+ * O layout anterior reservava uma linha para o destinatário privado mesmo quando
+ * esse bloco estava com display:none. Isso deslocava mensagens/status/composer e
+ * fazia o rodapé parecer estar por cima do campo de texto.
+ */
+html[data-ui-mode='desktop'] #chat-shell{
+  grid-template-rows:36px 34px minmax(0,1fr) 18px 42px!important;
+}
+
+html[data-ui-mode='desktop'] #chat-shell:has(.chat-private-target:not(.chat-private-hidden)){
+  grid-template-rows:36px 34px 38px minmax(0,1fr) 18px 42px!important;
+}
+
+html[data-ui-mode='desktop'] #chat-shell.chat-collapsed{
+  grid-template-rows:38px!important;
+}
+
+html[data-ui-mode='desktop'] .chat-messages{
+  min-height:0!important;
+  overflow:auto!important;
+}
+
+html[data-ui-mode='desktop'] .chat-status{
+  height:18px!important;
+  min-height:18px!important;
+  box-sizing:border-box!important;
+}
+
+html[data-ui-mode='desktop'] .chat-composer{
+  height:42px!important;
+  min-height:42px!important;
+  box-sizing:border-box!important;
+  align-items:center!important;
+}
+
+/* O rodapé antigo era o elemento visível por baixo do composer na captura. */
+html[data-ui-mode='desktop'] .chat-footer{
+  display:none!important;
+}
+
+/*
+ * DOCK
+ * Neutraliza pseudo-elementos herdados de estilos antigos e elimina o movimento
+ * vertical no hover, que podia fazer a borda do botão entrar/sair do ponteiro e
+ * gerar o efeito de "piscar".
+ */
+html[data-ui-mode='desktop'] .utility-dock button::before,
+html[data-ui-mode='desktop'] .utility-dock button::after{
+  content:none!important;
+  display:none!important;
+  pointer-events:none!important;
+}
+
+html[data-ui-mode='desktop'] .utility-dock button,
+html[data-ui-mode='desktop'] .utility-dock button:hover,
+html[data-ui-mode='desktop'] .utility-dock button:focus-visible{
+  transform:none!important;
+}
+
+html[data-ui-mode='desktop'] .utility-dock button kbd,
+html[data-ui-mode='desktop'] .utility-icon,
+html[data-ui-mode='desktop'] .utility-label{
+  pointer-events:none!important;
+}
+
+/* Configuração não possui atalho de teclado: remove o ponto decorativo do canto. */
+html[data-ui-mode='desktop'] #menu-button kbd{
+  display:none!important;
+}
+
+/* Remove definitivamente a estrela ornamental herdada acima da hotbar. */
+html[data-ui-mode='desktop'] #skill-bar::before{
+  content:none!important;
+  display:none!important;
+}
+
+@media(max-width:1279px){
+  html[data-ui-mode='desktop'] #chat-shell{
+    grid-template-rows:36px 34px minmax(0,1fr) 18px 42px!important;
+  }
+
+  html[data-ui-mode='desktop'] #chat-shell:has(.chat-private-target:not(.chat-private-hidden)){
+    grid-template-rows:36px 34px 38px minmax(0,1fr) 18px 42px!important;
+  }
+}
