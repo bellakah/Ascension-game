@@ -1,7 +1,17 @@
+import { MAP_PALETTE_ENTRIES } from '../editor/map/mapEditorCatalog';
 import { loadOrCreateActiveMap } from '../editor/map/mapEditorStorage';
 import { createNpcStudio } from './npcStudio';
-import { getNpcDefinition, NPC_ASSET_PREFIX, npcAssetId, npcIdFromAssetId, syncNpcDefinitionsIntoPalette } from './npcStore';
+import { getNpcDefinition, NPC_ASSET_PREFIX, npcAssetId, npcIdFromAssetId, saveNpcDefinition, syncNpcDefinitionsIntoPalette } from './npcStore';
 import { openNpcRouteStudio } from './npcRouteStudio';
+
+function normalizeAnimatedPreviewRects() {
+  for (const entry of MAP_PALETTE_ENTRIES) {
+    const sprite = entry.sprite;
+    const firstFrame = sprite?.animation?.frames[0];
+    if (!sprite || sprite.sourceRect || !firstFrame) continue;
+    sprite.sourceRect = { x: firstFrame.x, y: firstFrame.y, width: firstFrame.width, height: firstFrame.height };
+  }
+}
 
 export function installNpcEditorIntegration() {
   const root = document.querySelector<HTMLElement>('.mep');
@@ -9,7 +19,9 @@ export function installNpcEditorIntegration() {
   const inspectorBody = root?.querySelector<HTMLElement>('#mep-inspector-body');
   if (!root || !mode || !inspectorBody || root.dataset.npcStudioInstalled === '1') return;
   root.dataset.npcStudioInstalled = '1';
+  normalizeAnimatedPreviewRects();
   syncNpcDefinitionsIntoPalette();
+  normalizeAnimatedPreviewRects();
 
   const studio = createNpcStudio(root);
   const npcMode = document.createElement('button');
@@ -75,8 +87,26 @@ export function installNpcEditorIntegration() {
   observer.observe(inspectorBody, { childList: true, subtree: true });
   enhanceInspector();
 
+  window.addEventListener('ascension-asset-preset-change', (event) => {
+    const detail = (event as CustomEvent<{ assetId?: string; preset?: { scale?: number } }>).detail;
+    const assetId = detail?.assetId ?? '';
+    if (!assetId.startsWith(NPC_ASSET_PREFIX)) return;
+    const npcId = npcIdFromAssetId(assetId);
+    if (!npcId) return;
+    const definition = getNpcDefinition(npcId);
+    if (!definition) return;
+    const scale = Number(detail?.preset?.scale);
+    if (!Number.isFinite(scale)) return;
+    definition.appearance.scale = Math.max(.1, Math.min(10, scale));
+    saveNpcDefinition(definition);
+    syncNpcDefinitionsIntoPalette();
+    normalizeAnimatedPreviewRects();
+    window.dispatchEvent(new Event('resize'));
+  });
+
   window.addEventListener('ascension-npc-definitions-change', () => {
     syncNpcDefinitionsIntoPalette();
+    normalizeAnimatedPreviewRects();
     window.dispatchEvent(new Event('resize'));
   });
 }
