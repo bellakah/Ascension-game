@@ -14,10 +14,12 @@ if (playtest === 'map') {
   });
 } else if (editor === 'map') {
   void Promise.all([
+    import('./editor/studioLegacyMigration'),
     import('./npc/npcStore'),
     import('./monsterEditor/monsterStore'),
     import('./editor/map/mapEditorProApp'),
-  ]).then(async ([{ hydrateNpcDefinitionsIntoPalette }, { hydrateMonsterDefinitionsIntoPalette }, { startMapEditor }]) => {
+  ]).then(async ([{ ensureLegacyStudioDefinitions }, { hydrateNpcDefinitionsIntoPalette }, { hydrateMonsterDefinitionsIntoPalette }, { startMapEditor }]) => {
+    ensureLegacyStudioDefinitions();
     hydrateNpcDefinitionsIntoPalette();
     hydrateMonsterDefinitionsIntoPalette();
     await startMapEditor();
@@ -29,6 +31,8 @@ if (playtest === 'map') {
     installNpcEditorIntegration();
     const { installMonsterEditorIntegration } = await import('./monsterEditor/monsterEditorIntegration');
     installMonsterEditorIntegration();
+    const { installStudioAppearanceUx } = await import('./editor/studioAppearanceUx');
+    installStudioAppearanceUx();
   });
 } else {
   void import('./gameBootstrap').then(({ startGameApp }) => startGameApp());
