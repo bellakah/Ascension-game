@@ -7,6 +7,12 @@ type HudIdentity = {
   classIcon?: string;
 };
 
+export type HudResource = {
+  current: number;
+  max: number;
+  label: string;
+};
+
 const escapeHtml = (value: unknown) => String(value ?? '')
   .replaceAll('&', '&amp;')
   .replaceAll('<', '&lt;')
@@ -26,11 +32,22 @@ export function createHud(progress: CharacterProgress, identity: HudIdentity = {
   root.id = 'hud';
   root.innerHTML = `
     <div class="topbar">
-      <div class="player-portrait" aria-hidden="true"><span>${classIcon}</span></div>
-      <div class="brand"><b class="player-hud-name">${playerName}</b><span><i>${className}</i> • ${mapName}</span></div>
-      <div class="player-progression"><strong id="level-text"></strong><span id="exp-text"></span></div>
-      <div class="hp-shell"><div id="hp-fill"></div><span id="hp-text"></span></div>
-      <div class="coins">🪙 <span id="coins"></span></div>
+      <div class="player-portrait" aria-label="Retrato do personagem">
+        <img id="player-portrait-image" alt="" hidden>
+        <span id="player-portrait-fallback">${classIcon}</span>
+      </div>
+      <div class="brand">
+        <b class="player-hud-name">${playerName}</b>
+        <span><i>${className}</i><em>${mapName}</em></span>
+      </div>
+      <div class="player-meta-row">
+        <div class="player-progression"><strong id="level-text"></strong><span id="exp-text"></span></div>
+        <div class="coins" title="Moedas">● <span id="coins"></span></div>
+      </div>
+      <div class="player-vitals">
+        <div class="hp-shell"><div id="hp-fill"></div><span id="hp-text"></span></div>
+        <div class="resource-shell"><div id="resource-fill"></div><span id="resource-text"></span></div>
+      </div>
     </div>
     <div id="target-frame" class="target-frame target-hidden" aria-live="polite">
       <div class="target-head"><strong id="target-name">Alvo</strong><span id="target-meta">INIMIGO</span></div>
@@ -59,7 +76,7 @@ export function createHud(progress: CharacterProgress, identity: HudIdentity = {
       <button id="attack-btn" aria-label="Atacar">⚔</button>
     </div>
     <div class="desktop-shortcuts" aria-hidden="true">
-      <span><kbd>WASD</kbd>Mover</span><span><kbd>Mouse 1</kbd>Atacar</span><span><kbd>Tab</kbd>Selecionar alvo</span><span><kbd>E</kbd>Interagir</span><span><kbd>Enter</kbd>Chat</span><span><kbd>G</kbd>Guilda</span><span><kbd>M</kbd>Mapa</span><span><kbd>J</kbd>Missões</span><span><kbd>P</kbd>Mascote</span><span><kbd>I</kbd>Inventário</span><span><kbd>C</kbd>Personagem</span><span><kbd>ESC</kbd>Menu</span>
+      <span><kbd>WASD</kbd>Mover</span><span><kbd>Mouse 1</kbd>Atacar</span><span><kbd>Tab</kbd>Selecionar alvo</span><span><kbd>E</kbd>Interagir</span><span><kbd>Enter</kbd>Chat</span><span><kbd>G</kbd>Guilda</span><span><kbd>M</kbd>Mapa</span><span><kbd>J</kbd>Missões</span><span><kbd>P</kbd>Mascote</span><span><kbd>I</kbd>Inventário</span><span><kbd>C</kbd>Personagem</span><span><kbd>ESC</kbd>Fechar / limpar alvo</span>
     </div>
     <div id="desktop-exp-rail"><div id="desktop-exp-fill"></div><span id="desktop-exp-text"></span></div>`;
   document.body.appendChild(root);
@@ -73,8 +90,12 @@ export function createHud(progress: CharacterProgress, identity: HudIdentity = {
 
   return {
     root,
+    portraitImage: root.querySelector<HTMLImageElement>('#player-portrait-image')!,
+    portraitFallback: root.querySelector<HTMLElement>('#player-portrait-fallback')!,
     hpFill: root.querySelector<HTMLDivElement>('#hp-fill')!,
     hpText: root.querySelector<HTMLSpanElement>('#hp-text')!,
+    resourceFill: root.querySelector<HTMLDivElement>('#resource-fill')!,
+    resourceText: root.querySelector<HTMLSpanElement>('#resource-text')!,
     coinText: root.querySelector<HTMLSpanElement>('#coins')!,
     levelText: root.querySelector<HTMLElement>('#level-text')!,
     expText: root.querySelector<HTMLElement>('#exp-text')!,
@@ -99,9 +120,25 @@ export function createHud(progress: CharacterProgress, identity: HudIdentity = {
   };
 }
 
-export function updateHud(hud: Hud, progress: CharacterProgress, playerHp: number, coins: number) {
+export function setHudPortrait(hud: Hud, src: string) {
+  if (!src) return;
+  hud.portraitImage.src = src;
+  hud.portraitImage.hidden = false;
+  hud.portraitFallback.hidden = true;
+  hud.root.classList.add('has-character-portrait');
+}
+
+export function updateHudResource(hud: Hud, resource?: HudResource) {
+  const resourceCurrent = Math.max(0, Number(resource?.current ?? 0));
+  const resourceMax = Math.max(1, Number(resource?.max ?? 1));
+  hud.resourceFill.style.width = `${Math.max(0, Math.min(100, resourceCurrent / resourceMax * 100))}%`;
+  hud.resourceText.textContent = `${resource?.label || 'Recurso'} ${Math.ceil(resourceCurrent)}/${Math.ceil(resourceMax)}`;
+}
+
+export function updateHud(hud: Hud, progress: CharacterProgress, playerHp: number, coins: number, resource?: HudResource) {
   hud.hpFill.style.width = `${Math.max(0, Math.min(100, playerHp / progress.maxHp * 100))}%`;
   hud.hpText.textContent = `HP ${Math.max(0, Math.ceil(playerHp))}/${progress.maxHp}`;
+  updateHudResource(hud, resource);
   hud.coinText.textContent = String(coins);
   hud.levelText.textContent = `Nv. ${progress.level}`;
   hud.expText.textContent = `EXP ${progress.exp}/${progress.expToNext}`;

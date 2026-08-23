@@ -16,7 +16,7 @@ function patchMonsterHealthBars(code: string) {
 
   next = next.replace(
     "  const hpBack = new Graphics().roundRect(-31 * scale, -46 * scale, 62 * scale, 7 * scale, 3).fill(0x351617); hpBack.zIndex = 4; view.addChild(hpBack);\n  const hpFill = new Graphics().roundRect(-30 * scale, -45 * scale, 60 * scale, 5 * scale, 2).fill(definition.rank === 'boss' ? 0xe28a3d : definition.rank === 'elite' ? 0xdd5f65 : 0xc94d54); hpFill.zIndex = 5; view.addChild(hpFill);",
-    "  const hpBack = new Graphics().roundRect(-23 * scale, -46 * scale, 46 * scale, 5 * scale, 2).fill(0x351617); hpBack.zIndex = 4; hpBack.label = 'monster-health-bar'; view.addChild(hpBack);\n  const hpFill = new Graphics().roundRect(0, 0, 44 * scale, 3 * scale, 1.5).fill(definition.rank === 'boss' ? 0xe28a3d : definition.rank === 'elite' ? 0xdd5f65 : 0xc94d54); hpFill.position.set(-22 * scale, -45 * scale); hpFill.zIndex = 5; hpFill.label = 'monster-health-bar'; view.addChild(hpFill);",
+    "  const hpBarY = -46 * scale;\n  const hpBack = new Graphics().roundRect(-23, hpBarY, 46, 5, 2).fill(0x351617); hpBack.zIndex = 4; hpBack.label = 'monster-health-bar'; view.addChild(hpBack);\n  const hpFill = new Graphics().roundRect(0, 0, 44, 3, 1.5).fill(definition.rank === 'boss' ? 0xe28a3d : definition.rank === 'elite' ? 0xdd5f65 : 0xc94d54); hpFill.position.set(-22, hpBarY + 1); hpFill.zIndex = 5; hpFill.label = 'monster-health-bar'; view.addChild(hpFill);",
   );
 
   return next;
@@ -42,7 +42,7 @@ function patchRuntime(code: string) {
   if (!next.includes("from './tabTargetRuntime'")) {
     next = next.replace(
       "import { createHud, showDialog, updateHud } from './hud';",
-      "import { createHud, showDialog, updateHud } from './hud';\nimport { installTabTargetRuntime } from './tabTargetRuntime';\nimport { getSafeCameraPosition } from './desktopViewport';",
+      "import { createHud, setHudPortrait, showDialog, updateHud, updateHudResource } from './hud';\nimport { installTabTargetRuntime } from './tabTargetRuntime';\nimport { getSafeCameraPosition } from './desktopViewport';",
     );
   }
 
@@ -52,6 +52,13 @@ function patchRuntime(code: string) {
     next = next.replace(
       "    const hud = createHud(progress);",
       "    const hud = createHud(progress, { name: config.name, className: classDef.name, classIcon: classDef.icon });",
+    );
+  }
+
+  if (!next.includes('renderer.extract.base64({ target: hero.view')) {
+    next = next.replace(
+      "    const hud = createHud(progress, { name: config.name, className: classDef.name, classIcon: classDef.icon });",
+      "    const hud = createHud(progress, { name: config.name, className: classDef.name, classIcon: classDef.icon });\n    void app.renderer.extract.base64({ target: hero.view, format: 'png', resolution: 2, clearColor: '#00000000' })\n      .then((portrait) => setHudPortrait(hud, portrait))\n      .catch((error) => console.warn('[HUD] Não foi possível gerar o retrato do personagem.', error));",
     );
   }
 
@@ -65,7 +72,7 @@ function patchRuntime(code: string) {
   if (!next.includes('playerHpOverhead.scale.x = Math.max(0, Math.min(1, playerHp / Math.max(1, progress.maxHp)))')) {
     next = next.replace(
       "    const refresh = () => { updateHud(hud, progress, playerHp, coins); syncNpcMarkers(); };",
-      "    const refresh = () => { updateHud(hud, progress, playerHp, coins); playerHpOverhead.scale.x = Math.max(0, Math.min(1, playerHp / Math.max(1, progress.maxHp))); syncNpcMarkers(); };",
+      "    const refresh = () => { const resource = skillController.snapshot(); updateHud(hud, progress, playerHp, coins, { current: resource.energy, max: resource.maxEnergy, label: resource.resourceLabel }); playerHpOverhead.scale.x = Math.max(0, Math.min(1, playerHp / Math.max(1, progress.maxHp))); syncNpcMarkers(); };",
     );
   }
 
@@ -84,6 +91,13 @@ function patchRuntime(code: string) {
     next = next.replace(
       "    hud.attack.addEventListener('pointerdown', attack);",
       "    hud.attack.addEventListener('pointerdown', attack);\n    installTabTargetRuntime({ app, world, player, monsters, attack, uiOpen });",
+    );
+  }
+
+  if (!next.includes('updateHudResource(hud, { current: resource.energy')) {
+    next = next.replace(
+      "      if (skillUiMs >= 100) { skillUiMs = 0; skillBar.refresh(skillController.snapshot(), uiOpen()); }",
+      "      if (skillUiMs >= 100) { skillUiMs = 0; const resource = skillController.snapshot(); skillBar.refresh(resource, uiOpen()); updateHudResource(hud, { current: resource.energy, max: resource.maxEnergy, label: resource.resourceLabel }); }",
     );
   }
 
