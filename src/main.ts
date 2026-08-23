@@ -33,6 +33,8 @@ if (playtest === 'map') {
     installMonsterEditorIntegration();
     const { installStudioAppearanceUx } = await import('./editor/studioAppearanceUx');
     installStudioAppearanceUx();
+    const { installStudioAnimationStateTabsIntegration } = await import('./editor/studioAnimationStateTabsIntegration');
+    installStudioAnimationStateTabsIntegration();
   });
 } else {
   void import('./gameBootstrap').then(({ startGameApp }) => startGameApp());
