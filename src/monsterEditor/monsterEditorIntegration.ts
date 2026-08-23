@@ -1,6 +1,8 @@
 import { createMonsterStudio } from './monsterStudio';
 import { getMonsterDefinition, monsterAssetId, monsterIdFromAssetId, syncMonsterDefinitionsIntoPalette } from './monsterStore';
 
+const STUDIO_OPEN_EVENT = 'ascension-editor-studio-open';
+
 export function installMonsterEditorIntegration() {
   const root = document.querySelector<HTMLElement>('.mep');
   const mode = root?.querySelector<HTMLElement>('.mep-mode');
@@ -15,7 +17,23 @@ export function installMonsterEditorIntegration() {
   monsterMode.textContent = 'Monstros';
   monsterMode.title = 'Criador e editor profissional de monstros';
   mode.appendChild(monsterMode);
-  monsterMode.onclick = () => studio.open();
+
+  const closeStudio = () => {
+    studio.close();
+    monsterMode.classList.remove('active');
+  };
+  const openStudio = (monsterId?: string) => {
+    window.dispatchEvent(new CustomEvent(STUDIO_OPEN_EVENT, { detail: { kind: 'monster' } }));
+    studio.open(monsterId);
+  };
+
+  monsterMode.onclick = () => openStudio();
+  root.querySelector<HTMLButtonElement>('#mep-mode-map')?.addEventListener('click', closeStudio, { capture: true });
+  root.querySelector<HTMLButtonElement>('#mep-mode-world')?.addEventListener('click', closeStudio, { capture: true });
+  window.addEventListener(STUDIO_OPEN_EVENT, (event) => {
+    const kind = (event as CustomEvent<{ kind?: string }>).detail?.kind;
+    if (kind && kind !== 'monster') closeStudio();
+  });
 
   const place = document.createElement('button');
   place.className = 'npc-primary';
@@ -28,7 +46,7 @@ export function installMonsterEditorIntegration() {
     const activeId = studio.element.querySelector<HTMLButtonElement>('.npc-list-card.active')?.dataset.monster;
     if (!activeId) return;
     const definition = getMonsterDefinition(activeId); if (!definition) return;
-    studio.close();
+    closeStudio();
     root.querySelector<HTMLButtonElement>('[data-rail="objects"]')?.click();
     const search = root.querySelector<HTMLInputElement>('#mep-search');
     if (search) { search.value = definition.name; search.dispatchEvent(new Event('input', { bubbles: true })); }
@@ -49,7 +67,7 @@ export function installMonsterEditorIntegration() {
     actions.className = 'npc-editor-integration-actions monster-editor-integration-actions';
     actions.innerHTML = '<button data-monster-edit>☠ Editar monstro</button>';
     inspectorBody.appendChild(actions);
-    actions.querySelector<HTMLButtonElement>('[data-monster-edit]')!.onclick = () => studio.open(monsterId);
+    actions.querySelector<HTMLButtonElement>('[data-monster-edit]')!.onclick = () => openStudio(monsterId);
   };
 
   const observer = new MutationObserver(enhanceInspector);
