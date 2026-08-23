@@ -45,14 +45,14 @@ export function createHud(progress: CharacterProgress, identity: HudIdentity = {
     <div id="dialog-box" class="hidden"></div>
     <div id="stick"><div id="knob"></div></div>
     <div class="utility-dock">
-      <button id="menu-button" data-label="Menu" title="Menu do Jogo" aria-label="Menu do Jogo">☰</button>
-      <button id="chat-button" data-label="Chat" title="Chat" aria-label="Chat">💬</button>
-      <button id="guild-button" data-label="Guilda" title="Guilda" aria-label="Guilda">🛡</button>
-      <button id="map-button" data-label="Mapa" title="Mapa Mundial" aria-label="Mapa Mundial">🗺️</button>
-      <button id="quest-journal-button" data-label="Missões" title="Diário de Missões" aria-label="Diário de Missões">📖</button>
-      <button id="pet-button" data-label="Mascote" title="Mascote" aria-label="Mascote">🐾</button>
-      <button id="character-button" data-label="Personagem" title="Personagem" aria-label="Personagem">👤</button>
-      <button id="inventory-button" data-label="Inventário" title="Inventário" aria-label="Inventário">🎒</button>
+      <button id="inventory-button" data-label="Inventário" title="Inventário" aria-label="Inventário">▣</button>
+      <button id="character-button" data-label="Personagem" title="Personagem" aria-label="Personagem">♙</button>
+      <button id="guild-button" data-label="Guilda" title="Guilda" aria-label="Guilda">♜</button>
+      <button id="quest-journal-button" data-label="Missões" title="Diário de Missões" aria-label="Diário de Missões">▤</button>
+      <button id="map-button" data-label="Mapa" title="Mapa Mundial" aria-label="Mapa Mundial">⌖</button>
+      <button id="pet-button" data-label="Mascote" title="Mascote" aria-label="Mascote">♞</button>
+      <button id="chat-button" data-label="Chat" title="Chat" aria-label="Chat">✉</button>
+      <button id="menu-button" data-label="Config." title="Menu do Jogo" aria-label="Menu do Jogo">⚙</button>
     </div>
     <div class="action-dock">
       <button id="interact-btn" aria-label="Interagir">💬</button>
