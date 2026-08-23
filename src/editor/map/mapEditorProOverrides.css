@@ -1,19 +1,21 @@
 .mep .hidden{display:none!important}
 
-/* O mapa é a área principal: os painéis ocupam espaço próprio em vez de cobrir o canvas. */
-.mep{--rail:54px;--panel:232px;--inspector:270px}
+/* O mapa continua sendo a área principal, mas a biblioteca ganha espaço suficiente para previews legíveis. */
+.mep{--rail:54px;--panel:320px;--inspector:270px}
 .mep-rail{padding:10px 7px 8px;gap:7px}
-.mep-rail button{width:38px;height:38px}
-.mep-context{padding-left:14px}
+.mep-rail button{width:38px;height:38px;flex:0 0 auto}
+.mep-context{padding-left:14px;min-height:42px}
 
-.mep-panel{left:0;width:var(--panel);box-shadow:8px 0 18px rgba(0,0,0,.14)}
+.mep-panel{left:0;width:var(--panel);min-width:0;box-shadow:8px 0 18px rgba(0,0,0,.14)}
 .mep-inspector{width:var(--inspector);box-shadow:-8px 0 18px rgba(0,0,0,.14)}
 
 .mep-stage{top:8px;right:8px;bottom:8px;left:8px;border:1px solid #173141;border-radius:8px;background:#050a0f;transition:left .16s ease,right .16s ease}
 .mep-stage-wrap:has(.mep-panel:not(.hidden)) .mep-stage{left:calc(var(--panel) + 8px)}
 .mep-stage-wrap:has(.mep-inspector:not(.hidden)) .mep-stage{right:calc(var(--inspector) + 8px)}
+body.mep-resizing-panel,body.mep-resizing-panel *{cursor:col-resize!important;user-select:none!important}
+body.mep-resizing-panel .mep-stage{transition:none}
 
-/* Renderização em camadas: terreno e objetos parados não dependem mais do canvas de interação. */
+/* Renderização em camadas: terreno e objetos parados não dependem do canvas de interação. */
 .mep-stage>.mep-render-layer{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
 .mep-stage>.mep-terrain-layer{z-index:0;pointer-events:none;will-change:transform}
 .mep-stage>.mep-object-layer{z-index:1;pointer-events:none;will-change:transform}
@@ -27,33 +29,103 @@
 .mep-minimap-float{width:178px;height:122px;right:18px;bottom:18px;opacity:.92}
 .mep-selection-bar{bottom:22px}
 
-/* Menos informação na biblioteca e mais espaço útil. */
-.mep-panel-head{height:40px}
-.mep-search{padding:7px}
-.mep-filter-row{padding:0 7px 7px}
-.mep-asset-grid{padding:5px 7px 12px;gap:6px}
-.mep-card{padding:3px}
-.mep-card strong{font-size:8px}
-.mep-card small{display:none}
+/* Borda arrastável da biblioteca. */
+.mep-panel-resizer{position:absolute;top:0;right:-5px;bottom:0;width:10px;z-index:25;cursor:col-resize;touch-action:none}
+.mep-panel-resizer::after{content:"";position:absolute;top:44%;bottom:44%;left:4px;width:2px;border-radius:2px;background:#35596d;opacity:.35;transition:opacity .15s,background .15s}
+.mep-panel-resizer:hover::after,.mep-resizing-panel .mep-panel-resizer::after{opacity:1;background:#69c8ea}
+
+/* Cabeçalho e busca têm hierarquia visual clara. */
+.mep-panel-head{height:44px;padding:8px 10px;background:linear-gradient(180deg,#0d1d28,#0a1822)}
+.mep-panel-head strong{font-size:11px;letter-spacing:1px;color:#d8eaf3}
+.mep-panel-head button{border-color:#294658;background:#0c1a24}
+.mep-search{position:relative;padding:10px 10px 7px}
+.mep-search input{width:100%;height:35px;padding-left:32px;padding-right:31px;background:#07131c;border-color:#294759}
+.mep-search-icon{position:absolute;left:20px;top:50%;transform:translateY(-46%);font-size:17px;color:#6f93a6;pointer-events:none}
+.mep-search-clear{position:absolute;right:15px;top:50%;transform:translateY(-50%);width:24px;height:24px!important;padding:0!important;border:0!important;background:transparent!important;color:#7696a6!important;opacity:0;pointer-events:none}
+.mep-search.has-value .mep-search-clear{opacity:1;pointer-events:auto}
+.mep-search.has-value .mep-search-clear:hover{color:#d9eef8!important}
+.mep-library-meta{display:flex;align-items:center;gap:8px;padding:1px 11px 8px;color:#7898aa}
+.mep-library-meta strong{font-size:9px;letter-spacing:.9px;color:#a8c3d1}
+.mep-library-count{margin-left:auto;font-size:9px;color:#668899}
+
+/* Filtros compactos: Todos + Favoritos + seletor de categoria. */
+.mep-filter-row{display:grid;grid-template-columns:auto auto minmax(0,1fr);align-items:center;gap:6px;padding:0 10px 9px;overflow:visible}
+.mep-filter-row button{height:30px;padding:5px 9px;font-size:9px;border-color:#263f50;background:#0b1923}
+.mep-filter-row .mep-filter-primary[data-category="favorites"]{width:31px;padding:0;font-size:13px}
+.mep-filter-row .mep-category-hidden{display:none!important}
+.mep-category-select{min-width:0;width:100%;height:30px!important;padding:4px 26px 4px 8px!important;font-size:9px!important;background:#0b1923!important;border-color:#263f50!important;color:#c8dce7!important}
+
+/* Grid adaptativo: 2, 3 ou 4 colunas conforme a largura escolhida pelo usuário. */
+.mep-asset-grid{padding:7px 10px 16px;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:9px;align-content:start;scrollbar-width:thin;scrollbar-color:#385667 transparent;overscroll-behavior:contain}
+.mep-asset-grid::-webkit-scrollbar,.mep-inspector-body::-webkit-scrollbar{width:6px;height:6px}
+.mep-asset-grid::-webkit-scrollbar-track,.mep-inspector-body::-webkit-scrollbar-track{background:transparent}
+.mep-asset-grid::-webkit-scrollbar-thumb,.mep-inspector-body::-webkit-scrollbar-thumb{background:#365466;border-radius:10px}
+.mep-asset-grid::-webkit-scrollbar-thumb:hover,.mep-inspector-body::-webkit-scrollbar-thumb:hover{background:#4c7185}
+
+/* Cards com preview consistente, nomes legíveis e menos ruído visual. */
+.mep-card{min-width:0;position:relative;background:#0e1d28;border:1px solid #223e4f;border-radius:9px;padding:5px;cursor:pointer;transition:border-color .12s,background .12s,transform .12s,box-shadow .12s;isolation:isolate}
+.mep-card:hover{border-color:#4c93b1;background:#122735;transform:translateY(-1px);box-shadow:0 7px 16px rgba(0,0,0,.18)}
+.mep-card.active{border-color:#69d3ff;box-shadow:0 0 0 1px rgba(105,211,255,.28),0 7px 18px rgba(0,0,0,.2)}
+.mep-card-preview{position:relative;width:100%;aspect-ratio:1/1;border-radius:6px;overflow:hidden;border:1px solid #294658;background-color:#17252e;background-image:linear-gradient(45deg,rgba(255,255,255,.035) 25%,transparent 25%),linear-gradient(-45deg,rgba(255,255,255,.035) 25%,transparent 25%),linear-gradient(45deg,transparent 75%,rgba(255,255,255,.035) 75%),linear-gradient(-45deg,transparent 75%,rgba(255,255,255,.035) 75%);background-size:14px 14px;background-position:0 0,0 7px,7px -7px,-7px 0}
+.mep-card-preview canvas{display:block;width:100%!important;height:100%!important;aspect-ratio:auto!important;background:transparent!important;border-radius:0!important}
+.mep-card strong{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;min-height:23px;margin:6px 2px 0;font-size:9px;line-height:1.25;white-space:normal;overflow:hidden;text-overflow:ellipsis;color:#d5e7f0}
+.mep-card small{display:block;margin:2px 2px 1px;color:#688797;font-size:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mep-card-badge{position:absolute;left:5px;bottom:5px;padding:2px 4px;border-radius:4px;background:rgba(5,18,26,.86);border:1px solid rgba(83,171,205,.48);color:#8edfff;font-size:7px;font-weight:800;letter-spacing:.35px;pointer-events:none}
+
+.mep-card-actions{position:absolute;left:9px;right:9px;top:9px;z-index:4;display:flex;justify-content:space-between;align-items:center;pointer-events:none}
+.mep-card-actions .star,.mep-card-menu-button{position:static!important;width:24px!important;height:24px!important;padding:0!important;border:1px solid rgba(66,104,123,.7)!important;border-radius:6px!important;background:rgba(5,15,22,.86)!important;color:#d5e8f1!important;opacity:0;transform:translateY(-2px);transition:.12s;pointer-events:auto}
+.mep-card:hover .mep-card-actions .star,.mep-card:hover .mep-card-menu-button,.mep-card:focus-within .mep-card-actions .star,.mep-card:focus-within .mep-card-menu-button,.mep-card.is-favorite .mep-card-actions .star{opacity:1;transform:none}
+.mep-card.is-favorite .mep-card-actions .star{color:#ffd86b!important}
+.mep-original-delete{display:none!important}
+.mep-card-menu-popover{display:none;position:absolute;right:7px;top:37px;z-index:20;min-width:118px;padding:4px;background:#091721;border:1px solid #315166;border-radius:7px;box-shadow:0 10px 24px rgba(0,0,0,.42)}
+.mep-card-menu-popover.open{display:flex;flex-direction:column}
+.mep-card-menu-popover button{width:100%;height:auto!important;padding:7px 8px!important;border:0!important;background:transparent!important;text-align:left;font-size:9px}
+.mep-card-menu-popover button:hover{background:#142a38!important}
+.mep-card-menu-popover button.danger{color:#ff9a9a!important}
+.mep-load-more{grid-column:1/-1;min-height:34px;margin-top:2px;border-style:dashed!important;color:#83aabc!important;background:#0a1720!important;font-size:9px!important}
+.mep-empty{grid-column:1/-1;text-align:center;padding:38px 12px;color:#6f8b9c;border:1px dashed #203a49;border-radius:9px;background:#0a1720}
+
+/* Lateral esquerda organizada em ferramentas e controles inferiores. */
+.mep-rail{background:linear-gradient(180deg,#091620,#07131c)}
+.mep-rail-bottom-group{margin-top:auto;width:100%;display:flex;flex-direction:column;align-items:center;gap:7px;padding-top:9px;border-top:1px solid #1d3544}
+.mep-rail button[data-rail="assets"]{margin-top:3px}
+.mep-rail button.active{box-shadow:inset 3px 0 0 #69cbee}
+.mep-rail-bottom-group button.active{box-shadow:inset 3px 0 0 #69cbee}
+
+/* A barra de contexto preserva o essencial e esconde dicas longas quando falta espaço. */
+.mep-context{gap:7px;padding-right:10px}
+.mep-context strong{flex:0 0 auto;letter-spacing:.65px}
+.mep-context .group{min-width:0}
+.mep-context-hint{display:block;max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* Controles de iluminação usam o mesmo visual compacto dos demais controles. */
 .mep-lighting-readout{min-width:44px;text-align:center;font-size:10px;color:#d8edff;font-weight:700}
 .mep-light-color{height:31px;padding:2px!important}
 
-/* Notebook: painel fica temporariamente sobre o mapa, mas menor. */
+@media (max-width:1280px){
+  .mep-context-help{display:none!important}
+  .mep{--panel:290px}
+}
+
+/* Notebook: painel fica temporariamente sobre o mapa para preservar a área de trabalho. */
 @media (max-width:1100px){
-  .mep{--panel:208px;--inspector:245px}
+  .mep{--panel:280px;--inspector:245px}
   .mep-stage-wrap:has(.mep-panel:not(.hidden)) .mep-stage{left:8px}
   .mep-stage-wrap:has(.mep-inspector:not(.hidden)) .mep-stage{right:8px}
   .mep-stage-wrap:has(.mep-panel:not(.hidden)) .mep-chip{left:18px}
   .mep-stage-wrap:has(.mep-inspector:not(.hidden)) .mep-minimap-float{right:18px}
   .mep-panel,.mep-inspector{background:rgba(7,18,27,.965);backdrop-filter:blur(8px)}
+  .mep-brand div{display:none}
+  .mep-brand{min-width:auto}
 }
 
 @media (max-width:760px){
-  .mep{--rail:46px;--panel:min(208px,72vw);--inspector:min(250px,78vw)}
+  .mep{--rail:46px;--panel:min(280px,82vw);--inspector:min(250px,78vw)}
   .mep-rail{padding-left:4px;padding-right:4px}
   .mep-rail button{width:36px;height:36px}
+  .mep-panel-resizer{display:none}
   .mep-brand div,.mep-map-select span,.mep-top .publish{display:none}
   .mep-minimap-float{width:145px;height:98px}
+  .mep-asset-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+  .mep-filter-row{grid-template-columns:auto auto minmax(0,1fr)}
 }
