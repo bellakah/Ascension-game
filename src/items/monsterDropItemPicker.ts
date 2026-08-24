@@ -9,7 +9,12 @@ function ensureDatalist(overlay: HTMLElement) {
     list.id = LIST_ID;
     overlay.appendChild(list);
   }
-  list.innerHTML = listItemStudioRecords().map((item) => `<option value="${itemStudioDisplay(item)}">${item.key}</option>`).join('');
+
+  // O MutationObserver do Monster Studio observa a própria overlay. Reescrever o
+  // datalist em toda sincronização criava uma nova mutação, que chamava sync(),
+  // que reescrevia o datalist novamente e prendia a página em um loop de microtasks.
+  const html = listItemStudioRecords().map((item) => `<option value="${itemStudioDisplay(item)}">${item.key}</option>`).join('');
+  if (list.innerHTML !== html) list.innerHTML = html;
   return list;
 }
 
@@ -68,15 +73,34 @@ export function installMonsterDropItemPicker() {
   if (!root || !overlay || root.dataset.monsterItemPickerInstalled === '1') return;
   root.dataset.monsterItemPickerInstalled = '1';
 
+  let scheduled = 0;
   const sync = () => {
+    scheduled = 0;
     ensureDatalist(overlay);
     overlay.querySelectorAll<HTMLInputElement>('[data-drop-item]').forEach(enhanceInput);
   };
+  const schedule = () => {
+    if (scheduled) return;
+    scheduled = requestAnimationFrame(sync);
+  };
 
-  const observer = new MutationObserver(() => queueMicrotask(sync));
+  const observer = new MutationObserver((mutations) => {
+    // Mudanças feitas apenas dentro do nosso datalist não precisam disparar uma
+    // nova varredura. Isso também protege contra regressões se as opções mudarem.
+    const relevant = mutations.some((mutation) => {
+      const target = mutation.target as Node;
+      const list = overlay.querySelector<HTMLDataListElement>(`#${LIST_ID}`);
+      return !list || (target !== list && !list.contains(target));
+    });
+    if (relevant) schedule();
+  });
   observer.observe(overlay, { childList: true, subtree: true });
-  const unsubscribe = onItemStudioChange(sync);
-  window.addEventListener('pagehide', () => { observer.disconnect(); unsubscribe(); }, { once: true });
+  const unsubscribe = onItemStudioChange(schedule);
+  window.addEventListener('pagehide', () => {
+    observer.disconnect();
+    unsubscribe();
+    if (scheduled) cancelAnimationFrame(scheduled);
+  }, { once: true });
 
   const style = document.createElement('style');
   style.textContent = `.monster-drop-row input.monster-drop-invalid{border-color:#bd5454!important;box-shadow:0 0 0 1px rgba(189,84,84,.22)!important}.monster-drop-row [data-drop-item]{min-width:155px}`;
