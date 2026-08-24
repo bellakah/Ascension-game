@@ -1,17 +1,21 @@
 import './standaloneStudioShell.css';
 
-export type StandaloneStudioMode = 'actors' | 'items';
+export type StandaloneStudioMode = 'actors' | 'items' | 'collectibles';
 
-function editorUrl(mode: 'map' | 'actors' | 'items') {
+type EditorTarget = 'map' | 'actors' | 'items' | 'collectibles';
+
+function editorUrl(mode: EditorTarget) {
   const url = new URL(window.location.href);
   url.searchParams.delete('playtest');
+  url.searchParams.delete('section');
+  url.searchParams.delete('id');
   url.searchParams.set('editor', mode);
   return url.toString();
 }
 
 export function createStandaloneStudioShell(mode: StandaloneStudioMode) {
   document.body.className = 'map-editor-pro-mode standalone-studio-mode';
-  document.title = mode === 'actors' ? 'Ascension NPC & Monster Editor' : 'Ascension Item Editor';
+  document.title = mode === 'actors' ? 'Ascension NPC & Monster Editor' : mode === 'items' ? 'Ascension Item Editor' : 'Ascension Collectible Editor';
 
   const mount = document.querySelector<HTMLElement>('#app') ?? document.body;
   mount.innerHTML = '';
@@ -27,6 +31,7 @@ export function createStandaloneStudioShell(mode: StandaloneStudioMode) {
         <button id="mep-mode-npcs" type="button">NPCs</button>
         <button id="mep-mode-monsters" type="button">Monstros</button>
         <button id="mep-mode-items" type="button">Itens</button>
+        <button id="mep-mode-collectibles" type="button">Coletáveis</button>
       </nav>
       <div class="mep-spacer"></div>
       <span class="standalone-studio-status">Catálogos compartilhados com o jogo</span>
@@ -34,28 +39,29 @@ export function createStandaloneStudioShell(mode: StandaloneStudioMode) {
     </header>
     <main class="mep-stage-wrap standalone-studio-stage">
       <div class="standalone-studio-empty" aria-hidden="true">
-        <strong>${mode === 'actors' ? 'NPCs & Monstros' : 'Itens'}</strong>
+        <strong>${mode === 'actors' ? 'NPCs & Monstros' : mode === 'items' ? 'Itens' : 'Coletáveis'}</strong>
         <span>Carregando editor...</span>
       </div>
     </main>`;
   mount.appendChild(root);
 
-  const navigate = (target: 'map' | 'actors' | 'items') => {
-    window.location.href = editorUrl(target);
-  };
+  const navigate = (target: EditorTarget) => { window.location.href = editorUrl(target); };
   root.querySelector<HTMLButtonElement>('#mep-mode-map')!.onclick = () => navigate('map');
   root.querySelector<HTMLButtonElement>('#mep-mode-items')!.onclick = () => navigate('items');
+  root.querySelector<HTMLButtonElement>('#mep-mode-collectibles')!.onclick = () => navigate('collectibles');
   root.querySelector<HTMLButtonElement>('#standalone-open-game')!.onclick = () => {
     const url = new URL(window.location.href);
     url.searchParams.delete('editor');
     url.searchParams.delete('playtest');
+    url.searchParams.delete('section');
+    url.searchParams.delete('id');
     window.location.href = url.toString();
   };
 
   return {
     root,
     navigate,
-    setActive(id: 'npcs' | 'monsters' | 'items') {
+    setActive(id: 'npcs' | 'monsters' | 'items' | 'collectibles') {
       root.querySelectorAll<HTMLButtonElement>('.mep-mode button').forEach((button) => button.classList.remove('active'));
       root.querySelector<HTMLButtonElement>(`#mep-mode-${id}`)?.classList.add('active');
     },
