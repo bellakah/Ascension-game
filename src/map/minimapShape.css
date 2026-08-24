@@ -52,36 +52,51 @@ html[data-ui-mode='desktop'] .minimap-heading b{
   border-radius:1px;
 }
 
-/* Forma circular: mantém toda a cartografia dentro de um recorte redondo,
-   sem alterar a lógica do canvas ou do Marker Runtime V2. */
+/*
+ * Forma circular refinada:
+ * - aro muito mais fino;
+ * - canvas realmente 1:1;
+ * - título/rodapé em pills internas para não serem cortados pela circunferência;
+ * - controles reposicionados dentro da área segura do círculo.
+ */
 html[data-ui-mode='desktop'] #minimap-shell.minimap-shape-round{
-  width:226px!important;
-  height:226px!important;
+  width:216px!important;
+  height:216px!important;
   padding:0!important;
-  border-radius:50%!important;
   overflow:hidden!important;
-  background:radial-gradient(circle at 50% 42%,rgba(15,42,49,.98),rgba(4,16,22,.99) 72%)!important;
+  border:1px solid rgba(205,169,82,.42)!important;
+  border-radius:50%!important;
+  background:#07171d!important;
+  box-shadow:
+    0 12px 30px rgba(0,0,0,.42),
+    inset 0 0 0 2px rgba(255,255,255,.018),
+    inset 0 0 0 4px rgba(196,157,70,.035)!important;
 }
 
-html[data-ui-mode='desktop'] #minimap-shell.minimap-shape-round .minimap-heading{
-  position:absolute!important;
-  top:9px!important;
-  left:25px!important;
-  right:25px!important;
-  height:23px!important;
-  padding:0!important;
-  border-bottom:0!important;
-  background:linear-gradient(180deg,rgba(3,15,20,.76),rgba(3,15,20,.08))!important;
+html[data-ui-mode='desktop'] #minimap-shell.minimap-shape-round::before{
+  content:'';
+  position:absolute;
+  z-index:7;
+  inset:3px;
+  border:1px solid rgba(224,188,96,.12);
+  border-radius:50%;
+  pointer-events:none;
+}
+
+html[data-ui-mode='desktop'] #minimap-shell.minimap-shape-round:hover{
+  border-color:rgba(222,183,91,.62)!important;
 }
 
 html[data-ui-mode='desktop'] #minimap-shell.minimap-shape-round #minimap-canvas{
   position:absolute!important;
-  left:13px!important;
-  top:13px!important;
-  width:200px!important;
-  height:200px!important;
+  left:5px!important;
+  top:5px!important;
+  width:206px!important;
+  height:206px!important;
   margin:0!important;
+  border:0!important;
   border-radius:50%!important;
+  box-shadow:none!important;
   clip-path:circle(50% at 50% 50%)!important;
 }
 
@@ -91,21 +106,112 @@ html[data-ui-mode='desktop'] #minimap-shell.minimap-shape-round .minimap-marker-
   clip-path:circle(50% at 50% 50%)!important;
 }
 
+html[data-ui-mode='desktop'] #minimap-shell.minimap-shape-round .minimap-heading{
+  position:absolute!important;
+  z-index:9;
+  top:10px!important;
+  left:32px!important;
+  right:32px!important;
+  height:20px!important;
+  min-height:20px!important;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+  pointer-events:none;
+}
+
+html[data-ui-mode='desktop'] #minimap-shell.minimap-shape-round .minimap-heading b{
+  position:absolute;
+  left:50%;
+  top:0;
+  width:auto;
+  max-width:112px;
+  height:20px;
+  padding:0 8px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transform:translateX(-50%);
+  overflow:hidden;
+  border:1px solid rgba(110,145,148,.22);
+  border-radius:10px;
+  background:rgba(4,18,24,.72)!important;
+  box-shadow:0 2px 8px rgba(0,0,0,.24);
+  color:#f1eee5!important;
+  font-family:Georgia,'Times New Roman',serif!important;
+  font-size:10px!important;
+  font-weight:700!important;
+  line-height:1!important;
+  text-overflow:ellipsis;
+  text-shadow:0 1px 2px rgba(0,0,0,.78);
+  white-space:nowrap;
+}
+
+html[data-ui-mode='desktop'] #minimap-shell.minimap-shape-round .minimap-north{
+  position:absolute!important;
+  left:-16px!important;
+  top:1px!important;
+  width:18px!important;
+  height:18px!important;
+  display:grid!important;
+  place-items:center!important;
+  border:1px solid rgba(207,169,78,.38)!important;
+  border-radius:9px!important;
+  background:rgba(5,22,28,.78)!important;
+  color:#dfbb64!important;
+  font-size:7px!important;
+  pointer-events:none;
+}
+
+html[data-ui-mode='desktop'] #minimap-shell.minimap-shape-round .minimap-shape-toggle{
+  position:absolute!important;
+  right:-16px!important;
+  top:1px!important;
+  width:18px!important;
+  height:18px!important;
+  flex:0 0 18px!important;
+  border-radius:9px!important;
+  background:rgba(5,22,28,.82)!important;
+  pointer-events:auto;
+}
+
 html[data-ui-mode='desktop'] #minimap-shell.minimap-shape-round .minimap-footer{
   position:absolute!important;
-  z-index:8;
-  left:30px!important;
-  right:30px!important;
-  bottom:9px!important;
-  height:22px!important;
-  padding:0!important;
-  background:linear-gradient(0deg,rgba(3,15,20,.78),rgba(3,15,20,.08))!important;
+  z-index:9;
+  left:25px!important;
+  right:25px!important;
+  bottom:10px!important;
+  height:20px!important;
+  min-height:20px!important;
+  padding:0 8px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:6px!important;
+  border:1px solid rgba(110,145,148,.18);
+  border-radius:10px;
+  background:rgba(4,18,24,.70)!important;
+  box-shadow:0 2px 8px rgba(0,0,0,.22);
   pointer-events:none;
 }
 
 html[data-ui-mode='desktop'] #minimap-shell.minimap-shape-round .minimap-footer span{
-  max-width:98px;
+  min-width:0;
+  max-width:88px;
   overflow:hidden;
+  color:#9fb0ad!important;
+  font-size:7px!important;
+  line-height:1!important;
   text-overflow:ellipsis;
+  text-shadow:0 1px 2px rgba(0,0,0,.76);
+  white-space:nowrap;
+}
+
+html[data-ui-mode='desktop'] #minimap-shell.minimap-shape-round .minimap-footer strong{
+  flex:0 0 auto;
+  color:#d2b164!important;
+  font-size:8px!important;
+  line-height:1!important;
+  text-shadow:0 1px 2px rgba(0,0,0,.76);
   white-space:nowrap;
 }
