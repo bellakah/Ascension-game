@@ -98,19 +98,39 @@ export function monsterAssetId(id: string) { return `${MONSTER_ASSET_PREFIX}${id
 export function monsterIdFromAssetId(assetId: string) { return assetId.startsWith(MONSTER_ASSET_PREFIX) ? assetId.slice(MONSTER_ASSET_PREFIX.length) : null; }
 
 function appearanceAsset(definition: MonsterDefinition) {
-  const candidates = [
+  const configured = [
     definition.appearance.idle.south,
     definition.appearance.walk.south,
-    definition.appearance.fallbackAssetId,
+    definition.appearance.attack.south,
     ...Object.values(definition.appearance.idle),
     ...Object.values(definition.appearance.walk),
     ...Object.values(definition.appearance.attack),
+    ...Object.values(definition.appearance.hurt),
+    ...Object.values(definition.appearance.death),
   ].filter(Boolean) as string[];
-  for (const id of candidates) {
+
+  let firstConfigured: MapPaletteEntry | undefined;
+  for (const id of [...new Set(configured)]) {
     const entry = MAP_PALETTE_ENTRIES.find((value) => value.id === id && !value.id.startsWith(MONSTER_ASSET_PREFIX));
-    if (entry) return entry;
+    if (!entry) continue;
+    firstConfigured ??= entry;
+    if (entry.sprite) return entry;
   }
-  return getPaletteEntry('wolf');
+
+  const fallback = definition.appearance.fallbackAssetId
+    ? MAP_PALETTE_ENTRIES.find((value) => value.id === definition.appearance.fallbackAssetId && !value.id.startsWith(MONSTER_ASSET_PREFIX))
+    : undefined;
+  if (fallback?.sprite) return fallback;
+  return firstConfigured ?? fallback ?? getPaletteEntry('wolf');
+}
+
+function staticPreviewSprite(base: MapPaletteEntry) {
+  if (!base.sprite) return undefined;
+  const sprite = clone(base.sprite);
+  const firstFrame = sprite.animation?.frames?.[0];
+  if (firstFrame) sprite.sourceRect = { x: firstFrame.x, y: firstFrame.y, width: firstFrame.width, height: firstFrame.height };
+  delete sprite.animation;
+  return sprite;
 }
 
 export function resolveMonsterAppearanceAssetId(definition: MonsterDefinition, state: MonsterAnimationState, direction: MonsterDirection) {
@@ -140,15 +160,13 @@ export function syncMonsterDefinitionsIntoPalette() {
       objectKind: 'monster',
       tags: ['monster-studio', definition.rank, definition.category, ...definition.tags],
       folder: 'monster',
-      sprite: base.sprite ? clone(base.sprite) : undefined,
+      sprite: staticPreviewSprite(base),
       footprint: base.footprint ? clone(base.footprint) : { width: 1, height: 1 },
       source: 'custom',
     };
     if (entry.sprite) {
       entry.sprite.widthTiles = (entry.sprite.widthTiles ?? 1) * Math.max(.1, definition.appearance.scale || 1);
       entry.sprite.heightTiles = (entry.sprite.heightTiles ?? 1) * Math.max(.1, definition.appearance.scale || 1);
-      const firstFrame = entry.sprite.animation?.frames?.[0];
-      if (firstFrame) entry.sprite.sourceRect = { x: firstFrame.x, y: firstFrame.y, width: firstFrame.width, height: firstFrame.height };
     }
     MAP_PALETTE_ENTRIES.push(entry);
   }
