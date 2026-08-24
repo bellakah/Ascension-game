@@ -4,10 +4,11 @@ import type { CharacterProgress } from '../character/characterCreator';
 import { addItem } from '../items/itemCatalog';
 import { findItemStudioRecord, listItemStudioRecords } from '../items/itemStudioStore';
 import { listMonsterDefinitions } from '../monsterEditor/monsterStore';
-import { killMonster, resetGmMonster, spawnGmMonster, type Monster } from '../game/monsterSystem';
+import { killMonster, type Monster } from '../game/monsterSystem';
 import { WORLD_H, WORLD_W } from '../game/world';
 import { getGmRole, gmRoleLabel, hasGmPermission, listGmAccounts, setGmRole, type GmRole } from './gmAuthority';
 import { listGmAudit, writeGmAudit } from './gmAudit';
+import { resetGmMonster, spawnGmMonster } from './gmMonsterControl';
 
 export type GmRuntimeFlags = {
   godMode: boolean;
@@ -49,7 +50,7 @@ export function createGmPanel(options: GmPanelOptions) {
   launcher.className = 'gm-launcher';
   launcher.type = 'button';
   launcher.textContent = role === 'admin' ? 'ADMIN' : 'GM';
-  launcher.title = 'Abrir painel administrativo';
+  launcher.title = 'Abrir painel administrativo (F10)';
 
   const overlay = document.createElement('section');
   overlay.id = 'gm-panel';
@@ -119,8 +120,6 @@ export function createGmPanel(options: GmPanelOptions) {
   const resolveMonsterSource = (query: string) => {
     const raw = query.trim();
     if (!raw) return null;
-    if (/^lobo/i.test(raw) || raw === 'legacy:wolf') return { id: 'legacy:wolf', name: 'Lobo Sombrio' };
-    if (/^lodo/i.test(raw) || raw === 'legacy:sludge') return { id: 'legacy:sludge', name: 'Lodo Tóxico' };
     const lower = raw.toLocaleLowerCase('pt-BR');
     const definitions = listMonsterDefinitions();
     const exact = definitions.find((monster) => monster.id === raw || monster.name.toLocaleLowerCase('pt-BR') === lower);
@@ -131,10 +130,10 @@ export function createGmPanel(options: GmPanelOptions) {
 
   const renderMonsters = () => {
     const definitions = listMonsterDefinitions();
-    content.innerHTML = `<section class="gm-section"><h3>Controle de monstros</h3><p class="gm-note">Spawne definições do Monster Studio ou controle o monstro vivo mais próximo do GM.</p><div class="gm-card"><datalist id="gm-monster-list"><option value="Lobo Sombrio">legacy:wolf</option><option value="Lodo Tóxico">legacy:sludge</option>${definitions.map((monster) => `<option value="${esc(monster.name)}">${esc(monster.id)}</option>`).join('')}</datalist><div class="gm-grid"><label class="gm-field">Monstro<input id="gm-monster-query" list="gm-monster-list" placeholder="Nome ou ID"></label><label class="gm-field">Quantidade<input id="gm-monster-qty" type="number" min="1" max="20" value="1"></label></div><div class="gm-actions"><button class="gm-primary" id="gm-spawn-monster" type="button">Spawnar na minha posição</button></div></div><div class="gm-card"><strong style="font-size:10px;color:#dce9ee">Monstro mais próximo</strong><div class="gm-actions"><button id="gm-pull-monster" type="button">Puxar até mim</button><button id="gm-go-monster" type="button">Ir até monstro</button><button id="gm-reset-monster" type="button">Resetar</button><button class="gm-danger" id="gm-kill-monster" type="button">Matar</button></div><div class="gm-status" id="gm-status"></div></div></section>`;
+    content.innerHTML = `<section class="gm-section"><h3>Controle de monstros</h3><p class="gm-note">Spawne qualquer definição criada no Monster Studio ou controle o monstro vivo mais próximo do GM.</p><div class="gm-card"><datalist id="gm-monster-list">${definitions.map((monster) => `<option value="${esc(monster.name)}">${esc(monster.id)}</option>`).join('')}</datalist><div class="gm-grid"><label class="gm-field">Monstro<input id="gm-monster-query" list="gm-monster-list" placeholder="Nome ou ID do Monster Studio"></label><label class="gm-field">Quantidade<input id="gm-monster-qty" type="number" min="1" max="20" value="1"></label></div><div class="gm-actions"><button class="gm-primary" id="gm-spawn-monster" type="button">Spawnar na minha posição</button></div></div><div class="gm-card"><strong style="font-size:10px;color:#dce9ee">Monstro mais próximo</strong><div class="gm-actions"><button id="gm-pull-monster" type="button">Puxar até mim</button><button id="gm-go-monster" type="button">Ir até monstro</button><button id="gm-reset-monster" type="button">Resetar</button><button class="gm-danger" id="gm-kill-monster" type="button">Matar</button></div><div class="gm-status" id="gm-status"></div></div></section>`;
     content.querySelector<HTMLButtonElement>('#gm-spawn-monster')!.onclick = async () => {
       const source = resolveMonsterSource(content.querySelector<HTMLInputElement>('#gm-monster-query')!.value);
-      if (!source) { status('Monstro não encontrado.'); return; }
+      if (!source) { status('Monstro não encontrado no Monster Studio.'); return; }
       const count = clamp(Math.floor(Number(content.querySelector<HTMLInputElement>('#gm-monster-qty')!.value) || 1), 1, 20);
       let spawned = 0;
       for (let index = 0; index < count; index++) {
@@ -160,7 +159,7 @@ export function createGmPanel(options: GmPanelOptions) {
       killMonster(monster); audit('monster.kill', `${monster.name} (${monster.id})`); status(`${monster.name} eliminado.`);
     };
     content.querySelector<HTMLButtonElement>('#gm-reset-monster')!.onclick = () => {
-      const monster = options.monsters.sort((a, b) => Math.hypot(a.view.x - options.player.x, a.view.y - options.player.y) - Math.hypot(b.view.x - options.player.x, b.view.y - options.player.y))[0];
+      const monster = [...options.monsters].sort((a, b) => Math.hypot(a.view.x - options.player.x, a.view.y - options.player.y) - Math.hypot(b.view.x - options.player.x, b.view.y - options.player.y))[0];
       if (!monster) { status('Nenhum monstro encontrado.'); return; }
       resetGmMonster(monster); audit('monster.reset', `${monster.name} (${monster.id})`); status(`${monster.name} resetado.`);
     };
@@ -236,8 +235,9 @@ export function createGmPanel(options: GmPanelOptions) {
     if (nextRole === 'player') { close(); launcher.style.display = 'none'; }
     else { launcher.style.display = ''; renderNav(); if (open) render(); }
   };
+  const onAuditChanged = () => { if (open && activeTab === 'logs') renderLogs(); };
   window.addEventListener('ascension-gm-roles-change', onRolesChanged);
-  window.addEventListener('ascension-gm-audit-change', () => { if (open && activeTab === 'logs') renderLogs(); });
+  window.addEventListener('ascension-gm-audit-change', onAuditChanged);
 
   renderNav();
   return {
@@ -245,6 +245,11 @@ export function createGmPanel(options: GmPanelOptions) {
     close,
     toggle,
     isOpen: () => open,
-    destroy: () => { options.canvas.removeEventListener('pointerdown', onCanvasPointer, true); window.removeEventListener('ascension-gm-roles-change', onRolesChanged); launcher.remove(); overlay.remove(); },
+    destroy: () => {
+      options.canvas.removeEventListener('pointerdown', onCanvasPointer, true);
+      window.removeEventListener('ascension-gm-roles-change', onRolesChanged);
+      window.removeEventListener('ascension-gm-audit-change', onAuditChanged);
+      launcher.remove(); overlay.remove();
+    },
   };
 }
