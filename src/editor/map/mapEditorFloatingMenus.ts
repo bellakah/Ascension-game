@@ -95,10 +95,35 @@ export function installMapEditorFloatingMenus() {
   };
 
   const bindTopMenu = () => {
-    const anchor = root.querySelector<HTMLElement>('#mep-more');
+    const anchor = root.querySelector<HTMLButtonElement>('#mep-more');
     const menu = root.querySelector<HTMLElement>('#mep-more-menu')
       ?? document.querySelector<HTMLElement>('#mep-more-menu');
-    if (anchor && menu) bindMenu(menu, anchor, 'top');
+    if (!anchor || !menu) return;
+
+    bindMenu(menu, anchor, 'top');
+
+    // O código principal do Editor procura #mep-more-menu dentro de `.mep`.
+    // Depois que o menu é portado para document.body essa busca deixa de encontrar
+    // o elemento. Reassumimos o toggle usando a referência real do menu.
+    if (anchor.dataset.floatingTopToggle !== '1') {
+      anchor.dataset.floatingTopToggle = '1';
+      anchor.setAttribute('aria-haspopup', 'menu');
+      anchor.setAttribute('aria-expanded', String(!menu.classList.contains('hidden')));
+      anchor.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const opening = menu.classList.contains('hidden');
+        menu.classList.toggle('hidden');
+        anchor.setAttribute('aria-expanded', String(opening));
+        schedulePosition();
+      };
+
+      menu.addEventListener('click', (event) => {
+        if (!(event.target as HTMLElement).closest('button')) return;
+        menu.classList.add('hidden');
+        anchor.setAttribute('aria-expanded', 'false');
+      });
+    }
   };
 
   const bindCardMenus = () => {
@@ -132,8 +157,10 @@ export function installMapEditorFloatingMenus() {
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
     for (const entry of entries.values()) {
-      if (entry.kind === 'top') entry.menu.classList.add('hidden');
-      else entry.menu.classList.remove('open');
+      if (entry.kind === 'top') {
+        entry.menu.classList.add('hidden');
+        entry.anchor.setAttribute('aria-expanded', 'false');
+      } else entry.menu.classList.remove('open');
     }
   });
 
@@ -141,7 +168,10 @@ export function installMapEditorFloatingMenus() {
     const target = event.target as HTMLElement;
     if (target.closest('#mep-more,.mep-card-menu-button,.mep-floating-menu')) return;
     for (const entry of entries.values()) {
-      if (entry.kind === 'card') entry.menu.classList.remove('open');
+      if (entry.kind === 'top') {
+        entry.menu.classList.add('hidden');
+        entry.anchor.setAttribute('aria-expanded', 'false');
+      } else entry.menu.classList.remove('open');
     }
   });
 }
