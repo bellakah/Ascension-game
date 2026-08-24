@@ -35,6 +35,7 @@ import { hydrateNpcDefinitionsIntoPalette } from './npc/npcStore';
 import { installPublishedNpcRuntime } from './npc/npcRuntime';
 import { hydrateMonsterDefinitionsIntoPalette } from './monsterEditor/monsterStore';
 import { hydrateItemStudioRuntime } from './items/itemStudioStore';
+import { installItemInventoryVisualIntegration } from './items/itemInventoryVisualIntegration';
 
 export async function startGameApp() {
   installResponsiveUi();
@@ -44,6 +45,7 @@ export async function startGameApp() {
   const chatBootstrap = prepareChatBootstrap();
   const guildBootstrap = prepareGuildBootstrap();
   hydrateItemStudioRuntime();
+  installItemInventoryVisualIntegration();
   hydrateNpcDefinitionsIntoPalette();
   hydrateMonsterDefinitionsIntoPalette();
   await preparePublishedWorldRuntime();
