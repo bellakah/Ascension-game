@@ -37,6 +37,8 @@ if (playtest === 'map') {
     installStudioAppearanceUx();
     const { installStudioAnimationStateTabsIntegration } = await import('./editor/studioAnimationStateTabsIntegration');
     installStudioAnimationStateTabsIntegration();
+    const { installMapMarkerStudioIntegration } = await import('./editor/map/mapMarkerStudio');
+    installMapMarkerStudioIntegration();
   });
 } else {
   void import('./gameBootstrap').then(({ startGameApp }) => startGameApp());

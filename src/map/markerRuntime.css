@@ -1,0 +1,172 @@
+/* Marker Runtime V2 — marcadores leves, persistentes e editáveis. */
+#map-marker-layer,
+.map-player-marker{opacity:0!important;pointer-events:none!important}
+
+#map-marker-layer-v2{
+  position:absolute;
+  inset:0;
+  z-index:12;
+  pointer-events:none;
+}
+
+.map-marker-v2{
+  --marker-size:18px;
+  --marker-color:#b7d7cf;
+  --marker-opacity:1;
+  --marker-bg:transparent;
+  --marker-border:transparent;
+  --marker-border-width:0px;
+  --marker-label-size:12px;
+  position:absolute;
+  width:max(24px,calc(var(--marker-size) + 12px));
+  height:max(24px,calc(var(--marker-size) + 12px));
+  margin:0;
+  padding:0;
+  display:grid;
+  place-items:center;
+  border:0;
+  outline:0;
+  background:none;
+  color:var(--marker-color);
+  opacity:var(--marker-opacity);
+  pointer-events:auto;
+  cursor:pointer;
+  overflow:visible;
+  z-index:2;
+  appearance:none;
+  -webkit-appearance:none;
+  transform:translate(-50%,-50%);
+}
+
+.map-marker-v2 .marker-visual{
+  position:relative;
+  width:calc(var(--marker-size) + 4px);
+  height:calc(var(--marker-size) + 4px);
+  display:grid;
+  place-items:center;
+  border:var(--marker-border-width) solid var(--marker-border);
+  border-radius:7px;
+  background:var(--marker-bg);
+  color:var(--marker-color);
+  pointer-events:none;
+  transition:border-color .12s ease,box-shadow .12s ease,filter .12s ease;
+}
+.map-marker-v2:not(.marker-has-background) .marker-visual{border-radius:0}
+.map-marker-v2.marker-shadow .marker-visual{filter:drop-shadow(0 2px 2px rgba(0,0,0,.72))}
+.map-marker-v2.marker-glow .marker-visual{filter:drop-shadow(0 0 5px color-mix(in srgb,var(--marker-color) 56%,transparent)) drop-shadow(0 2px 2px rgba(0,0,0,.65))}
+.map-marker-v2.selected .marker-visual{
+  box-shadow:0 0 0 2px rgba(246,221,151,.88),0 0 0 5px rgba(7,26,32,.68),0 0 14px color-mix(in srgb,var(--marker-color) 38%,transparent);
+}
+.map-marker-v2:hover .marker-visual{filter:brightness(1.18) drop-shadow(0 2px 2px rgba(0,0,0,.72))}
+
+.marker-source,
+.marker-source>span,
+.marker-source>i,
+.marker-source>img{
+  width:var(--marker-size);
+  height:var(--marker-size);
+  display:grid;
+  place-items:center;
+  color:inherit;
+  font-size:var(--marker-size);
+  line-height:1;
+  object-fit:contain;
+  pointer-events:none;
+  user-select:none;
+}
+.marker-source>img{display:block}
+
+.map-marker-v2 .marker-label{
+  position:absolute;
+  top:calc(50% + var(--marker-size) / 2 + 9px);
+  left:50%;
+  transform:translateX(-50%);
+  max-width:210px;
+  padding:3px 6px;
+  border:1px solid rgba(184,157,88,.22);
+  border-radius:4px;
+  background:rgba(4,17,22,.94);
+  box-shadow:0 4px 12px rgba(0,0,0,.3);
+  color:#ece9df;
+  font-size:var(--marker-label-size);
+  font-weight:700;
+  line-height:1.15;
+  white-space:nowrap;
+  pointer-events:none;
+  opacity:0;
+  visibility:hidden;
+  transition:opacity .1s ease;
+}
+.map-marker-v2[data-label-mode='always'] .marker-label,
+.map-marker-v2[data-label-mode='hover']:hover .marker-label,
+.map-marker-v2[data-label-mode='selected'].selected .marker-label{
+  opacity:1;
+  visibility:visible;
+}
+
+.map-marker-v2 .marker-badge{
+  position:absolute;
+  z-index:3;
+  top:-5px;
+  right:-5px;
+  width:max(18px,calc(var(--badge-size,13px) + 7px));
+  height:max(18px,calc(var(--badge-size,13px) + 7px));
+  display:none;
+  place-items:center;
+  border:var(--badge-border-width,1px) solid var(--badge-border,#fff0a0);
+  border-radius:6px;
+  background:var(--badge-bg,#d9ad44);
+  color:var(--badge-color,#211808);
+  box-shadow:0 3px 8px rgba(0,0,0,.45),0 0 8px color-mix(in srgb,var(--badge-bg) 45%,transparent);
+  pointer-events:none;
+}
+.map-marker-v2.has-badge .marker-badge{display:grid}
+.map-marker-v2 .marker-badge .marker-source,
+.map-marker-v2 .marker-badge .marker-source>*{
+  width:var(--badge-size,13px);
+  height:var(--badge-size,13px);
+  font-size:var(--badge-size,13px);
+}
+
+.map-marker-v2.player{
+  pointer-events:none;
+  z-index:5;
+}
+.map-marker-v2.player .marker-visual{
+  transform:rotate(var(--map-player-heading,0rad));
+  transform-origin:center;
+  transition:transform .1s linear;
+}
+.map-marker-v2.player.selected .marker-visual{box-shadow:none}
+
+/* Minimapa V2: o canvas antigo continua atualizando como fonte de estado, mas fica invisível. */
+#minimap-shell{position:relative!important}
+#minimap-canvas{opacity:0!important}
+.minimap-direction-marker{display:none!important}
+.minimap-v2-canvas{
+  position:absolute;
+  z-index:3;
+  display:block;
+  border-radius:3px;
+  pointer-events:none;
+}
+.minimap-marker-layer-v2{
+  position:absolute;
+  z-index:5;
+  pointer-events:none;
+  overflow:hidden;
+  border-radius:3px;
+}
+.minimap-marker-layer-v2 .map-marker-v2{
+  pointer-events:none;
+  transform:translate(-50%,-50%) scale(.78);
+  transform-origin:center;
+}
+.minimap-marker-layer-v2 .map-marker-v2 .marker-label{display:none!important}
+.minimap-marker-layer-v2 .map-marker-v2.selected .marker-visual{box-shadow:none}
+.minimap-marker-layer-v2 .map-marker-v2.player{transform:translate(-50%,-50%) scale(.9)}
+
+@media(max-width:1279px){
+  #map-marker-layer-v2>.map-marker-v2{display:none}
+  .minimap-marker-layer-v2 .map-marker-v2{display:grid}
+}
