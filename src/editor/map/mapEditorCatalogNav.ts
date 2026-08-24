@@ -42,17 +42,32 @@ export function installMapEditorCatalogNav() {
   mode.append(actors, items, collectibles);
 
   if (!inspector) return;
+
+  let activeKey = '';
+  let frame = 0;
+
   const enhanceInspector = () => {
-    inspector.querySelector('.catalog-editor-link')?.remove();
+    frame = 0;
     const canvas = inspector.querySelector<HTMLCanvasElement>('.mep-inspector-hero canvas[data-asset]');
     const assetId = canvas?.dataset.asset ?? '';
     const npcId = npcIdFromAssetId(assetId);
     const monsterId = monsterIdFromAssetId(assetId);
     const collectibleId = collectibleIdFromAssetId(assetId);
-    if (!npcId && !monsterId && !collectibleId) return;
+    const key = npcId ? `npc:${npcId}` : monsterId ? `monster:${monsterId}` : collectibleId ? `collectible:${collectibleId}` : '';
+    const existing = inspector.querySelector<HTMLElement>('.catalog-editor-link');
+
+    // O próprio link altera o DOM do inspetor. Se a seleção não mudou e o
+    // link continua presente, não o remova/recrie: isso evita um loop infinito
+    // do MutationObserver ao selecionar NPCs, monstros ou coletáveis.
+    if (key === activeKey && existing?.dataset.catalogKey === key) return;
+
+    existing?.remove();
+    activeKey = key;
+    if (!key) return;
 
     const holder = document.createElement('div');
     holder.className = 'catalog-editor-link';
+    holder.dataset.catalogKey = key;
     const button = document.createElement('button');
     button.type = 'button';
     button.textContent = npcId ? '♟ Editar no NPC Studio' : monsterId ? '☠ Editar no Monster Studio' : '⛏ Editar no Collectible Studio';
@@ -64,7 +79,16 @@ export function installMapEditorCatalogNav() {
     inspector.appendChild(holder);
   };
 
-  const observer = new MutationObserver(enhanceInspector);
+  const schedule = () => {
+    if (frame) return;
+    frame = requestAnimationFrame(enhanceInspector);
+  };
+  const observer = new MutationObserver((mutations) => {
+    // Texto/estado do próprio link não pode disparar uma reconstrução.
+    if (mutations.every((mutation) => (mutation.target as HTMLElement).closest?.('.catalog-editor-link'))) return;
+    schedule();
+  });
   observer.observe(inspector, { childList: true, subtree: true });
+  window.addEventListener('pagehide', () => { observer.disconnect(); if (frame) cancelAnimationFrame(frame); }, { once: true });
   enhanceInspector();
 }
