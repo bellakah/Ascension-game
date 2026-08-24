@@ -1,4 +1,4 @@
-import { Application, Container, Ticker } from 'pixi.js';
+import { Application, Container, Text, Ticker } from 'pixi.js';
 import { getSafeCameraPosition } from './desktopViewport';
 import { WORLD_H, WORLD_W } from './world';
 
@@ -32,13 +32,6 @@ function saveZoom(value: number) {
   }
 }
 
-function playerPoint() {
-  const text = document.querySelector<HTMLElement>('#minimap-coords')?.textContent ?? '';
-  const match = text.match(/(-?\d+)\s*,\s*(-?\d+)/);
-  if (!match) return null;
-  return { x: Number(match[1]), y: Number(match[2]) };
-}
-
 function normalizedWheelPixels(event: WheelEvent, pageHeight: number) {
   if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) return event.deltaY * 16;
   if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) return event.deltaY * Math.max(320, pageHeight);
@@ -46,9 +39,23 @@ function normalizedWheelPixels(event: WheelEvent, pageHeight: number) {
 }
 
 /**
- * Captura a Application criada pelo runtime sem acoplar o controlador de câmera
- * ao restante da lógica de combate/movimento. Deve ser preparado antes de
- * startGame() e anexado depois que o jogo terminar de montar o HUD.
+ * O player é um Container do mundo com o Text do nome em y=-94.
+ * Essa referência é usada diretamente para a câmera seguir coordenadas reais
+ * a cada frame, sem depender do texto arredondado/atrasado do minimapa.
+ */
+function findPlayerContainer(world: Container) {
+  for (const child of world.children) {
+    if (!(child instanceof Container)) continue;
+    const hasPlayerName = child.children.some((entry) => entry instanceof Text && Math.abs(entry.y + 94) < 0.5);
+    if (hasPlayerName) return child;
+  }
+  return null;
+}
+
+/**
+ * Captura a Application criada pelo runtime sem acoplar o controlador de zoom
+ * à lógica de combate/movimento. Deve ser preparado antes de startGame() e
+ * anexado depois que o jogo terminar de montar o HUD.
  */
 export function prepareCameraZoom() {
   let capturedApp: Application | null = null;
@@ -87,6 +94,7 @@ export function prepareCameraZoom() {
     const canvas = app.canvas;
     if (!(canvas instanceof HTMLCanvasElement)) return;
 
+    let player = findPlayerContainer(world);
     let currentZoom = readZoom();
     let targetZoom = currentZoom;
     world.scale.set(currentZoom);
@@ -113,13 +121,14 @@ export function prepareCameraZoom() {
       world.scale.set(currentZoom);
       document.documentElement.dataset.cameraZoom = String(Math.round(currentZoom * 100));
 
-      const point = playerPoint();
-      if (!point) return;
+      if (!player || !player.parent) player = findPlayerContainer(world);
+      if (!player) return;
+
       const camera = getSafeCameraPosition(
         app.screen.width,
         app.screen.height,
-        point.x,
-        point.y,
+        player.x,
+        player.y,
         WORLD_W,
         WORLD_H,
         currentZoom,
