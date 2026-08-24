@@ -35,6 +35,22 @@ export function installMinimapShape() {
 
   let shape: MinimapShape = readShape();
 
+  const resizeCanvases = (next: MinimapShape) => {
+    const legacy = shell.querySelector<HTMLCanvasElement>('#minimap-canvas');
+    const v2 = shell.querySelector<HTMLCanvasElement>('.minimap-v2-canvas');
+    const width = 400;
+    const height = next === 'round' ? 400 : 352;
+
+    if (legacy && (legacy.width !== width || legacy.height !== height)) {
+      legacy.width = width;
+      legacy.height = height;
+    }
+    if (v2 && (v2.width !== width || v2.height !== height)) {
+      v2.width = width;
+      v2.height = height;
+    }
+  };
+
   const apply = (next: MinimapShape, persist = false) => {
     shape = next;
     shell.classList.toggle('minimap-shape-round', shape === 'round');
@@ -43,6 +59,7 @@ export function installMinimapShape() {
     toggle.dataset.currentShape = shape;
     toggle.title = `Usar minimapa ${target}`;
     toggle.setAttribute('aria-label', `Usar minimapa ${target}`);
+    resizeCanvases(shape);
     if (persist) saveShape(shape);
 
     // O Marker Runtime usa as dimensões do canvas legado para posicionar a
