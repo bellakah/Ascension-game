@@ -1,8 +1,9 @@
 import './mapEditorCatalogNav.css';
 import { npcIdFromAssetId } from '../../npc/npcStore';
 import { monsterIdFromAssetId } from '../../monsterEditor/monsterStore';
+import { collectibleIdFromAssetId } from '../../gathering/collectibleStore';
 
-function editorUrl(editor: 'actors' | 'items', section?: 'npc' | 'monster', id?: string) {
+function editorUrl(editor: 'actors' | 'items' | 'collectibles', section?: 'npc' | 'monster', id?: string) {
   const url = new URL(window.location.href);
   url.searchParams.delete('playtest');
   url.searchParams.set('editor', editor);
@@ -31,7 +32,14 @@ export function installMapEditorCatalogNav() {
   items.textContent = 'Itens';
   items.title = 'Abrir o Item Studio separado';
   items.onclick = () => { window.location.href = editorUrl('items'); };
-  mode.append(actors, items);
+
+  const collectibles = document.createElement('button');
+  collectibles.id = 'mep-open-collectibles-editor';
+  collectibles.type = 'button';
+  collectibles.textContent = 'Coletáveis';
+  collectibles.title = 'Abrir o editor separado de recursos coletáveis';
+  collectibles.onclick = () => { window.location.href = editorUrl('collectibles'); };
+  mode.append(actors, items, collectibles);
 
   if (!inspector) return;
   const enhanceInspector = () => {
@@ -40,15 +48,17 @@ export function installMapEditorCatalogNav() {
     const assetId = canvas?.dataset.asset ?? '';
     const npcId = npcIdFromAssetId(assetId);
     const monsterId = monsterIdFromAssetId(assetId);
-    if (!npcId && !monsterId) return;
+    const collectibleId = collectibleIdFromAssetId(assetId);
+    if (!npcId && !monsterId && !collectibleId) return;
 
     const holder = document.createElement('div');
     holder.className = 'catalog-editor-link';
     const button = document.createElement('button');
     button.type = 'button';
-    button.textContent = npcId ? '♟ Editar no NPC Studio' : '☠ Editar no Monster Studio';
+    button.textContent = npcId ? '♟ Editar no NPC Studio' : monsterId ? '☠ Editar no Monster Studio' : '⛏ Editar no Collectible Studio';
     button.onclick = () => {
-      window.location.href = editorUrl('actors', npcId ? 'npc' : 'monster', npcId ?? monsterId ?? undefined);
+      if (collectibleId) window.location.href = editorUrl('collectibles', undefined, collectibleId);
+      else window.location.href = editorUrl('actors', npcId ? 'npc' : 'monster', npcId ?? monsterId ?? undefined);
     };
     holder.appendChild(button);
     inspector.appendChild(holder);
