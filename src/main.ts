@@ -19,12 +19,18 @@ if (playtest === 'map') {
     import('./monsterEditor/monsterStore'),
     import('./editor/map/mapEditorProApp'),
   ]).then(async ([{ ensureLegacyStudioDefinitions }, { hydrateNpcDefinitionsIntoPalette }, { hydrateMonsterDefinitionsIntoPalette }, { startMapEditor }]) => {
-    // O Map Editor só hidrata os catálogos necessários para desenhar/colocar NPCs e
-    // monstros. Os Studios pesados agora vivem em entrypoints separados.
+    // Primeira hidratação mantém os IDs compostos disponíveis enquanto o Map Editor inicia.
     ensureLegacyStudioDefinitions();
     hydrateNpcDefinitionsIntoPalette();
     hydrateMonsterDefinitionsIntoPalette();
     await startMapEditor();
+
+    // startMapEditor carrega a biblioteca IndexedDB/V2. Recriamos os assets compostos
+    // depois disso para que NPCs e monstros usem o sprite realmente configurado, em
+    // vez dos placeholders Rowan/Lobo escolhidos antes dos assets existirem na paleta.
+    hydrateNpcDefinitionsIntoPalette();
+    hydrateMonsterDefinitionsIntoPalette();
+    window.dispatchEvent(new Event('resize'));
 
     const { installMapEditorInteractionPerf } = await import('./editor/map/mapEditorInteractionPerf');
     installMapEditorInteractionPerf();
