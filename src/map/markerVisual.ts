@@ -16,9 +16,12 @@ export function applyMarkerStyle(node: HTMLElement, style: MarkerStyle) {
 }
 
 export function renderMarkerSource(node: HTMLElement, style: MarkerStyle) {
+  const source = style.source;
+  const signature = `${source.kind}|${source.value}|${source.fallback ?? ''}|${style.color}`;
+  if (node.dataset.markerSourceSignature === signature) return;
+  node.dataset.markerSourceSignature = signature;
   node.replaceChildren();
   node.className = 'marker-source';
-  const source = style.source;
 
   if (source.kind === 'image') {
     const image = document.createElement('img');
