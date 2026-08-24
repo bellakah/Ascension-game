@@ -151,18 +151,39 @@ export function npcIdFromAssetId(assetId: string) {
 }
 
 function appearanceAsset(definition: NpcDefinition) {
-  const candidates = [
+  const configured = [
     definition.appearance.idle.south,
     definition.appearance.walk.south,
-    definition.appearance.fallbackAssetId,
     ...Object.values(definition.appearance.idle),
     ...Object.values(definition.appearance.walk),
   ].filter(Boolean) as string[];
-  for (const id of candidates) {
+
+  let firstConfigured: MapPaletteEntry | undefined;
+  for (const id of [...new Set(configured)]) {
     const entry = MAP_PALETTE_ENTRIES.find((value) => value.id === id && !value.id.startsWith(NPC_ASSET_PREFIX));
-    if (entry) return entry;
+    if (!entry) continue;
+    firstConfigured ??= entry;
+    // Para o preview do mapa, um sprite realmente configurado tem prioridade
+    // sobre placeholders antigos como Rowan/Elandra sem imagem.
+    if (entry.sprite) return entry;
   }
-  return getPaletteEntry('rowan');
+
+  const fallback = definition.appearance.fallbackAssetId
+    ? MAP_PALETTE_ENTRIES.find((value) => value.id === definition.appearance.fallbackAssetId && !value.id.startsWith(NPC_ASSET_PREFIX))
+    : undefined;
+  if (fallback?.sprite) return fallback;
+  return firstConfigured ?? fallback ?? getPaletteEntry('rowan');
+}
+
+function staticPreviewSprite(base: MapPaletteEntry) {
+  if (!base.sprite) return undefined;
+  const sprite = clone(base.sprite);
+  const firstFrame = sprite.animation?.frames?.[0];
+  if (firstFrame) sprite.sourceRect = { x: firstFrame.x, y: firstFrame.y, width: firstFrame.width, height: firstFrame.height };
+  // O Map Editor precisa só de uma referência visual leve. As animações completas
+  // permanecem na definição do NPC e continuam sendo usadas pelo runtime do jogo.
+  delete sprite.animation;
+  return sprite;
 }
 
 export function resolveNpcAppearanceAssetId(definition: NpcDefinition, state: 'idle' | 'walk', direction: NpcDirection) {
@@ -195,7 +216,7 @@ export function syncNpcDefinitionsIntoPalette() {
       objectKind: 'npc',
       tags: ['npc-studio', definition.role, ...definition.tags],
       folder: 'npc',
-      sprite: base.sprite ? clone(base.sprite) : undefined,
+      sprite: staticPreviewSprite(base),
       footprint: base.footprint ? clone(base.footprint) : { width: 1, height: 1 },
       source: 'custom',
     };
