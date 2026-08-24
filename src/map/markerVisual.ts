@@ -33,7 +33,7 @@ export function renderMarkerSource(node: HTMLElement, style: MarkerStyle) {
     const image = document.createElement('img');
     image.alt = '';
     image.draggable = false;
-    image.src = svgDataUrl(source.value);
+    image.src = svgDataUrl(source.value.replaceAll('currentColor', style.color));
     node.appendChild(image);
     return;
   }
