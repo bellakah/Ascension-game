@@ -34,6 +34,7 @@ import { subscribePublishedMap } from './map/publishedMapStore';
 import { hydrateNpcDefinitionsIntoPalette } from './npc/npcStore';
 import { installPublishedNpcRuntime } from './npc/npcRuntime';
 import { hydrateMonsterDefinitionsIntoPalette } from './monsterEditor/monsterStore';
+import { hydrateItemStudioRuntime } from './items/itemStudioStore';
 
 export async function startGameApp() {
   installResponsiveUi();
@@ -42,6 +43,7 @@ export async function startGameApp() {
   const cameraZoom = prepareCameraZoom();
   const chatBootstrap = prepareChatBootstrap();
   const guildBootstrap = prepareGuildBootstrap();
+  hydrateItemStudioRuntime();
   hydrateNpcDefinitionsIntoPalette();
   hydrateMonsterDefinitionsIntoPalette();
   await preparePublishedWorldRuntime();
