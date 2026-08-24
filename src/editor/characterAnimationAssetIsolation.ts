@@ -1,10 +1,12 @@
 import { MAP_PALETTE_ENTRIES } from './map/mapEditorCatalog';
+import { STUDIO_INTERNAL_ASSET_TAG } from './map/mapAssetLibraryV2';
 import type { MapPaletteEntry } from './map/mapEditorTypes';
 import { listNpcDefinitions, NPC_ASSET_PREFIX } from '../npc/npcStore';
 import { listMonsterDefinitions, MONSTER_ASSET_PREFIX } from '../monsterEditor/monsterStore';
 import { MONSTER_STATES } from '../monsterEditor/monsterTypes';
+import { COLLECTIBLE_ASSET_PREFIX, listCollectibleDefinitions } from '../gathering/collectibleStore';
 
-const INTERNAL_TAG = 'character-animation-internal';
+const LEGACY_INTERNAL_TAG = 'character-animation-internal';
 
 function addValues(target: Set<string>, values: Record<string, string | undefined>) {
   for (const value of Object.values(values)) {
@@ -24,24 +26,34 @@ function linkedAnimationIds() {
     for (const state of MONSTER_STATES) addValues(ids, monster.appearance[state.id]);
   }
 
+  for (const collectible of listCollectibleDefinitions()) {
+    for (const state of ['idle', 'harvest', 'break', 'depleted', 'respawn'] as const) {
+      const value = collectible.appearance[state];
+      if (value) ids.add(value);
+    }
+  }
+
   return ids;
 }
 
 function isCompositeDefinition(entry: MapPaletteEntry) {
-  return entry.id.startsWith(NPC_ASSET_PREFIX) || entry.id.startsWith(MONSTER_ASSET_PREFIX);
+  return entry.id.startsWith(NPC_ASSET_PREFIX)
+    || entry.id.startsWith(MONSTER_ASSET_PREFIX)
+    || entry.id.startsWith(COLLECTIBLE_ASSET_PREFIX);
 }
 
 function shouldIsolate(entry: MapPaletteEntry, linked: Set<string>) {
-  if (!linked.has(entry.id) || isCompositeDefinition(entry)) return false;
-  if (entry.tags?.includes(INTERNAL_TAG)) return true;
+  if (isCompositeDefinition(entry)) return false;
+  if (entry.tags?.includes(STUDIO_INTERNAL_ASSET_TAG) || entry.tags?.includes(LEGACY_INTERNAL_TAG)) return true;
+  if (!linked.has(entry.id)) return false;
   return entry.source === 'custom' && Boolean(entry.sprite?.animation?.frames.length);
 }
 
 function isolateEntry(entry: MapPaletteEntry) {
-  // A animação continua no catálogo para o preview/runtime encontrá-la pelo ID,
-  // mas deixa de ser um objeto independente que pode ser colocado no mapa.
+  // O asset continua no catálogo interno para preview/runtime encontrá-lo pelo ID,
+  // mas nunca pode virar um objeto independente colocável no mapa.
   entry.objectKind = undefined;
-  entry.tags = [...new Set([...(entry.tags ?? []), INTERNAL_TAG])];
+  entry.tags = [...new Set([...(entry.tags ?? []), STUDIO_INTERNAL_ASSET_TAG])];
 }
 
 export function installCharacterAnimationAssetIsolation() {
@@ -62,8 +74,8 @@ export function installCharacterAnimationAssetIsolation() {
       hidden.add(entry.id);
     }
 
-    // Remove cards já renderizados antes desta integração iniciar. O asset não é
-    // apagado: só deixa de aparecer como item independente na biblioteca do mapa.
+    // Remove cards renderizados pelo painel. A fonte continua disponível para o
+    // NPC/monstro/coletável composto, mas não aparece como objeto independente.
     grid.querySelectorAll<HTMLElement>('[data-card]').forEach((card) => {
       const id = card.dataset.card;
       if (id && hidden.has(id)) card.remove();
@@ -80,6 +92,7 @@ export function installCharacterAnimationAssetIsolation() {
 
   window.addEventListener('ascension-npc-definitions-change', schedule);
   window.addEventListener('ascension-monster-definitions-change', schedule);
+  window.addEventListener('ascension-collectible-definitions-change', schedule);
   window.addEventListener('ascension-editor-studio-open', schedule);
 
   apply();
