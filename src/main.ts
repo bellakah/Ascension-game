@@ -33,6 +33,8 @@ if (playtest === 'map') {
     installNpcEditorIntegration();
     const { installMonsterEditorIntegration } = await import('./monsterEditor/monsterEditorIntegration');
     installMonsterEditorIntegration();
+    const { installItemEditorIntegration } = await import('./items/itemEditorIntegration');
+    installItemEditorIntegration();
     const { installStudioAppearanceUx } = await import('./editor/studioAppearanceUx');
     installStudioAppearanceUx();
     const { installCharacterAnimationAssetIsolation } = await import('./editor/characterAnimationAssetIsolation');
