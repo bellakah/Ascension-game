@@ -20,6 +20,15 @@ export function installDesktopViewportMetrics() {
   window.addEventListener('resize', apply, { passive: true });
 }
 
+function axisPosition(viewStart: number, viewEnd: number, worldSize: number, focus: number) {
+  const viewSize = Math.max(1, viewEnd - viewStart);
+  if (worldSize <= viewSize) return viewStart + (viewSize - worldSize) / 2;
+  const desired = viewStart + viewSize / 2 - focus;
+  const minimum = viewEnd - worldSize;
+  const maximum = viewStart;
+  return Math.max(minimum, Math.min(maximum, desired));
+}
+
 export function getSafeCameraPosition(
   screenWidth: number,
   screenHeight: number,
@@ -27,11 +36,18 @@ export function getSafeCameraPosition(
   playerY: number,
   worldWidth: number,
   worldHeight: number,
+  scale = 1,
 ) {
+  const safeScale = Math.max(0.01, Number.isFinite(scale) ? scale : 1);
+  const scaledWorldWidth = worldWidth * safeScale;
+  const scaledWorldHeight = worldHeight * safeScale;
+  const scaledPlayerX = playerX * safeScale;
+  const scaledPlayerY = playerY * safeScale;
+
   if (document.documentElement.dataset.uiMode !== 'desktop') {
     return {
-      x: Math.max(Math.min(0, screenWidth - worldWidth), Math.min(0, screenWidth / 2 - playerX)),
-      y: Math.max(Math.min(0, screenHeight - worldHeight), Math.min(0, screenHeight / 2 - playerY)),
+      x: axisPosition(0, screenWidth, scaledWorldWidth, scaledPlayerX),
+      y: axisPosition(0, screenHeight, scaledWorldHeight, scaledPlayerY),
     };
   }
 
@@ -40,16 +56,9 @@ export function getSafeCameraPosition(
   const safeRight = Math.max(safeLeft + 220, screenWidth - margin.right);
   const safeTop = margin.top;
   const safeBottom = Math.max(safeTop + 220, screenHeight - margin.bottom);
-  const centerX = safeLeft + (safeRight - safeLeft) / 2;
-  const centerY = safeTop + (safeBottom - safeTop) / 2;
-
-  const minX = safeRight - worldWidth;
-  const maxX = safeLeft;
-  const minY = safeBottom - worldHeight;
-  const maxY = safeTop;
 
   return {
-    x: Math.max(minX, Math.min(maxX, centerX - playerX)),
-    y: Math.max(minY, Math.min(maxY, centerY - playerY)),
+    x: axisPosition(safeLeft, safeRight, scaledWorldWidth, scaledPlayerX),
+    y: axisPosition(safeTop, safeBottom, scaledWorldHeight, scaledPlayerY),
   };
 }
