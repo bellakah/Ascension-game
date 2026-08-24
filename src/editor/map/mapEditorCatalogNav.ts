@@ -1,3 +1,4 @@
+import './mapEditorCatalogNav.css';
 import { npcIdFromAssetId } from '../../npc/npcStore';
 import { monsterIdFromAssetId } from '../../monsterEditor/monsterStore';
 
@@ -42,7 +43,7 @@ export function installMapEditorCatalogNav() {
     if (!npcId && !monsterId) return;
 
     const holder = document.createElement('div');
-    holder.className = 'npc-editor-integration-actions catalog-editor-link';
+    holder.className = 'catalog-editor-link';
     const button = document.createElement('button');
     button.type = 'button';
     button.textContent = npcId ? '♟ Editar no NPC Studio' : '☠ Editar no Monster Studio';
