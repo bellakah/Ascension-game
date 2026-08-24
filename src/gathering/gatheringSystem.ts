@@ -1,6 +1,6 @@
 import { Container, Graphics, Rectangle, Sprite, Text, Texture } from 'pixi.js';
 import type { CharacterProgress } from '../character/characterCreator';
-import { triggerLatestGatheringAction } from '../character/lpcCharacter';
+import { triggerLatestGatheringAction, type LpcGatheringAction } from '../character/lpcCharacter';
 import { animationFrameIndex } from '../editor/map/mapAnimationRuntime';
 import { getMapAssetImage } from '../editor/map/mapAssetRenderer';
 import { getPaletteEntry } from '../editor/map/mapEditorCatalog';
@@ -53,6 +53,13 @@ const textureCache = new Map<string, Texture[]>();
 function saveState(progress: CharacterProgress) { const state = progress as GatheringSave; state.gatheringData ??= {}; return state.gatheringData; }
 function readyAt(progress: CharacterProgress, id: string) { return Math.max(0, Number(saveState(progress)[id]?.readyAt ?? 0)); }
 function setReadyAt(progress: CharacterProgress, id: string, value: number) { saveState(progress)[id] = { readyAt: value }; }
+function playerGatheringAction(definition: CollectibleDefinition): LpcGatheringAction {
+  const value = definition.playerAnimation;
+  if (value === 'mine') return 'mine';
+  if (value === 'dig') return 'dig';
+  if (value === 'gather' || value === 'emote') return 'gather';
+  return 'chop';
+}
 
 function fallbackArt(definition: CollectibleDefinition) {
   const color = COLORS[definition.kind];
@@ -165,7 +172,9 @@ export function createGatheringSystem(world: Container, progress: CharacterProgr
     pulse += deltaMs * .0024; const now = Date.now(); const closest = nearest(x, y, map);
     for (const node of nodes) {
       const state = visualState(node, progress, now); const ready = state === 'idle' || state === 'respawn'; const isClosest = closest?.node === node; const until = Math.max(0, readyAt(progress, node.id) - now);
-      if (!ready) node.wasReady = false; applyAppearance(node, state, performance.now());
+      if (!ready) node.wasReady = false;
+      if (state === 'harvest' && isClosest) triggerLatestGatheringAction(playerGatheringAction(node.definition));
+      applyAppearance(node, state, performance.now());
       node.view.alpha = state === 'depleted' && !node.definition.appearance.depleted ? .27 : 1; node.marker.visible = ready; node.marker.alpha = isClosest ? .82 : .38; node.halo.alpha = ready ? (isClosest ? .45 + Math.sin(pulse) * .08 : .14) : .04;
       node.label.visible = Boolean(isClosest && ready); node.label.text = `${node.definition.icon} ${node.definition.name} · ${node.definition.hint}`;
       node.depleted.visible = Boolean(isClosest && state === 'depleted'); node.depleted.text = until > 0 ? `Retorna em ${Math.max(1, Math.ceil(until / 1000))}s` : '';
@@ -181,8 +190,7 @@ export function createGatheringSystem(world: Container, progress: CharacterProgr
     const now = Date.now(); node.harvestingUntil = now + node.definition.harvestDurationMs; node.breakUntil = node.harvestingUntil + 450;
     const ready = node.breakUntil + spawnRespawnDelay({ count: 1, radiusTiles: 0, minDistanceTiles: 0, respawnMs: node.respawnMs, respawnJitterMs: node.respawnJitterMs }, node.definition.respawnMs);
     setReadyAt(progress, node.id, ready); node.wasReady = false;
-    const action = node.definition.playerAnimation === 'slash' ? 'chop' : node.definition.playerAnimation === 'emote' ? 'gather' : node.definition.playerAnimation;
-    if (action === 'chop' || action === 'mine' || action === 'dig' || action === 'gather') triggerLatestGatheringAction(action);
+    triggerLatestGatheringAction(playerGatheringAction(node.definition));
     const first = rewards.find((reward) => reward.added > 0);
     return { ok: true, node: { id: node.id, name: node.definition.name, x: node.x, y: node.y, animation: node.definition.playerAnimation === 'gather' || node.definition.playerAnimation === 'emote' ? 'emote' : 'slash', playerAnimation: node.definition.playerAnimation, harvestDurationMs: node.definition.harvestDurationMs }, itemId: first?.itemId, added, lost };
   };
