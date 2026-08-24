@@ -139,9 +139,14 @@
 }
 .map-marker-v2.player.selected .marker-visual{box-shadow:none}
 
-/* Minimapa V2: o canvas antigo continua atualizando como fonte de estado, mas fica invisível. */
+/*
+ * Minimapa V2: o canvas original permanece visível como camada base/fallback.
+ * O canvas V2 fica por cima quando o runtime está saudável. Se o runtime não
+ * inicializar por qualquer motivo, o jogador continua vendo o minimapa legado
+ * em vez de uma área vazia.
+ */
 #minimap-shell{position:relative!important}
-#minimap-canvas{opacity:0!important}
+#minimap-canvas{opacity:1!important;visibility:visible!important}
 .minimap-direction-marker{display:none!important}
 .minimap-v2-canvas{
   position:absolute;
@@ -149,6 +154,7 @@
   display:block;
   border-radius:3px;
   pointer-events:none;
+  background:transparent;
 }
 .minimap-marker-layer-v2{
   position:absolute;
