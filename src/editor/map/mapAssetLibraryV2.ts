@@ -7,6 +7,8 @@ const SOURCE_STORE = 'sources';
 const ASSET_STORE = 'assets';
 const V2_PREFIX = 'v2-';
 
+export const STUDIO_INTERNAL_ASSET_TAG = 'studio-internal';
+
 type SourceRecord = {
   id: string;
   name: string;
@@ -32,6 +34,7 @@ type AssetRecord = {
   anchorY: number;
   footprint?: MapFootprintDefinition;
   tags: string[];
+  internal?: boolean;
   createdAt: number;
 };
 
@@ -93,6 +96,7 @@ function sourceUrl(source: SourceRecord) {
 }
 
 function toEntry(asset: AssetRecord, source: SourceRecord): MapPaletteEntry {
+  const internal = asset.internal === true;
   return {
     id: asset.id,
     palette: asset.palette,
@@ -102,9 +106,9 @@ function toEntry(asset: AssetRecord, source: SourceRecord): MapPaletteEntry {
     color: asset.color || '#61788b',
     description: asset.animation?.frames.length ? `Asset animado • ${asset.animation.frames.length} frames` : 'Asset recortado na biblioteca visual.',
     defaultLayer: asset.palette === 'terrain' ? 'ground' : 'objects',
-    objectKind: asset.palette === 'terrain' ? undefined : (asset.objectKind ?? 'doodad'),
+    objectKind: asset.palette === 'terrain' || internal ? undefined : (asset.objectKind ?? 'doodad'),
     source: 'custom',
-    tags: [...asset.tags, 'biblioteca-v2'],
+    tags: [...new Set([...asset.tags, 'biblioteca-v2', ...(internal ? [STUDIO_INTERNAL_ASSET_TAG] : [])])],
     sprite: {
       src: sourceUrl(source),
       nativeWidth: source.width,
@@ -162,6 +166,24 @@ export async function addAssetsToLibrary(sourceId: string, values: AssetLibraryC
   }
   await hydrateAssetLibraryV2();
   return records.map((record) => MAP_PALETTE_ENTRIES.find((entry) => entry.id === record.id)).filter((entry): entry is MapPaletteEntry => Boolean(entry));
+}
+
+export async function markLibraryAssetInternal(assetId: string, tags: string[] = []) {
+  const db = await openDb();
+  try {
+    const transaction = db.transaction(ASSET_STORE, 'readwrite');
+    const store = transaction.objectStore(ASSET_STORE);
+    const record = await requestToPromise(store.get(assetId)) as AssetRecord | undefined;
+    if (!record) return null;
+    record.internal = true;
+    record.tags = [...new Set([...(record.tags ?? []), ...tags, STUDIO_INTERNAL_ASSET_TAG])];
+    store.put(record);
+    await transactionDone(transaction);
+  } finally {
+    db.close();
+  }
+  await hydrateAssetLibraryV2();
+  return MAP_PALETTE_ENTRIES.find((entry) => entry.id === assetId) ?? null;
 }
 
 export async function deleteLibraryAsset(assetId: string) {
