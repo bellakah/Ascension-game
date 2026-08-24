@@ -30,6 +30,12 @@ export type MapCatalogContext = {
   monsters: Monster[];
 };
 
+let lastMapPois: MapPoi[] = [];
+
+export function getLastMapPois() {
+  return lastMapPois;
+}
+
 function merchantPoi(merchant: VillageMerchant, map: string): MapPoi {
   const bank = merchant.id === 'silas';
   const icon = merchant.id === 'rowan' ? '⚒' : merchant.id === 'mira' ? '⚗' : merchant.id === 'theo' ? '🪙' : '🏦';
@@ -193,5 +199,6 @@ export function getMapPois(context: MapCatalogContext): MapPoi[] {
     });
   }
 
+  lastMapPois = pois;
   return pois;
 }
