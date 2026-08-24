@@ -24,6 +24,7 @@ import { installDesktopViewportMetrics } from './game/desktopViewport';
 import { installDesktopPartyHudBridge } from './game/partyHudBridge';
 import { installDesktopHudStage3 } from './game/desktopHudStage3';
 import { installGameContextMenuGuard } from './game/contextMenuGuard';
+import { prepareCameraZoom } from './game/cameraZoom';
 import { installMapAutoRoute } from './map/mapAutoRoute';
 import { installMarkerRuntime } from './map/markerRuntime';
 import { installMinimapShape } from './map/minimapShape';
@@ -38,6 +39,7 @@ export async function startGameApp() {
   installResponsiveUi();
   installDesktopViewportMetrics();
   installGameContextMenuGuard();
+  const cameraZoom = prepareCameraZoom();
   const chatBootstrap = prepareChatBootstrap();
   const guildBootstrap = prepareGuildBootstrap();
   hydrateNpcDefinitionsIntoPalette();
@@ -60,5 +62,6 @@ export async function startGameApp() {
     installMarkerRuntime();
     installMinimapShape();
     installMapAutoRoute();
+    cameraZoom.attach();
   });
 }
