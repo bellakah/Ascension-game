@@ -1,7 +1,9 @@
 import '../npc/npcStudio.css';
 import './collectibleStudio.css';
-import { MAP_PALETTE_ENTRIES, getPaletteEntry } from '../editor/map/mapEditorCatalog';
-import { getMapAssetImage } from '../editor/map/mapAssetRenderer';
+import { getPaletteEntry } from '../editor/map/mapEditorCatalog';
+import { drawAssetThumbnail, getMapAssetImage } from '../editor/map/mapAssetRenderer';
+import { openMapAnimationStudio } from '../editor/map/mapAnimationStudio';
+import { markLibraryAssetInternal } from '../editor/map/mapAssetLibraryV2';
 import { findItemStudioRecord, itemStudioDisplay, listItemStudioRecords } from '../items/itemStudioStore';
 import {
   createCollectibleDefinition,
@@ -18,18 +20,22 @@ const esc = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, (char) =
 const STATES: Array<[CollectibleAnimationState, string]> = [['idle','Parado'], ['harvest','Durante coleta'], ['break','Quebrar / cair'], ['depleted','Esgotado'], ['respawn','Reaparecer']];
 const KINDS = Object.entries(COLLECTIBLE_KIND_LABELS) as Array<[CollectibleKind, string]>;
 
-function appearanceOptions() {
-  return MAP_PALETTE_ENTRIES
-    .filter((entry) => !entry.id.startsWith('collectibledef:') && (entry.sprite || entry.palette === 'resource' || entry.palette === 'doodad'))
-    .map((entry) => `<option value="${esc(entry.id)}">${esc(entry.label)} · ${esc(entry.id)}</option>`).join('');
-}
-
 function itemOptions() {
   return listItemStudioRecords().map((item) => `<option value="${esc(itemStudioDisplay(item))}">${esc(item.key)}</option>`).join('');
 }
 
-function previewAsset(definition: CollectibleDefinition) {
-  return definition.appearance.idle || definition.appearance.fallbackAssetId;
+function stateLabel(state: CollectibleAnimationState) {
+  return STATES.find(([id]) => id === state)?.[1] ?? state;
+}
+
+function explicitAppearance(definition: CollectibleDefinition, state: CollectibleAnimationState) {
+  return definition.appearance[state] || '';
+}
+
+function effectiveAppearance(definition: CollectibleDefinition, state: CollectibleAnimationState) {
+  return explicitAppearance(definition, state)
+    || definition.appearance.idle
+    || definition.appearance.fallbackAssetId;
 }
 
 export function createCollectibleStudio(root: HTMLElement) {
@@ -38,6 +44,7 @@ export function createCollectibleStudio(root: HTMLElement) {
   let draft = activeId ? clone(values[0]) : null as CollectibleDefinition | null;
   let search = '';
   let tab: 'general' | 'appearance' | 'drops' = 'general';
+  let previewState: CollectibleAnimationState = 'idle';
 
   const overlay = document.createElement('section');
   overlay.className = 'npc-studio-overlay collectible-studio-overlay hidden';
@@ -62,6 +69,13 @@ export function createCollectibleStudio(root: HTMLElement) {
     draft = activeId ? clone(values.find((entry) => entry.id === activeId)!) : null;
   };
 
+  const saveDraftAndReload = () => {
+    if (!draft) return;
+    const saved = saveCollectibleDefinition(draft);
+    activeId = saved.id;
+    reload(saved.id);
+  };
+
   const renderPreview = () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#08141d'; ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -69,13 +83,13 @@ export function createCollectibleStudio(root: HTMLElement) {
     for (let x = 0; x < canvas.width; x += 32) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke(); }
     for (let y = 0; y < canvas.height; y += 32) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke(); }
     if (!draft) return;
-    const entry = getPaletteEntry(previewAsset(draft));
+    const entry = getPaletteEntry(effectiveAppearance(draft, previewState));
     const image = getMapAssetImage(entry, renderPreview);
     const sprite = entry.sprite;
     if (image?.complete && image.naturalWidth > 0) {
       const frame = sprite?.animation?.frames?.[0] ?? sprite?.sourceRect ?? { x: 0, y: 0, width: image.naturalWidth, height: image.naturalHeight };
       const max = 220 * draft.appearance.scale;
-      const ratio = Math.min(max / frame.width, max / frame.height);
+      const ratio = Math.min(max / Math.max(1, frame.width), max / Math.max(1, frame.height));
       const width = frame.width * ratio, height = frame.height * ratio;
       ctx.imageSmoothingEnabled = !sprite?.pixelated;
       ctx.drawImage(image, frame.x, frame.y, frame.width, frame.height, 160 - width / 2, 260 - height, width, height);
@@ -85,7 +99,7 @@ export function createCollectibleStudio(root: HTMLElement) {
     }
     overlay.querySelector<HTMLElement>('#collectible-preview-id')!.textContent = `COLETÁVEL #${draft.numericId}`;
     overlay.querySelector<HTMLElement>('#collectible-preview-name')!.textContent = draft.name;
-    overlay.querySelector<HTMLElement>('#collectible-preview-kind')!.textContent = COLLECTIBLE_KIND_LABELS[draft.kind];
+    overlay.querySelector<HTMLElement>('#collectible-preview-kind')!.textContent = `${COLLECTIBLE_KIND_LABELS[draft.kind]} · ${stateLabel(previewState)}`;
     overlay.querySelector<HTMLElement>('#collectible-summary')!.innerHTML = `<div class="npc-summary-card"><span>Coleta</span><strong>${(draft.harvestDurationMs / 1000).toFixed(1)}s</strong></div><div class="npc-summary-card"><span>Respawn</span><strong>${(draft.respawnMs / 1000).toFixed(1)}s</strong></div><div class="npc-summary-card"><span>Drops</span><strong>${draft.drops.length}</strong></div>`;
   };
 
@@ -93,7 +107,7 @@ export function createCollectibleStudio(root: HTMLElement) {
     const query = search.trim().toLocaleLowerCase('pt-BR').replace(/^#/, '');
     const filtered = values.filter((entry) => !query || `${entry.numericId} ${entry.name} ${entry.kind} ${entry.category} ${entry.tags.join(' ')}`.toLocaleLowerCase('pt-BR').includes(query));
     listNode.innerHTML = filtered.map((entry) => `<button class="npc-list-card ${entry.id === activeId ? 'active' : ''}" data-collectible="${esc(entry.id)}"><span class="npc-list-avatar">${esc(entry.icon)}</span><span><strong>${esc(entry.name)}</strong><span>#${entry.numericId} · ${esc(entry.category)}</span></span><span class="npc-list-role">${esc(COLLECTIBLE_KIND_LABELS[entry.kind])}</span></button>`).join('') || '<div class="collectible-empty">Nenhum coletável.</div>';
-    listNode.querySelectorAll<HTMLButtonElement>('[data-collectible]').forEach((button) => button.onclick = () => { activeId = button.dataset.collectible!; draft = clone(values.find((entry) => entry.id === activeId)!); renderAll(); });
+    listNode.querySelectorAll<HTMLButtonElement>('[data-collectible]').forEach((button) => button.onclick = () => { activeId = button.dataset.collectible!; draft = clone(values.find((entry) => entry.id === activeId)!); previewState = 'idle'; renderAll(); });
   };
 
   const bindText = (selector: string, apply: (value: string) => void) => {
@@ -131,14 +145,59 @@ export function createCollectibleStudio(root: HTMLElement) {
     };
   };
 
+  const importAppearance = (state: CollectibleAnimationState) => {
+    if (!draft) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/png,image/webp,image/jpeg';
+    input.multiple = true;
+    input.onchange = () => {
+      const files = [...(input.files ?? [])];
+      if (!files.length) return;
+      void openMapAnimationStudio(files, (entries) => {
+        const created = entries[0];
+        if (!created || !draft) return;
+        void markLibraryAssetInternal(created.id, ['collectible-animation-internal', `collectible:${draft.id}`, `collectible-state:${state}`]).then(() => {
+          if (!draft) return;
+          draft.appearance[state] = created.id;
+          previewState = state;
+          saveDraftAndReload();
+          tab = 'appearance';
+          renderAll();
+        });
+      }).catch((error) => alert(error instanceof Error ? error.message : 'Não foi possível importar a animação.'));
+    };
+    input.click();
+  };
+
   const renderAppearance = () => {
     if (!draft) return;
-    const options = appearanceOptions();
-    form.innerHTML = `<section><h4>Aparência por estado</h4><p class="monster-inline-note">Use qualquer asset ou animação da biblioteca. Durante a coleta o recurso pode balançar, quebrar, desaparecer e reaparecer.</p>${STATES.map(([state,label]) => `<label>${label}<select data-appearance-state="${state}"><option value="">— usar Idle / fallback —</option>${options}</select></label>`).join('')}</section><section><h4>Visual</h4><div class="npc-form-grid"><label>Escala<input id="collectible-scale" type="number" min=".1" max="10" step=".1" value="${draft.appearance.scale}"></label><label class="npc-check"><input id="collectible-shadow" type="checkbox" ${draft.appearance.showShadow ? 'checked' : ''}> Mostrar sombra</label></div></section>`;
-    form.querySelectorAll<HTMLSelectElement>('[data-appearance-state]').forEach((select) => {
-      const state = select.dataset.appearanceState as CollectibleAnimationState;
-      select.value = draft!.appearance[state] ?? '';
-      select.onchange = () => { if (!draft) return; if (select.value) draft.appearance[state] = select.value; else delete draft.appearance[state]; if (state === 'idle' && select.value) draft.appearance.fallbackAssetId = select.value; renderPreview(); };
+    form.innerHTML = `<section><h4>Aparência por estado</h4><p class="monster-inline-note">Carregue a imagem, spritesheet ou vários frames diretamente em cada estado. Essas animações ficam internas ao coletável e não aparecem como objetos separados no Map Editor.</p><div class="collectible-state-list">${STATES.map(([state,label]) => {
+      const explicit = explicitAppearance(draft!, state);
+      const effective = effectiveAppearance(draft!, state);
+      const entry = getPaletteEntry(effective);
+      const inherited = !explicit;
+      return `<article class="collectible-state-card ${previewState === state ? 'active' : ''}" data-state-card="${state}"><button type="button" class="collectible-state-preview" data-preview-state="${state}" title="Visualizar ${esc(label)}"><canvas data-state-thumb="${state}" width="92" height="76"></canvas></button><div class="collectible-state-copy"><strong>${esc(label)}</strong><span>${inherited ? (state === 'idle' ? `Fallback: ${esc(entry.label)}` : `Usa Parado · ${esc(entry.label)}`) : esc(entry.label)}</span><small>${explicit ? (entry.sprite?.animation?.frames.length ? `${entry.sprite.animation.frames.length} frames` : 'Imagem estática') : 'Sem asset próprio'}</small></div><div class="collectible-state-actions"><button type="button" data-import-state="${state}" class="npc-small-action">${explicit ? 'Substituir' : '＋ Carregar'}</button>${explicit ? `<button type="button" data-clear-state="${state}" class="collectible-clear-state">Limpar</button>` : ''}</div></article>`;
+    }).join('')}</div></section><section><h4>Visual</h4><div class="npc-form-grid"><label>Escala<input id="collectible-scale" type="number" min=".1" max="10" step=".1" value="${draft.appearance.scale}"></label><label class="npc-check"><input id="collectible-shadow" type="checkbox" ${draft.appearance.showShadow ? 'checked' : ''}> Mostrar sombra</label></div></section>`;
+
+    form.querySelectorAll<HTMLCanvasElement>('[data-state-thumb]').forEach((thumb) => {
+      const state = thumb.dataset.stateThumb as CollectibleAnimationState;
+      drawAssetThumbnail(thumb, getPaletteEntry(effectiveAppearance(draft!, state)));
+    });
+    form.querySelectorAll<HTMLButtonElement>('[data-preview-state]').forEach((button) => button.onclick = () => {
+      previewState = button.dataset.previewState as CollectibleAnimationState;
+      renderAppearance();
+      renderPreview();
+    });
+    form.querySelectorAll<HTMLButtonElement>('[data-import-state]').forEach((button) => button.onclick = () => importAppearance(button.dataset.importState as CollectibleAnimationState));
+    form.querySelectorAll<HTMLButtonElement>('[data-clear-state]').forEach((button) => button.onclick = () => {
+      if (!draft) return;
+      const state = button.dataset.clearState as CollectibleAnimationState;
+      delete draft.appearance[state];
+      previewState = state;
+      saveDraftAndReload();
+      tab = 'appearance';
+      renderAll();
     });
     bindNumber('#collectible-scale', (value) => draft!.appearance.scale = Math.max(.1, Math.min(10, value || 1)));
     const shadow = form.querySelector<HTMLInputElement>('#collectible-shadow')!; shadow.onchange = () => { if (draft) draft.appearance.showShadow = shadow.checked; };
@@ -168,14 +227,14 @@ export function createCollectibleStudio(root: HTMLElement) {
   const renderAll = () => { renderList(); renderTabs(); renderForm(); renderPreview(); };
 
   overlay.querySelector<HTMLInputElement>('#collectible-search')!.oninput = (event) => { search = (event.currentTarget as HTMLInputElement).value; renderList(); };
-  overlay.querySelector<HTMLButtonElement>('#collectible-new')!.onclick = () => { draft = createCollectibleDefinition(); activeId = draft.id; tab = 'general'; renderAll(); };
+  overlay.querySelector<HTMLButtonElement>('#collectible-new')!.onclick = () => { draft = createCollectibleDefinition(); activeId = draft.id; tab = 'general'; previewState = 'idle'; renderAll(); };
   overlay.querySelector<HTMLButtonElement>('#collectible-save')!.onclick = () => { if (!draft) return; const saved = saveCollectibleDefinition(draft); activeId = saved.id; reload(saved.id); renderAll(); };
-  overlay.querySelector<HTMLButtonElement>('#collectible-duplicate')!.onclick = () => { if (!draft) return; if (!values.some((value) => value.id === draft!.id)) saveCollectibleDefinition(draft); const copy = duplicateCollectibleDefinition(draft.id); if (copy) { activeId = copy.id; reload(copy.id); renderAll(); } };
-  overlay.querySelector<HTMLButtonElement>('#collectible-delete')!.onclick = () => { if (!draft || !confirm(`Excluir “${draft.name}”?`)) return; try { deleteCollectibleDefinition(draft.id); reload(''); renderAll(); } catch (error) { alert(error instanceof Error ? error.message : 'Não foi possível excluir.'); } };
+  overlay.querySelector<HTMLButtonElement>('#collectible-duplicate')!.onclick = () => { if (!draft) return; if (!values.some((value) => value.id === draft!.id)) saveCollectibleDefinition(draft); const copy = duplicateCollectibleDefinition(draft.id); if (copy) { activeId = copy.id; reload(copy.id); previewState = 'idle'; renderAll(); } };
+  overlay.querySelector<HTMLButtonElement>('#collectible-delete')!.onclick = () => { if (!draft || !confirm(`Excluir “${draft.name}”?`)) return; try { deleteCollectibleDefinition(draft.id); reload(''); previewState = 'idle'; renderAll(); } catch (error) { alert(error instanceof Error ? error.message : 'Não foi possível excluir.'); } };
 
   const close = () => overlay.classList.add('hidden');
   overlay.querySelector<HTMLButtonElement>('#collectible-back')!.onclick = close;
-  const open = (id?: string) => { values = listCollectibleDefinitions(); if (id && getCollectibleDefinition(id)) activeId = id; reload(activeId); overlay.classList.remove('hidden'); renderAll(); };
+  const open = (id?: string) => { values = listCollectibleDefinitions(); if (id && getCollectibleDefinition(id)) activeId = id; reload(activeId); previewState = 'idle'; overlay.classList.remove('hidden'); renderAll(); };
   renderAll();
   return { open, close, element: overlay };
 }
