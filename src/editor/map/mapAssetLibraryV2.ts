@@ -168,6 +168,24 @@ export async function addAssetsToLibrary(sourceId: string, values: AssetLibraryC
   return records.map((record) => MAP_PALETTE_ENTRIES.find((entry) => entry.id === record.id)).filter((entry): entry is MapPaletteEntry => Boolean(entry));
 }
 
+export async function markLibraryAssetInternal(assetId: string, tags: string[] = []) {
+  const db = await openDb();
+  try {
+    const transaction = db.transaction(ASSET_STORE, 'readwrite');
+    const store = transaction.objectStore(ASSET_STORE);
+    const record = await requestToPromise(store.get(assetId)) as AssetRecord | undefined;
+    if (!record) return null;
+    record.internal = true;
+    record.tags = [...new Set([...(record.tags ?? []), ...tags, STUDIO_INTERNAL_ASSET_TAG])];
+    store.put(record);
+    await transactionDone(transaction);
+  } finally {
+    db.close();
+  }
+  await hydrateAssetLibraryV2();
+  return MAP_PALETTE_ENTRIES.find((entry) => entry.id === assetId) ?? null;
+}
+
 export async function deleteLibraryAsset(assetId: string) {
   const db = await openDb();
   let sourceId: string | null = null;
