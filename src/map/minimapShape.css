@@ -1,0 +1,111 @@
+/* Ajustes independentes de formato/posição do minimapa desktop. */
+html[data-ui-mode='desktop'] #minimap-shell{
+  top:14px!important;
+  right:14px!important;
+}
+
+html[data-ui-mode='desktop'] .minimap-heading{
+  position:relative;
+  z-index:8;
+  gap:6px;
+}
+
+html[data-ui-mode='desktop'] .minimap-heading b{
+  min-width:0;
+  flex:1;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.minimap-shape-toggle{
+  width:19px;
+  height:19px;
+  flex:0 0 19px;
+  display:grid;
+  place-items:center;
+  border:1px solid rgba(202,163,74,.36);
+  border-radius:4px;
+  background:rgba(8,31,39,.9);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035);
+  cursor:pointer;
+  pointer-events:auto;
+}
+.minimap-shape-toggle:hover,
+.minimap-shape-toggle:focus-visible{
+  border-color:rgba(226,186,92,.72);
+  background:#12343e;
+  outline:none;
+}
+.minimap-shape-toggle-glyph{
+  width:8px;
+  height:8px;
+  display:block;
+  border:1.5px solid #d6b760;
+  border-radius:2px;
+  pointer-events:none;
+}
+.minimap-shape-toggle[data-current-shape='square'] .minimap-shape-toggle-glyph{
+  border-radius:50%;
+}
+.minimap-shape-toggle[data-current-shape='round'] .minimap-shape-toggle-glyph{
+  border-radius:1px;
+}
+
+/* Forma circular: mantém toda a cartografia dentro de um recorte redondo,
+   sem alterar a lógica do canvas ou do Marker Runtime V2. */
+html[data-ui-mode='desktop'] #minimap-shell.minimap-shape-round{
+  width:226px!important;
+  height:226px!important;
+  padding:0!important;
+  border-radius:50%!important;
+  overflow:hidden!important;
+  background:radial-gradient(circle at 50% 42%,rgba(15,42,49,.98),rgba(4,16,22,.99) 72%)!important;
+}
+
+html[data-ui-mode='desktop'] #minimap-shell.minimap-shape-round .minimap-heading{
+  position:absolute!important;
+  top:9px!important;
+  left:25px!important;
+  right:25px!important;
+  height:23px!important;
+  padding:0!important;
+  border-bottom:0!important;
+  background:linear-gradient(180deg,rgba(3,15,20,.76),rgba(3,15,20,.08))!important;
+}
+
+html[data-ui-mode='desktop'] #minimap-shell.minimap-shape-round #minimap-canvas{
+  position:absolute!important;
+  left:13px!important;
+  top:13px!important;
+  width:200px!important;
+  height:200px!important;
+  margin:0!important;
+  border-radius:50%!important;
+  clip-path:circle(50% at 50% 50%)!important;
+}
+
+html[data-ui-mode='desktop'] #minimap-shell.minimap-shape-round .minimap-v2-canvas,
+html[data-ui-mode='desktop'] #minimap-shell.minimap-shape-round .minimap-marker-layer-v2{
+  border-radius:50%!important;
+  clip-path:circle(50% at 50% 50%)!important;
+}
+
+html[data-ui-mode='desktop'] #minimap-shell.minimap-shape-round .minimap-footer{
+  position:absolute!important;
+  z-index:8;
+  left:30px!important;
+  right:30px!important;
+  bottom:9px!important;
+  height:22px!important;
+  padding:0!important;
+  background:linear-gradient(0deg,rgba(3,15,20,.78),rgba(3,15,20,.08))!important;
+  pointer-events:none;
+}
+
+html[data-ui-mode='desktop'] #minimap-shell.minimap-shape-round .minimap-footer span{
+  max-width:98px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
