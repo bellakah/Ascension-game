@@ -24,6 +24,7 @@ import { installDesktopViewportMetrics } from './game/desktopViewport';
 import { installDesktopPartyHudBridge } from './game/partyHudBridge';
 import { installDesktopHudStage3 } from './game/desktopHudStage3';
 import { installMapAutoRoute } from './map/mapAutoRoute';
+import { installMarkerRuntime } from './map/markerRuntime';
 import { installMapSystemStage4Polish } from './map/mapSystemStage4Polish';
 import { preparePublishedWorldRuntime } from './map/publishedMapRuntime';
 import { subscribePublishedMap } from './map/publishedMapStore';
@@ -53,6 +54,7 @@ export async function startGameApp() {
     installDesktopPartyHudBridge();
     installDesktopHudStage3();
     installMapSystemStage4Polish();
+    installMarkerRuntime();
     installMapAutoRoute();
   });
 }
