@@ -24,19 +24,19 @@ export async function startActorsEditor() {
   const monsterButton = shell.root.querySelector<HTMLButtonElement>('#mep-mode-monsters')!;
   const itemButton = shell.root.querySelector<HTMLButtonElement>('#mep-mode-items')!;
 
-  const openNpc = () => {
+  const openNpc = (npcId?: string) => {
     monsterStudio.close();
-    npcStudio.open();
+    npcStudio.open(npcId);
     shell.setActive('npcs');
   };
-  const openMonster = () => {
+  const openMonster = (monsterId?: string) => {
     npcStudio.close();
-    monsterStudio.open();
+    monsterStudio.open(monsterId);
     shell.setActive('monsters');
   };
 
-  npcButton.onclick = openNpc;
-  monsterButton.onclick = openMonster;
+  npcButton.onclick = () => openNpc();
+  monsterButton.onclick = () => openMonster();
   itemButton.onclick = () => shell.navigate('items');
 
   npcStudio.element.querySelector<HTMLButtonElement>('#npc-studio-back')!.onclick = () => shell.navigate('map');
@@ -46,7 +46,9 @@ export async function startActorsEditor() {
   installStudioAnimationStateTabsIntegration();
   installMonsterDropItemPicker();
 
-  const requested = new URLSearchParams(window.location.search).get('section');
-  if (requested === 'npc') openNpc();
-  else openMonster();
+  const params = new URLSearchParams(window.location.search);
+  const requested = params.get('section');
+  const id = params.get('id') ?? undefined;
+  if (requested === 'npc') openNpc(id);
+  else openMonster(id);
 }
