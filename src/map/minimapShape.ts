@@ -22,16 +22,19 @@ function saveShape(shape: MinimapShape) {
 
 export function installMinimapShape() {
   const shell = document.querySelector<HTMLElement>('#minimap-shell');
-  const heading = shell?.querySelector<HTMLElement>('.minimap-heading');
-  const north = heading?.querySelector<HTMLElement>('.minimap-north');
-  if (!shell || !heading || !north || heading.querySelector('.minimap-shape-toggle')) return;
+  if (!shell || document.querySelector('.minimap-shape-toggle-floating')) return;
 
-  const toggle = document.createElement('span');
-  toggle.className = 'minimap-shape-toggle';
-  toggle.setAttribute('role', 'button');
-  toggle.tabIndex = 0;
+  // Remove a implementação antiga caso exista em uma sessão reaproveitada.
+  shell.querySelector('.minimap-shape-toggle')?.remove();
+
+  // O shell do minimapa é um <button>. Colocar outro controle interativo dentro
+  // dele gera uma árvore inválida e alguns navegadores engolem o clique. O
+  // seletor de formato passa a ser um botão independente, fixo sobre a HUD.
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'minimap-shape-toggle minimap-shape-toggle-floating';
   toggle.innerHTML = '<span class="minimap-shape-toggle-glyph" aria-hidden="true"></span>';
-  heading.insertBefore(toggle, north);
+  document.body.appendChild(toggle);
 
   let shape: MinimapShape = readShape();
 
@@ -55,6 +58,8 @@ export function installMinimapShape() {
     shape = next;
     shell.classList.toggle('minimap-shape-round', shape === 'round');
     shell.classList.toggle('minimap-shape-square', shape === 'square');
+    document.documentElement.dataset.minimapShape = shape;
+
     const target = shape === 'round' ? 'quadrado' : 'redondo';
     toggle.dataset.currentShape = shape;
     toggle.title = `Usar minimapa ${target}`;
@@ -69,7 +74,10 @@ export function installMinimapShape() {
 
   const switchShape = () => apply(shape === 'round' ? 'square' : 'round', true);
 
-  toggle.addEventListener('pointerdown', (event) => event.stopPropagation());
+  toggle.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  });
   toggle.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -83,4 +91,6 @@ export function installMinimapShape() {
   });
 
   apply(shape);
+
+  window.addEventListener('pagehide', () => toggle.remove(), { once: true });
 }
