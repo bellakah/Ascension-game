@@ -1,15 +1,34 @@
 import {
   ITEM_CATALOG,
   type EquipSlot,
-  type ItemChestConfig,
-  type ItemChestEntry,
+  type ItemCategory,
   type ItemDefinition,
   type ItemRarity,
   type ItemStats,
 } from './itemCatalog';
 import type { ClassId } from '../classes/classCatalog';
 
-export type ItemStudioCategory = ItemDefinition['category'];
+export type ItemStudioCategory =
+  | 'consumable'
+  | 'material'
+  | 'weapon'
+  | 'armor'
+  | 'accessory'
+  | 'chest'
+  | 'quest'
+  | 'currency'
+  | 'special';
+
+export type ItemChestMode = 'independent' | 'weighted';
+export type ItemChestEntry = {
+  itemId: string;
+  numericId?: number;
+  chance: number;
+  weight: number;
+  min: number;
+  max: number;
+};
+export type ItemChestConfig = { mode: ItemChestMode; rolls: number; entries: ItemChestEntry[] };
 export type ItemStudioSource = 'legacy' | 'custom';
 
 export type ItemStudioFlags = {
@@ -53,8 +72,33 @@ const CHANGE_EVENT = 'ascension-item-definitions-change';
 const clone = <T>(value: T): T => typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value)) as T;
 const clampInt = (value: number, min: number, max: number) => Math.max(min, Math.min(max, Math.floor(Number(value) || 0)));
 
+export const ITEM_STUDIO_CATEGORY_LABELS: Record<ItemStudioCategory, string> = {
+  consumable: 'Consumíveis',
+  material: 'Materiais',
+  weapon: 'Armas',
+  armor: 'Armaduras',
+  accessory: 'Acessórios',
+  chest: 'Baús',
+  quest: 'Missão',
+  currency: 'Moedas',
+  special: 'Especiais',
+};
+
 function defaultFlags(): ItemStudioFlags {
   return { tradeable: true, sellable: true, droppable: true, destroyable: true };
+}
+
+function studioCategoryFromRuntime(category: ItemCategory, equipSlot?: EquipSlot): ItemStudioCategory {
+  if (category === 'equipment') return equipSlot === 'accessory' ? 'accessory' : 'armor';
+  return category;
+}
+
+function runtimeCategory(category: ItemStudioCategory): ItemCategory {
+  if (category === 'weapon') return 'weapon';
+  if (category === 'armor') return 'equipment';
+  if (category === 'accessory') return 'accessory';
+  if (category === 'consumable' || category === 'chest') return 'consumable';
+  return 'material';
 }
 
 function readFile(): ItemStudioFile {
@@ -75,7 +119,7 @@ function writeFile(file: ItemStudioFile, notify = true) {
 
 function normalizeChest(chest?: ItemChestConfig): ItemChestConfig | undefined {
   if (!chest) return undefined;
-  const mode = chest.mode === 'weighted' ? 'weighted' : 'independent';
+  const mode: ItemChestMode = chest.mode === 'weighted' ? 'weighted' : 'independent';
   const entries = Array.isArray(chest.entries) ? chest.entries.map((entry) => ({
     itemId: String(entry.itemId ?? ''),
     numericId: Number.isFinite(entry.numericId) ? Math.max(1, Math.floor(Number(entry.numericId))) : undefined,
@@ -127,21 +171,17 @@ function recordFromRuntime(item: ItemDefinition, numericId: number): ItemStudioR
     name: item.name,
     description: item.description,
     icon: item.icon,
-    iconImage: item.iconImage,
-    category: item.category,
+    category: studioCategoryFromRuntime(item.category, item.equipSlot),
     rarity: item.rarity,
     stackMax: item.stackMax,
     value: item.value,
     equipSlot: item.equipSlot,
     stats: item.stats,
     heal: item.heal,
-    manaHeal: item.manaHeal,
     capacityBonus: item.capacityBonus,
-    levelRequirement: item.levelRequirement,
     allowedClasses: item.allowedClasses,
-    tags: item.tags ?? [],
-    flags: item.flags ?? defaultFlags(),
-    chest: item.chest,
+    tags: [],
+    flags: defaultFlags(),
     createdAt: now,
     updatedAt: now,
   });
@@ -150,25 +190,18 @@ function recordFromRuntime(item: ItemDefinition, numericId: number): ItemStudioR
 function runtimeFromRecord(record: ItemStudioRecord): ItemDefinition {
   return {
     id: record.key,
-    numericId: record.numericId,
     name: record.name,
     description: record.description,
     icon: record.icon,
-    ...(record.iconImage ? { iconImage: record.iconImage } : {}),
-    category: record.category,
+    category: runtimeCategory(record.category),
     rarity: record.rarity,
     stackMax: record.stackMax,
     value: record.value,
     ...(record.equipSlot ? { equipSlot: record.equipSlot } : {}),
     ...(record.stats ? { stats: clone(record.stats) } : {}),
     ...(record.heal ? { heal: record.heal } : {}),
-    ...(record.manaHeal ? { manaHeal: record.manaHeal } : {}),
     ...(record.capacityBonus ? { capacityBonus: record.capacityBonus } : {}),
-    ...(record.levelRequirement ? { levelRequirement: record.levelRequirement } : {}),
     ...(record.allowedClasses?.length ? { allowedClasses: [...record.allowedClasses] } : {}),
-    tags: [...record.tags],
-    flags: clone(record.flags),
-    ...(record.chest ? { chest: clone(record.chest) } : {}),
   };
 }
 
@@ -182,8 +215,8 @@ export function ensureItemStudioMigration() {
   let nextId = Math.max(0, ...file.items.map((item) => item.numericId)) + 1;
   let changed = false;
 
-  // Migra o catálogo antigo para IDs numéricos permanentes sem trocar as chaves
-  // internas usadas pelos saves/inventário existentes.
+  // O ID numérico novo é a identidade usada pelo Editor. A chave antiga é
+  // preservada internamente para inventários/saves já existentes continuarem válidos.
   for (const item of Object.values(ITEM_CATALOG)) {
     if (existingKeys.has(item.id)) continue;
     file.items.push(recordFromRuntime(item, nextId++));
