@@ -23,6 +23,7 @@ import { installResponsiveUi } from './game/responsive';
 import { installDesktopViewportMetrics } from './game/desktopViewport';
 import { installDesktopPartyHudBridge } from './game/partyHudBridge';
 import { installDesktopHudStage3 } from './game/desktopHudStage3';
+import { installGameContextMenuGuard } from './game/contextMenuGuard';
 import { installMapAutoRoute } from './map/mapAutoRoute';
 import { installMarkerRuntime } from './map/markerRuntime';
 import { installMinimapShape } from './map/minimapShape';
@@ -36,6 +37,7 @@ import { hydrateMonsterDefinitionsIntoPalette } from './monsterEditor/monsterSto
 export async function startGameApp() {
   installResponsiveUi();
   installDesktopViewportMetrics();
+  installGameContextMenuGuard();
   const chatBootstrap = prepareChatBootstrap();
   const guildBootstrap = prepareGuildBootstrap();
   hydrateNpcDefinitionsIntoPalette();
