@@ -25,7 +25,7 @@ type ItemStudioTab = 'general' | 'properties' | 'chest';
 const CATEGORIES = Object.entries(ITEM_STUDIO_CATEGORY_LABELS) as Array<[ItemStudioCategory, string]>;
 const RARITIES: Array<[ItemRarity, string]> = [['common', 'Comum'], ['uncommon', 'Incomum'], ['rare', 'Raro'], ['epic', 'Épico']];
 const EQUIP_SLOTS: Array<[EquipSlot, string]> = [['weapon', 'Arma'], ['armor', 'Peitoral'], ['head', 'Cabeça'], ['legs', 'Pernas'], ['boots', 'Botas'], ['accessory', 'Acessório']];
-const CLASSES: Array<[ClassId, string]> = [['warrior', 'Guerreiro'], ['mage', 'Mago'], ['priest', 'Sacerdote'], ['archer', 'Arqueiro']];
+const CLASSES: Array<[ClassId, string]> = [['warrior', 'Guerreiro'], ['mage', 'Mago']];
 
 function iconHtml(item: Pick<ItemStudioRecord, 'icon' | 'iconImage'>, className = '') {
   return item.iconImage
