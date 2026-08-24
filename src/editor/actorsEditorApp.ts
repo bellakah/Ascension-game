@@ -5,8 +5,6 @@ import { createNpcStudio } from '../npc/npcStudio';
 import { hydrateNpcDefinitionsIntoPalette } from '../npc/npcStore';
 import { createMonsterStudio } from '../monsterEditor/monsterStudio';
 import { hydrateMonsterDefinitionsIntoPalette } from '../monsterEditor/monsterStore';
-import { ensureItemStudioMigration } from '../items/itemStudioStore';
-import { installMonsterDropItemPicker } from '../items/monsterDropItemPicker';
 import { installStudioAppearanceUx } from './studioAppearanceUx';
 import { installStudioAnimationStateTabsIntegration } from './studioAnimationStateTabsIntegration';
 
@@ -14,7 +12,6 @@ export async function startActorsEditor() {
   const shell = createStandaloneStudioShell('actors');
   await hydrateAssetLibraryV2();
   ensureLegacyStudioDefinitions();
-  ensureItemStudioMigration();
   hydrateNpcDefinitionsIntoPalette();
   hydrateMonsterDefinitionsIntoPalette();
 
@@ -23,6 +20,22 @@ export async function startActorsEditor() {
   const npcButton = shell.root.querySelector<HTMLButtonElement>('#mep-mode-npcs')!;
   const monsterButton = shell.root.querySelector<HTMLButtonElement>('#mep-mode-monsters')!;
   const itemButton = shell.root.querySelector<HTMLButtonElement>('#mep-mode-items')!;
+
+  let dropPickerRequested = false;
+  const ensureDropPicker = () => {
+    if (dropPickerRequested) return;
+    dropPickerRequested = true;
+    // Deixa a UI do editor pintar primeiro. O Item Studio só é importado quando
+    // o usuário realmente entra no Monster Studio, evitando pesar o bootstrap.
+    window.setTimeout(() => {
+      void import('../items/monsterDropItemPicker').then(({ installMonsterDropItemPicker }) => {
+        installMonsterDropItemPicker();
+      }).catch((error) => {
+        console.error('[ActorsEditor] Falha ao carregar seletor de itens dos drops.', error);
+        dropPickerRequested = false;
+      });
+    }, 0);
+  };
 
   const openNpc = (npcId?: string) => {
     monsterStudio.close();
@@ -33,6 +46,7 @@ export async function startActorsEditor() {
     npcStudio.close();
     monsterStudio.open(monsterId);
     shell.setActive('monsters');
+    ensureDropPicker();
   };
 
   npcButton.onclick = () => openNpc();
@@ -44,7 +58,6 @@ export async function startActorsEditor() {
 
   installStudioAppearanceUx();
   installStudioAnimationStateTabsIntegration();
-  installMonsterDropItemPicker();
 
   const params = new URLSearchParams(window.location.search);
   const requested = params.get('section');
