@@ -6,10 +6,12 @@ if (playtest === 'map') {
   void Promise.all([
     import('./npc/npcStore'),
     import('./monsterEditor/monsterStore'),
+    import('./gathering/collectibleStore'),
     import('./editor/map/mapPlaytest'),
-  ]).then(([{ hydrateNpcDefinitionsIntoPalette }, { hydrateMonsterDefinitionsIntoPalette }, { startMapPlaytest }]) => {
+  ]).then(([{ hydrateNpcDefinitionsIntoPalette }, { hydrateMonsterDefinitionsIntoPalette }, { ensureCollectibleMigration }, { startMapPlaytest }]) => {
     hydrateNpcDefinitionsIntoPalette();
     hydrateMonsterDefinitionsIntoPalette();
+    ensureCollectibleMigration();
     return startMapPlaytest();
   });
 } else if (editor === 'map') {
@@ -17,19 +19,19 @@ if (playtest === 'map') {
     import('./editor/studioLegacyMigration'),
     import('./npc/npcStore'),
     import('./monsterEditor/monsterStore'),
+    import('./gathering/collectibleStore'),
     import('./editor/map/mapEditorProApp'),
-  ]).then(async ([{ ensureLegacyStudioDefinitions }, { hydrateNpcDefinitionsIntoPalette }, { hydrateMonsterDefinitionsIntoPalette }, { startMapEditor }]) => {
-    // Primeira hidratação mantém os IDs compostos disponíveis enquanto o Map Editor inicia.
+  ]).then(async ([{ ensureLegacyStudioDefinitions }, { hydrateNpcDefinitionsIntoPalette }, { hydrateMonsterDefinitionsIntoPalette }, { ensureCollectibleMigration }, { startMapEditor }]) => {
     ensureLegacyStudioDefinitions();
     hydrateNpcDefinitionsIntoPalette();
     hydrateMonsterDefinitionsIntoPalette();
+    ensureCollectibleMigration();
     await startMapEditor();
 
-    // startMapEditor carrega a biblioteca IndexedDB/V2. Recriamos os assets compostos
-    // depois disso para que NPCs e monstros usem o sprite realmente configurado, em
-    // vez dos placeholders Rowan/Lobo escolhidos antes dos assets existirem na paleta.
+    // A biblioteca V2 já está disponível depois do start; reconstruímos previews compostos reais.
     hydrateNpcDefinitionsIntoPalette();
     hydrateMonsterDefinitionsIntoPalette();
+    ensureCollectibleMigration();
     window.dispatchEvent(new Event('resize'));
 
     const { installMapEditorInteractionPerf } = await import('./editor/map/mapEditorInteractionPerf');
@@ -42,6 +44,8 @@ if (playtest === 'map') {
     installCharacterAnimationAssetIsolation();
     const { installMapEditorCatalogNav } = await import('./editor/map/mapEditorCatalogNav');
     installMapEditorCatalogNav();
+    const { installSpawnGroupInspector } = await import('./editor/map/spawnGroupInspector');
+    installSpawnGroupInspector();
     const { installMapMarkerStudioIntegration } = await import('./editor/map/mapMarkerStudio');
     installMapMarkerStudioIntegration();
   });
@@ -49,6 +53,8 @@ if (playtest === 'map') {
   void import('./editor/actorsEditorApp').then(({ startActorsEditor }) => startActorsEditor());
 } else if (editor === 'items') {
   void import('./editor/itemsEditorApp').then(({ startItemsEditor }) => startItemsEditor());
+} else if (editor === 'collectibles') {
+  void import('./editor/collectiblesEditorApp').then(({ startCollectiblesEditor }) => startCollectiblesEditor());
 } else {
   void import('./gameBootstrap').then(({ startGameApp }) => startGameApp());
 }

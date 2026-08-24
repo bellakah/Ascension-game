@@ -36,6 +36,8 @@ import { installPublishedNpcRuntime } from './npc/npcRuntime';
 import { hydrateMonsterDefinitionsIntoPalette } from './monsterEditor/monsterStore';
 import { hydrateItemStudioRuntime } from './items/itemStudioStore';
 import { installItemInventoryVisualIntegration } from './items/itemInventoryVisualIntegration';
+import { ensureDefaultGatheringTools } from './gathering/gatheringToolMigration';
+import { ensureCollectibleMigration } from './gathering/collectibleStore';
 
 export async function startGameApp() {
   installResponsiveUi();
@@ -45,9 +47,11 @@ export async function startGameApp() {
   const chatBootstrap = prepareChatBootstrap();
   const guildBootstrap = prepareGuildBootstrap();
   hydrateItemStudioRuntime();
+  ensureDefaultGatheringTools();
   installItemInventoryVisualIntegration();
   hydrateNpcDefinitionsIntoPalette();
   hydrateMonsterDefinitionsIntoPalette();
+  ensureCollectibleMigration();
   await preparePublishedWorldRuntime();
   await installPublishedNpcRuntime();
   const unsubscribePublished = subscribePublishedMap(() => {

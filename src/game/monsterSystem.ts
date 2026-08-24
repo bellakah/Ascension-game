@@ -3,7 +3,9 @@ import { animationFrameIndex } from '../editor/map/mapAnimationRuntime';
 import { getMapAssetImage } from '../editor/map/mapAssetRenderer';
 import { getPaletteEntry } from '../editor/map/mapEditorCatalog';
 import type { MapAnimationFrame, MapPaletteEntry, MapSpriteRect } from '../editor/map/mapEditorTypes';
-import { getPreparedPublishedWorldRuntime, getPublishedObjectPositions } from '../map/publishedMapRuntime';
+import { generateSpawnOffsets, readSpawnGroupConfig, spawnRespawnDelay } from '../editor/map/spawnGroupConfig';
+import { getSpawnGroup } from '../editor/map/spawnGroupStore';
+import { getPreparedPublishedWorldRuntime } from '../map/publishedMapRuntime';
 import { getMonsterDefinition, monsterIdFromAssetId, resolveMonsterAppearanceAssetId } from '../monsterEditor/monsterStore';
 import type { MonsterAnimationState, MonsterDefinition, MonsterDirection, MonsterDrop } from '../monsterEditor/monsterTypes';
 import { ToxicSludgeView } from '../monsters/toxicSludge';
@@ -146,10 +148,7 @@ async function createCustomMonster(world: Container, objectId: string, definitio
   if (original) original.visible = false;
 
   const monster: Monster = {
-    id: objectId,
-    kind: definition.id,
-    name: definition.name,
-    view, hpFill,
+    id: objectId, kind: definition.id, name: definition.name, view, hpFill,
     maxHp: Math.max(1, definition.stats.maxHp), hp: Math.max(1, definition.stats.maxHp),
     damage: Math.max(1, definition.stats.attack), defense: Math.max(0, definition.stats.defense),
     speed: Math.max(0, definition.stats.moveSpeed),
@@ -169,19 +168,48 @@ async function createCustomMonster(world: Container, objectId: string, definitio
 
 export async function createMonsters(world: Container) {
   const publishedRuntime = getPreparedPublishedWorldRuntime();
-  const wolves = getPublishedObjectPositions('wolf'); const sludges = getPublishedObjectPositions('sludge');
   const wolfDefaults = [{ x: 1320, y: 930 }, { x: 1510, y: 720 }, { x: 1740, y: 1030 }];
   const sludgeDefaults = [{ x: 430, y: 560 }, { x: 560, y: 1080 }, { x: 1520, y: 390 }, { x: 1880, y: 690 }, { x: 1680, y: 1320 }];
-  const wolfPositions = publishedRuntime ? wolves : wolfDefaults, sludgePositions = publishedRuntime ? sludges : sludgeDefaults;
   const result: Monster[] = [];
-  for (let index = 0; index < wolfPositions.length; index++) result.push(createWolf(world, `wolf-${index + 1}`, wolfPositions[index].x, wolfPositions[index].y));
-  for (let index = 0; index < sludgePositions.length; index++) result.push(await createSludge(world, `sludge-${index + 1}`, sludgePositions[index].x, sludgePositions[index].y));
-  if (publishedRuntime) {
-    for (const object of publishedRuntime.document.objects) {
-      const monsterId = monsterIdFromAssetId(object.assetId); if (!monsterId) continue;
-      const definition = getMonsterDefinition(monsterId); if (!definition) continue;
-      const x = (object.x + .5) * publishedRuntime.document.tileSize, y = (object.y + 1) * publishedRuntime.document.tileSize;
-      result.push(await createCustomMonster(world, object.id, definition, x, y));
+
+  if (!publishedRuntime) {
+    for (let index = 0; index < wolfDefaults.length; index++) result.push(createWolf(world, `wolf-${index + 1}`, wolfDefaults[index].x, wolfDefaults[index].y));
+    for (let index = 0; index < sludgeDefaults.length; index++) result.push(await createSludge(world, `sludge-${index + 1}`, sludgeDefaults[index].x, sludgeDefaults[index].y));
+    return result;
+  }
+
+  const document = publishedRuntime.document;
+  for (const object of document.objects) {
+    if (object.assetId === 'wolf' || object.assetId === 'sludge') {
+      const baseRespawn = object.assetId === 'wolf' ? 7000 : 6500;
+      const stored = getSpawnGroup(document.id, object.id);
+      const config = stored ?? readSpawnGroupConfig(object, baseRespawn);
+      const offsets = generateSpawnOffsets(config, `${document.id}:${object.id}:${object.assetId}`);
+      for (let index = 0; index < offsets.length; index++) {
+        const offset = offsets[index];
+        const x = (object.x + .5 + offset.x) * document.tileSize;
+        const y = (object.y + 1 + offset.y) * document.tileSize;
+        const monster = object.assetId === 'wolf'
+          ? createWolf(world, `${object.id}:${index}`, x, y)
+          : await createSludge(world, `${object.id}:${index}`, x, y);
+        monster.respawnMs = Math.max(500, spawnRespawnDelay(config, baseRespawn));
+        result.push(monster);
+      }
+      continue;
+    }
+
+    const monsterId = monsterIdFromAssetId(object.assetId); if (!monsterId) continue;
+    const definition = getMonsterDefinition(monsterId); if (!definition) continue;
+    const stored = getSpawnGroup(document.id, object.id);
+    const config = stored ?? readSpawnGroupConfig(object, definition.ai.respawnMs);
+    const offsets = generateSpawnOffsets(config, `${document.id}:${object.id}:monster`);
+    for (let index = 0; index < offsets.length; index++) {
+      const offset = offsets[index];
+      const x = (object.x + .5 + offset.x) * document.tileSize;
+      const y = (object.y + 1 + offset.y) * document.tileSize;
+      const monster = await createCustomMonster(world, `${object.id}:${index}`, definition, x, y);
+      monster.respawnMs = Math.max(500, spawnRespawnDelay(config, definition.ai.respawnMs));
+      result.push(monster);
     }
   }
   return result;
