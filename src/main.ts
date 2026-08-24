@@ -35,6 +35,8 @@ if (playtest === 'map') {
     installMonsterEditorIntegration();
     const { installStudioAppearanceUx } = await import('./editor/studioAppearanceUx');
     installStudioAppearanceUx();
+    const { installCharacterAnimationAssetIsolation } = await import('./editor/characterAnimationAssetIsolation');
+    installCharacterAnimationAssetIsolation();
     const { installStudioAnimationStateTabsIntegration } = await import('./editor/studioAnimationStateTabsIntegration');
     installStudioAnimationStateTabsIntegration();
     const { installMapMarkerStudioIntegration } = await import('./editor/map/mapMarkerStudio');
