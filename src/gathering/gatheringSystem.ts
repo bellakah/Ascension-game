@@ -10,7 +10,7 @@ import { getItem } from '../items/itemCatalog';
 import { getPreparedPublishedWorldRuntime } from '../map/publishedMapRuntime';
 import { GATHERING_NODES, type GatheringKind } from './gatheringCatalog';
 import { collectibleIdFromAssetId, ensureCollectibleMigration, getCollectibleDefinition, resolveCollectibleAppearanceAssetId } from './collectibleStore';
-import { hasRequiredGatheringTool, requiredGatheringToolName, rollCollectibleDrops } from './collectibleRuntimeHelpers';
+import { hasRequiredGatheringTool, requiredGatheringToolName, resolveGatheringToolVisual, rollCollectibleDrops } from './collectibleRuntimeHelpers';
 import type { CollectibleAnimationState, CollectibleDefinition, CollectiblePlayerAnimation } from './collectibleTypes';
 
 type GatheringSave = CharacterProgress & { gatheringData?: Record<string, { readyAt: number }> };
@@ -173,7 +173,7 @@ export function createGatheringSystem(world: Container, progress: CharacterProgr
     for (const node of nodes) {
       const state = visualState(node, progress, now); const ready = state === 'idle' || state === 'respawn'; const isClosest = closest?.node === node; const until = Math.max(0, readyAt(progress, node.id) - now);
       if (!ready) node.wasReady = false;
-      if (state === 'harvest' && isClosest) triggerLatestGatheringAction(playerGatheringAction(node.definition));
+      if (state === 'harvest' && isClosest) triggerLatestGatheringAction(playerGatheringAction(node.definition), resolveGatheringToolVisual(node.definition), node.harvestingUntil);
       applyAppearance(node, state, performance.now());
       node.view.alpha = state === 'depleted' && !node.definition.appearance.depleted ? .27 : 1; node.marker.visible = ready; node.marker.alpha = isClosest ? .82 : .38; node.halo.alpha = ready ? (isClosest ? .45 + Math.sin(pulse) * .08 : .14) : .04;
       node.label.visible = Boolean(isClosest && ready); node.label.text = `${node.definition.icon} ${node.definition.name} · ${node.definition.hint}`;
@@ -190,7 +190,7 @@ export function createGatheringSystem(world: Container, progress: CharacterProgr
     const now = Date.now(); node.harvestingUntil = now + node.definition.harvestDurationMs; node.breakUntil = node.harvestingUntil + 450;
     const ready = node.breakUntil + spawnRespawnDelay({ count: 1, radiusTiles: 0, minDistanceTiles: 0, respawnMs: node.respawnMs, respawnJitterMs: node.respawnJitterMs }, node.definition.respawnMs);
     setReadyAt(progress, node.id, ready); node.wasReady = false;
-    triggerLatestGatheringAction(playerGatheringAction(node.definition));
+    triggerLatestGatheringAction(playerGatheringAction(node.definition), resolveGatheringToolVisual(node.definition), node.harvestingUntil);
     const first = rewards.find((reward) => reward.added > 0);
     return { ok: true, node: { id: node.id, name: node.definition.name, x: node.x, y: node.y, animation: node.definition.playerAnimation === 'gather' || node.definition.playerAnimation === 'emote' ? 'emote' : 'slash', playerAnimation: node.definition.playerAnimation, harvestDurationMs: node.definition.harvestDurationMs }, itemId: first?.itemId, added, lost };
   };
