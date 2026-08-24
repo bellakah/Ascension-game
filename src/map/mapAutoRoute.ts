@@ -15,10 +15,10 @@ type RouteState = {
 type HeapNode = { index: number; priority: number };
 
 const MOVE_KEYS = new Set(['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright']);
-const SYNTHETIC_KEYS = ['w', 'a', 's', 'd'] as const;
 const CELL_SIZE = 38;
 const ARRIVE_RADIUS = 25;
 const MAX_REPLANS = 3;
+let syntheticMovementDepth = 0;
 
 class MinHeap {
   private values: HeapNode[] = [];
@@ -228,7 +228,12 @@ function buildPath(start: Point, target: Point, obstacles: Obstacle[], worldWidt
 }
 
 function dispatchMovement(type: 'keydown' | 'keyup', key: string) {
-  window.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true, cancelable: true }));
+  syntheticMovementDepth++;
+  try {
+    window.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true, cancelable: true }));
+  } finally {
+    syntheticMovementDepth--;
+  }
 }
 
 export function installMapAutoRoute() {
@@ -402,6 +407,16 @@ export function installMapAutoRoute() {
 
   overlay.addEventListener('dblclick', (event) => {
     const target = event.target as HTMLElement;
+    const markerV2 = target.closest<HTMLElement>('.map-marker-v2');
+    if (markerV2 && markerV2.dataset.markerId && markerV2.dataset.markerId !== '__player__') {
+      const x = Number.parseFloat(markerV2.style.left);
+      const y = Number.parseFloat(markerV2.style.top);
+      if (Number.isFinite(x) && Number.isFinite(y)) {
+        event.preventDefault(); event.stopPropagation();
+        startRoute({ x, y }, markerV2.title.split(' · ')[0] || 'destino');
+      }
+      return;
+    }
     const poi = target.closest<HTMLElement>('.map-poi');
     if (poi) {
       const point = pointFromPoi(poi);
@@ -422,14 +437,24 @@ export function installMapAutoRoute() {
     window.setTimeout(() => { routeButton.disabled = !selectedPoi(); }, 0);
   });
 
-  window.addEventListener('keydown', (event) => {
-    if (!route || !event.isTrusted) return;
+  const onManualMovement = (event: KeyboardEvent) => {
+    if (!route || syntheticMovementDepth > 0) return;
     if (MOVE_KEYS.has(event.key.toLowerCase())) cancelRoute('Auto-rota cancelada pelo movimento manual.');
-  }, true);
-  document.querySelector('#stick')?.addEventListener('pointerdown', (event) => {
-    if (route && event.isTrusted) cancelRoute('Auto-rota cancelada pelo movimento manual.');
-  }, true);
+  };
+  window.addEventListener('keydown', onManualMovement, true);
+  document.addEventListener('keydown', onManualMovement, true);
 
-  window.addEventListener('pagehide', () => { cancelRoute(); status.remove(); }, { once: true });
-  window.setInterval(tick, 80);
+  const stick = document.querySelector('#stick');
+  const onStick = () => { if (route) cancelRoute('Auto-rota cancelada pelo movimento manual.'); };
+  stick?.addEventListener('pointerdown', onStick, true);
+
+  const tickTimer = window.setInterval(tick, 80);
+  window.addEventListener('pagehide', () => {
+    cancelRoute();
+    status.remove();
+    window.clearInterval(tickTimer);
+    window.removeEventListener('keydown', onManualMovement, true);
+    document.removeEventListener('keydown', onManualMovement, true);
+    stick?.removeEventListener('pointerdown', onStick, true);
+  }, { once: true });
 }
