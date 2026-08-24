@@ -1,0 +1,13 @@
+html,body,#app{width:100%;height:100%;margin:0;overflow:hidden;background:#050b11}
+.standalone-studio-mode{background:#050b11;color:#dbeaf3;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.standalone-studio{width:100%;height:100%;display:grid;grid-template-rows:54px minmax(0,1fr);background:#061019;color:#dbeaf3}
+.standalone-studio *{box-sizing:border-box}
+.standalone-studio button,.standalone-studio input,.standalone-studio select,.standalone-studio textarea{font:inherit}
+.standalone-studio button{border:1px solid #274454;background:#0d1d28;color:#cce0eb;border-radius:6px;cursor:pointer}
+.standalone-studio button:hover{border-color:#4a819c;background:#122938}
+.standalone-studio .mep-top{min-width:0;display:flex;align-items:center;gap:8px;padding:6px 10px;background:#08141d;border-bottom:1px solid #1d3543;box-shadow:0 5px 18px rgba(0,0,0,.24);z-index:120}
+.standalone-studio .mep-brand{display:flex;align-items:center;gap:8px;min-width:152px}.standalone-studio .mep-logo{width:32px;height:32px;display:grid;place-items:center;border:1px solid #bd9141;border-radius:7px;color:#e8bd65;font-weight:900;background:#0b1c25}.standalone-studio .mep-brand strong,.standalone-studio .mep-brand span{display:block}.standalone-studio .mep-brand strong{font-size:10px;letter-spacing:1.1px}.standalone-studio .mep-brand div span{font-size:7px;color:#6f91a3;letter-spacing:.7px;margin-top:2px}
+.standalone-studio .mep-mode{display:flex;align-items:center;gap:4px;padding:3px;border:1px solid #1e3847;border-radius:8px;background:#07121a}.standalone-studio .mep-mode button{height:32px;padding:0 13px;border-color:transparent;background:transparent;font-size:9px}.standalone-studio .mep-mode button.active{background:#17364a;border-color:#396982;color:#fff;box-shadow:inset 0 -2px #59c8ef}.standalone-studio .mep-spacer{flex:1}.standalone-studio-status{font-size:8px;color:#6e92a4;white-space:nowrap}.standalone-studio #standalone-open-game{height:34px;padding:0 13px;background:#163325;border-color:#2f6b4b;color:#9de6b9;font-size:9px;font-weight:700}
+.standalone-studio-stage{position:relative;min-width:0;min-height:0;overflow:hidden;background:#061019}.standalone-studio-empty{position:absolute;inset:0;display:grid;place-content:center;gap:6px;text-align:center;color:#466677}.standalone-studio-empty strong{font-size:18px;color:#668a9e}.standalone-studio-empty span{font-size:9px}
+.standalone-studio .npc-studio-overlay{z-index:90}
+@media(max-width:850px){.standalone-studio-status{display:none}.standalone-studio .mep-brand{min-width:auto}.standalone-studio .mep-brand div{display:none}.standalone-studio .mep-mode button{padding:0 8px}}
