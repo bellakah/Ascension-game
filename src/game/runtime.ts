@@ -5,6 +5,8 @@ import { createCharacterSheet } from '../character/characterSheet';
 import { createCraftingStations, nearestCraftingStation } from '../crafting/craftingStations';
 import { createCraftingUi } from '../crafting/craftingUi';
 import { createGatheringSystem, gatheringItemName } from '../gathering/gatheringSystem';
+import { ensureGmAuthorityBootstrap, getGmRole, type GmRole } from '../gm/gmAuthority';
+import { createGmPanel, type GmRuntimeFlags } from '../gm/gmPanel';
 import { createInventory } from '../items/inventory';
 import { ensureInventoryState, getItem } from '../items/itemCatalog';
 import { spawnMonsterLoot, updateGroundLoot, type GroundLoot } from '../items/lootSystem';
@@ -38,6 +40,7 @@ export async function startGame() {
     const selected = await showCharacterCreator();
     const config = selected.config;
     const progress = selected.progress;
+    ensureGmAuthorityBootstrap();
     const settingsStore = createSettingsStore(selected.accountKey);
     const input = createInputManager(settingsStore);
     const graphics = graphicsBootstrap(settingsStore.settings);
@@ -75,6 +78,16 @@ export async function startGame() {
     player.addChild(hero.view);
     const playerName = new Text({ text: config.name, style: { fill: 0xffffff, fontSize: 14, fontWeight: 'bold', stroke: { color: 0, width: 4 } } });
     playerName.anchor.set(.5); playerName.y = -94; player.addChild(playerName);
+    let currentGmRole: GmRole = getGmRole(selected.accountKey);
+    const gmTag = new Text({ text: '', style: { fill: 0x8ddfff, fontSize: 11, fontWeight: '900', stroke: { color: 0x061017, width: 4 } } });
+    gmTag.anchor.set(.5); gmTag.y = -112; player.addChild(gmTag);
+    const syncGmTag = (role: GmRole = getGmRole(selected.accountKey)) => {
+      currentGmRole = role;
+      gmTag.text = role === 'admin' ? '[ADMIN]' : role === 'gm' ? '[GM]' : '';
+      gmTag.style.fill = role === 'admin' ? 0xffd36f : 0x8ddfff;
+      gmTag.visible = role !== 'player' && settingsStore.settings.interface.showNames;
+    };
+    syncGmTag(currentGmRole);
     player.position.set(
       Math.max(40, Math.min(WORLD_W - 40, progress.position.x || SPAWN.x)),
       Math.max(80, Math.min(WORLD_H - 40, progress.position.y || SPAWN.y)),
@@ -95,6 +108,7 @@ export async function startGame() {
     const keys = new Set<string>();
     let stickX = 0, stickY = 0;
     const resetStick = () => { stickX = 0; stickY = 0; hud.knob.style.transform = 'translate(0, 0)'; };
+    const gmFlags: GmRuntimeFlags = { godMode: false, noclip: false, speedMultiplier: 1 };
 
     const save = () => {
       progress.hp = isDead ? 0 : Math.max(1, Math.ceil(playerHp));
@@ -171,6 +185,22 @@ export async function startGame() {
       onChanged: () => save(),
     });
 
+    const gmPanel = createGmPanel({
+      accountKey: selected.accountKey,
+      characterName: config.name,
+      progress,
+      player,
+      world,
+      monsters,
+      canvas: app.canvas,
+      flags: gmFlags,
+      refreshInventory: () => { inventory.refresh(); characterSheet.refresh(); },
+      refreshHud: refresh,
+      save,
+      notify: (message) => showDialog(hud, message),
+      onRoleChanged: (role) => syncGmTag(role),
+    });
+
     const audioManager = createAudioManager(settingsStore);
     const applySettings = (settings: GameSettings) => {
       document.documentElement.dataset.hideMinimap = String(!settings.interface.showMinimap);
@@ -178,6 +208,7 @@ export async function startGame() {
       document.documentElement.dataset.hideDesktopShortcuts = String(!settings.interface.showDesktopShortcuts);
       document.documentElement.dataset.graphicsPreset = settings.graphics.preset;
       playerName.visible = settings.interface.showNames;
+      gmTag.visible = settings.interface.showNames && currentGmRole !== 'player';
       for (const monster of monsters) {
         for (const child of monster.view.children) {
           if (child instanceof Text && child.text === monster.name) child.visible = settings.interface.showNames;
@@ -202,6 +233,7 @@ export async function startGame() {
     window.addEventListener('keydown', (event) => {
       if (event.repeat) return;
       if (!input.matches(event, 'menu') && event.code !== 'Escape') return;
+      if (gmPanel?.isOpen()) { event.preventDefault(); event.stopImmediatePropagation(); gmPanel.close(); return; }
       event.preventDefault(); event.stopImmediatePropagation();
       if (isDead) return;
       if (gameMenu.isOpen()) { gameMenu.close(); return; }
@@ -231,14 +263,15 @@ export async function startGame() {
       },
     });
 
-    const uiOpen = () => isDead || respawnScreen.isOpen() || inventory.isOpen() || characterSheet.isOpen() || shop.isOpen() || questJournal.isOpen() || craftingUi.isOpen() || petUi.isOpen() || mapSystem.isOpen() || gameMenu.isOpen();
-    hud.inventory.addEventListener('pointerdown', () => { if (isDead) return; shop.close(); craftingUi.close(); characterSheet.close(); questJournal.close(); petUi.close(); mapSystem.close(); inventory.toggle(); });
-    hud.character.addEventListener('pointerdown', () => { if (isDead) return; shop.close(); craftingUi.close(); inventory.close(); questJournal.close(); petUi.close(); mapSystem.close(); characterSheet.toggle(); });
-    hud.questJournal.addEventListener('pointerdown', () => { if (isDead) return; shop.close(); craftingUi.close(); inventory.close(); characterSheet.close(); petUi.close(); mapSystem.close(); questJournal.toggle(); });
-    hud.pet.addEventListener('pointerdown', () => { if (isDead) return; shop.close(); craftingUi.close(); inventory.close(); characterSheet.close(); questJournal.close(); mapSystem.close(); petUi.toggle(); });
-    hud.map.addEventListener('pointerdown', () => { if (isDead) return; shop.close(); craftingUi.close(); inventory.close(); characterSheet.close(); questJournal.close(); petUi.close(); keys.clear(); resetStick(); mapSystem.toggle(); });
+    const uiOpen = () => isDead || respawnScreen.isOpen() || inventory.isOpen() || characterSheet.isOpen() || shop.isOpen() || questJournal.isOpen() || craftingUi.isOpen() || petUi.isOpen() || mapSystem.isOpen() || gameMenu.isOpen() || Boolean(gmPanel?.isOpen());
+    hud.inventory.addEventListener('pointerdown', () => { if (isDead) return; gmPanel?.close(); shop.close(); craftingUi.close(); characterSheet.close(); questJournal.close(); petUi.close(); mapSystem.close(); inventory.toggle(); });
+    hud.character.addEventListener('pointerdown', () => { if (isDead) return; gmPanel?.close(); shop.close(); craftingUi.close(); inventory.close(); questJournal.close(); petUi.close(); mapSystem.close(); characterSheet.toggle(); });
+    hud.questJournal.addEventListener('pointerdown', () => { if (isDead) return; gmPanel?.close(); shop.close(); craftingUi.close(); inventory.close(); characterSheet.close(); petUi.close(); mapSystem.close(); questJournal.toggle(); });
+    hud.pet.addEventListener('pointerdown', () => { if (isDead) return; gmPanel?.close(); shop.close(); craftingUi.close(); inventory.close(); characterSheet.close(); questJournal.close(); mapSystem.close(); petUi.toggle(); });
+    hud.map.addEventListener('pointerdown', () => { if (isDead) return; gmPanel?.close(); shop.close(); craftingUi.close(); inventory.close(); characterSheet.close(); questJournal.close(); petUi.close(); keys.clear(); resetStick(); mapSystem.toggle(); });
     hud.menu.addEventListener('pointerdown', () => {
       if (isDead) return;
+      gmPanel?.close();
       if (!gameMenu.isOpen()) { shop.close(); craftingUi.close(); inventory.close(); characterSheet.close(); questJournal.close(); petUi.close(); mapSystem.close(); keys.clear(); resetStick(); }
       gameMenu.toggle();
     });
@@ -247,7 +280,7 @@ export async function startGame() {
       if (respawnScreen.isOpen()) return;
       isDead = true; playerHp = 0; progress.hp = 0;
       deathPosition = { x: player.x, y: player.y }; player.alpha = .42;
-      keys.clear(); resetStick(); inventory.close(); characterSheet.close(); shop.close(); questJournal.close(); craftingUi.close(); petUi.close(); mapSystem.close(); gameMenu.close();
+      keys.clear(); resetStick(); inventory.close(); characterSheet.close(); shop.close(); questJournal.close(); craftingUi.close(); petUi.close(); mapSystem.close(); gameMenu.close(); gmPanel?.close();
       skillBar.refresh(skillController.snapshot(), true);
       const village = nearestVillage(deathPosition.x, deathPosition.y, progress.map || 'Floresta Inicial');
       if (village) respawnScreen.show(village);
@@ -365,7 +398,7 @@ export async function startGame() {
         const step = Math.min(travel, i * 12);
         const x = Math.max(40, Math.min(WORLD_W - 40, player.x + dx / d * step));
         const y = Math.max(80, Math.min(WORLD_H - 40, player.y + dy / d * step));
-        if (collides(obstacles, x, y) || isInSafeZone(x, y)) break;
+        if ((!gmFlags.noclip && collides(obstacles, x, y)) || isInSafeZone(x, y)) break;
         bestX = x; bestY = y;
       }
       player.position.set(bestX, bestY);
@@ -481,12 +514,13 @@ export async function startGame() {
     hud.interact.addEventListener('pointerdown', interact);
     window.addEventListener('keydown', (event) => {
       const key = event.key.toLowerCase();
+      if (event.code === 'F10') return;
       if (isDead) { event.preventDefault(); return; }
-      if (key === 'i') { characterSheet.close(); questJournal.close(); craftingUi.close(); petUi.close(); mapSystem.close(); if (shop.isOpen()) shop.close(); }
-      if (key === 'c') { inventory.close(); questJournal.close(); craftingUi.close(); petUi.close(); mapSystem.close(); if (shop.isOpen()) shop.close(); }
-      if (key === 'j') { inventory.close(); characterSheet.close(); craftingUi.close(); petUi.close(); mapSystem.close(); if (shop.isOpen()) shop.close(); }
-      if (key === 'p') { inventory.close(); characterSheet.close(); questJournal.close(); craftingUi.close(); mapSystem.close(); if (shop.isOpen()) shop.close(); }
-      if (key === 'm') { inventory.close(); characterSheet.close(); questJournal.close(); craftingUi.close(); petUi.close(); if (shop.isOpen()) shop.close(); }
+      if (key === 'i') { gmPanel?.close(); characterSheet.close(); questJournal.close(); craftingUi.close(); petUi.close(); mapSystem.close(); if (shop.isOpen()) shop.close(); }
+      if (key === 'c') { gmPanel?.close(); inventory.close(); questJournal.close(); craftingUi.close(); petUi.close(); mapSystem.close(); if (shop.isOpen()) shop.close(); }
+      if (key === 'j') { gmPanel?.close(); inventory.close(); characterSheet.close(); craftingUi.close(); petUi.close(); mapSystem.close(); if (shop.isOpen()) shop.close(); }
+      if (key === 'p') { gmPanel?.close(); inventory.close(); characterSheet.close(); questJournal.close(); craftingUi.close(); mapSystem.close(); if (shop.isOpen()) shop.close(); }
+      if (key === 'm') { gmPanel?.close(); inventory.close(); characterSheet.close(); questJournal.close(); craftingUi.close(); petUi.close(); if (shop.isOpen()) shop.close(); }
       if (uiOpen() && event.key !== 'Escape' && key !== 'i' && key !== 'c' && key !== 'j' && key !== 'p' && key !== 'm') return;
       if (key === 'p') { event.preventDefault(); petUi.toggle(); return; }
       if (key === 'm') { event.preventDefault(); keys.clear(); resetStick(); mapSystem.toggle(); return; }
@@ -511,6 +545,7 @@ export async function startGame() {
 
     document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
     window.addEventListener('pagehide', save);
+    window.addEventListener('pagehide', () => gmPanel?.destroy(), { once: true });
     if (isDead) enterDeathState();
 
     app.ticker.add((ticker: Ticker) => {
@@ -536,11 +571,11 @@ export async function startGame() {
       if (moving) {
         dx /= Math.max(1, len); dy /= Math.max(1, len);
         const facing: Facing = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down'); hero.setFacing(facing);
-        const speed = 4.4 * ticker.deltaTime;
+        const speed = 4.4 * gmFlags.speedMultiplier * ticker.deltaTime;
         const nx = Math.max(40, Math.min(WORLD_W - 40, player.x + dx * speed));
         const ny = Math.max(80, Math.min(WORLD_H - 40, player.y + dy * speed));
-        if (!collides(obstacles, nx, player.y)) player.x = nx;
-        if (!collides(obstacles, player.x, ny)) player.y = ny;
+        if (gmFlags.noclip || !collides(obstacles, nx, player.y)) player.x = nx;
+        if (gmFlags.noclip || !collides(obstacles, player.x, ny)) player.y = ny;
       }
       hero.update(moving, ticker.deltaTime);
       petSystem.update(ticker, !isDead && !uiOpen());
@@ -554,7 +589,7 @@ export async function startGame() {
       if (!uiOpen()) {
         for (const zone of visitZonesAt(player.x, player.y, map)) announceQuestUpdates(registerQuestEvent(progress, { type: 'visit', zoneId: zone.id }));
         updateMonsters(monsters, ticker, player, progress.defense, (damage) => {
-          if (isDead) return; playerHp = Math.max(0, playerHp - damage); floating(player.x, player.y - 90, `-${damage}`, 0xff8f8f);
+          if (isDead || gmFlags.godMode) return; playerHp = Math.max(0, playerHp - damage); floating(player.x, player.y - 90, `-${damage}`, 0xff8f8f);
           if (playerHp <= 0) { enterDeathState(); return; } refresh();
         });
 
