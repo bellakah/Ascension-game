@@ -18,6 +18,8 @@ export type ClassComputedStats = {
   resourceMax: number;
 };
 
+export type ClassRuntimeProgress = CharacterProgress & Omit<ClassComputedStats, 'resourceMax'>;
+
 function grow(base: number, perLevel: number, level: number, mode: ClassDefinition['progression']['growthMode']) {
   const steps = Math.max(0, level - 1);
   if (mode === 'percent') return base * Math.pow(1 + perLevel / 100, steps);
@@ -52,22 +54,39 @@ export function classStatsAtLevel(classDef: ClassDefinition, level: number): Cla
   };
 }
 
+export function ensureAdvancedClassStats(progress: CharacterProgress, classDef: ClassDefinition) {
+  const state = progress as ClassRuntimeProgress;
+  const computed = classStatsAtLevel(classDef, progress.level);
+  if (!Number.isFinite(state.magicAttack)) state.magicAttack = computed.magicAttack;
+  if (!Number.isFinite(state.magicDefense)) state.magicDefense = computed.magicDefense;
+  if (!Number.isFinite(state.accuracy)) state.accuracy = computed.accuracy;
+  if (!Number.isFinite(state.evasion)) state.evasion = computed.evasion;
+  if (!Number.isFinite(state.critChance)) state.critChance = computed.critChance;
+  if (!Number.isFinite(state.critDamage)) state.critDamage = computed.critDamage;
+  if (!Number.isFinite(state.attackSpeed)) state.attackSpeed = computed.attackSpeed;
+  if (!Number.isFinite(state.castSpeed)) state.castSpeed = computed.castSpeed;
+  if (!Number.isFinite(state.moveSpeed)) state.moveSpeed = computed.moveSpeed;
+  if (!Number.isFinite(state.hpRegen)) state.hpRegen = computed.hpRegen;
+  return state;
+}
+
 export function applyClassStatsForLevel(progress: CharacterProgress, classDef: ClassDefinition, level = progress.level) {
+  const state = progress as ClassRuntimeProgress;
   const stats = classStatsAtLevel(classDef, level);
-  progress.maxHp = stats.maxHp;
-  progress.attack = stats.attack;
-  progress.defense = stats.defense;
-  progress.magicAttack = stats.magicAttack;
-  progress.magicDefense = stats.magicDefense;
-  progress.accuracy = stats.accuracy;
-  progress.evasion = stats.evasion;
-  progress.critChance = stats.critChance;
-  progress.critDamage = stats.critDamage;
-  progress.attackSpeed = stats.attackSpeed;
-  progress.castSpeed = stats.castSpeed;
-  progress.moveSpeed = stats.moveSpeed;
-  progress.hpRegen = stats.hpRegen;
-  progress.expToNext = expForLevel(classDef, level);
+  state.maxHp = stats.maxHp;
+  state.attack = stats.attack;
+  state.defense = stats.defense;
+  state.magicAttack = stats.magicAttack;
+  state.magicDefense = stats.magicDefense;
+  state.accuracy = stats.accuracy;
+  state.evasion = stats.evasion;
+  state.critChance = stats.critChance;
+  state.critDamage = stats.critDamage;
+  state.attackSpeed = stats.attackSpeed;
+  state.castSpeed = stats.castSpeed;
+  state.moveSpeed = stats.moveSpeed;
+  state.hpRegen = stats.hpRegen;
+  state.expToNext = expForLevel(classDef, level);
   return stats;
 }
 
