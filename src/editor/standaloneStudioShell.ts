@@ -1,8 +1,8 @@
 import './standaloneStudioShell.css';
 
-export type StandaloneStudioMode = 'actors' | 'items' | 'collectibles' | 'quests' | 'events' | 'shops' | 'crafts' | 'classes';
+export type StandaloneStudioMode = 'actors' | 'items' | 'collectibles' | 'quests' | 'events' | 'shops' | 'crafts' | 'classes' | 'skills';
 
-type EditorTarget = 'map' | 'actors' | 'items' | 'collectibles' | 'quests' | 'events' | 'shops' | 'crafts' | 'classes';
+type EditorTarget = 'map' | 'actors' | 'items' | 'collectibles' | 'quests' | 'events' | 'shops' | 'crafts' | 'classes' | 'skills';
 
 function editorUrl(mode: EditorTarget) {
   const url = new URL(window.location.href);
@@ -15,7 +15,7 @@ function editorUrl(mode: EditorTarget) {
 
 export function createStandaloneStudioShell(mode: StandaloneStudioMode) {
   document.body.className = 'map-editor-pro-mode standalone-studio-mode';
-  document.title = mode === 'actors' ? 'Ascension NPC & Monster Editor' : mode === 'items' ? 'Ascension Item Editor' : mode === 'collectibles' ? 'Ascension Collectible Editor' : mode === 'quests' ? 'Ascension Mission Editor' : mode === 'events' ? 'Ascension Event Editor' : mode === 'shops' ? 'Ascension Shop Editor' : mode === 'crafts' ? 'Ascension Craft Editor' : 'Ascension Class Editor';
+  document.title = mode === 'actors' ? 'Ascension NPC & Monster Editor' : mode === 'items' ? 'Ascension Item Editor' : mode === 'collectibles' ? 'Ascension Collectible Editor' : mode === 'quests' ? 'Ascension Mission Editor' : mode === 'events' ? 'Ascension Event Editor' : mode === 'shops' ? 'Ascension Shop Editor' : mode === 'crafts' ? 'Ascension Craft Editor' : mode === 'classes' ? 'Ascension Class Editor' : 'Ascension Skill Editor';
 
   const mount = document.querySelector<HTMLElement>('#app') ?? document.body;
   mount.innerHTML = '';
@@ -37,6 +37,7 @@ export function createStandaloneStudioShell(mode: StandaloneStudioMode) {
         <button id="mep-mode-shops" type="button">Lojas</button>
         <button id="mep-mode-crafts" type="button">Crafting</button>
         <button id="mep-mode-classes" type="button">Classes</button>
+        <button id="mep-mode-skills" type="button">Skills</button>
       </nav>
       <div class="mep-spacer"></div>
       <span class="standalone-studio-status">Catálogos compartilhados com o jogo</span>
@@ -44,7 +45,7 @@ export function createStandaloneStudioShell(mode: StandaloneStudioMode) {
     </header>
     <main class="mep-stage-wrap standalone-studio-stage">
       <div class="standalone-studio-empty" aria-hidden="true">
-        <strong>${mode === 'actors' ? 'NPCs & Monstros' : mode === 'items' ? 'Itens' : mode === 'collectibles' ? 'Coletáveis' : mode === 'quests' ? 'Missões' : mode === 'events' ? 'Eventos' : mode === 'shops' ? 'Lojas' : mode === 'crafts' ? 'Crafting' : 'Classes'}</strong>
+        <strong>${mode === 'actors' ? 'NPCs & Monstros' : mode === 'items' ? 'Itens' : mode === 'collectibles' ? 'Coletáveis' : mode === 'quests' ? 'Missões' : mode === 'events' ? 'Eventos' : mode === 'shops' ? 'Lojas' : mode === 'crafts' ? 'Crafting' : mode === 'classes' ? 'Classes' : 'Skills'}</strong>
         <span>Carregando editor...</span>
       </div>
     </main>`;
@@ -59,6 +60,7 @@ export function createStandaloneStudioShell(mode: StandaloneStudioMode) {
   root.querySelector<HTMLButtonElement>('#mep-mode-shops')!.onclick = () => navigate('shops');
   root.querySelector<HTMLButtonElement>('#mep-mode-crafts')!.onclick = () => navigate('crafts');
   root.querySelector<HTMLButtonElement>('#mep-mode-classes')!.onclick = () => navigate('classes');
+  root.querySelector<HTMLButtonElement>('#mep-mode-skills')!.onclick = () => navigate('skills');
   root.querySelector<HTMLButtonElement>('#standalone-open-game')!.onclick = () => {
     const url = new URL(window.location.href);
     url.searchParams.delete('editor');
@@ -73,12 +75,13 @@ export function createStandaloneStudioShell(mode: StandaloneStudioMode) {
   if (mode === 'shops') root.querySelector<HTMLButtonElement>('#mep-mode-shops')?.classList.add('active');
   if (mode === 'crafts') root.querySelector<HTMLButtonElement>('#mep-mode-crafts')?.classList.add('active');
   if (mode === 'classes') root.querySelector<HTMLButtonElement>('#mep-mode-classes')?.classList.add('active');
+  if (mode === 'skills') root.querySelector<HTMLButtonElement>('#mep-mode-skills')?.classList.add('active');
 
   return {
     root,
     content: root.querySelector<HTMLElement>('.standalone-studio-stage')!,
     navigate,
-    setActive(id: 'npcs' | 'monsters' | 'items' | 'collectibles' | 'quests' | 'events' | 'shops' | 'crafts' | 'classes') {
+    setActive(id: 'npcs' | 'monsters' | 'items' | 'collectibles' | 'quests' | 'events' | 'shops' | 'crafts' | 'classes' | 'skills') {
       root.querySelectorAll<HTMLButtonElement>('.mep-mode button').forEach((button) => button.classList.remove('active'));
       root.querySelector<HTMLButtonElement>(`#mep-mode-${id}`)?.classList.add('active');
     },
