@@ -1,4 +1,5 @@
 import type { CharacterProgress } from '../character/characterCreator';
+import { isMissionEnabledByEvents } from '../events/eventRuntime';
 import { addItem, getItem, itemQuantity, removeItem } from '../items/itemCatalog';
 import { QUEST_CATALOG, getQuestDefinition } from './questCatalog';
 import { listMissionStudioRecords } from './missionStudioStore';
@@ -146,6 +147,7 @@ export function getQuestState(progress: CharacterProgress, questId: string) {
 }
 
 export function isQuestAvailable(progress: CharacterProgress, quest: QuestDefinition) {
+  if (!isMissionEnabledByEvents(quest.id)) return false;
   const state = stateFor(progress, quest);
   if (state.status !== 'not_started') return false;
   const req = quest.requirements;

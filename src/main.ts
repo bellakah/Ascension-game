@@ -57,6 +57,8 @@ if (playtest === 'map') {
   void import('./editor/collectiblesEditorApp').then(({ startCollectiblesEditor }) => startCollectiblesEditor());
 } else if (editor === 'quests') {
   void import('./editor/questsEditorApp').then(({ startQuestsEditorApp }) => startQuestsEditorApp());
+} else if (editor === 'events') {
+  void import('./editor/eventsEditorApp').then(({ startEventsEditorApp }) => startEventsEditorApp());
 } else {
   void import('./gameBootstrap').then(({ startGameApp }) => startGameApp());
 }
