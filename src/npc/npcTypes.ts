@@ -14,7 +14,7 @@ export type NpcAppearance = {
 export type NpcDialogueChoice = {
   id: string;
   text: string;
-  action: 'close' | 'dialogue' | 'shop' | 'quest' | 'custom';
+  action: 'close' | 'dialogue' | 'shop' | 'quest' | 'craft' | 'custom';
   target?: string;
 };
 
@@ -24,10 +24,15 @@ export type NpcDialogueNode = {
   choices: NpcDialogueChoice[];
 };
 
-export type NpcShopItem = {
-  itemId: string;
-  price: number;
-  stock: number | null;
+// Campos legados continuam opcionais para migrar NPCs criados antes do Shop Studio.
+export type NpcShopItem = { itemId: string; price: number; stock: number | null };
+export type NpcShopLink = {
+  enabled: boolean;
+  shopId: string;
+  currencyId?: string;
+  buyMultiplier?: number;
+  sellMultiplier?: number;
+  items?: NpcShopItem[];
 };
 
 export type NpcScheduleEntry = {
@@ -58,13 +63,7 @@ export type NpcDefinition = {
     startNodeId: string;
     nodes: NpcDialogueNode[];
   };
-  shop: {
-    enabled: boolean;
-    currencyId: string;
-    buyMultiplier: number;
-    sellMultiplier: number;
-    items: NpcShopItem[];
-  };
+  shop: NpcShopLink;
   quests: {
     offers: string[];
     completes: string[];
