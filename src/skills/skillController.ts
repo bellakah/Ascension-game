@@ -38,17 +38,21 @@ export function ensureSkillProgress(progress: CharacterProgress) {
 
 export function createSkillController(progress: CharacterProgress) {
   const classDef = getClassDefinition(progress.classId);
-  const skills = getSkillsForClass(classDef.id);
+  const allClassSkills = getSkillsForClass(classDef.id);
+  const skills = allClassSkills.filter((skill) => skill.unlockLevel <= progress.level);
   const state = ensureSkillProgress(progress);
-  const cooldowns: Partial<Record<SkillId, number>> = Object.fromEntries(skills.map((skill) => [skill.id, 0]));
+  const cooldowns: Partial<Record<SkillId, number>> = Object.fromEntries(allClassSkills.map((skill) => [skill.id, 0]));
   let buffAttackPercent = 0;
   let buffRemainingMs = 0;
   let buffName = '';
   let buffIcon = '';
 
+  const belongsToClass = (skillId: string) => classDef.skillIds.includes(skillId) || getSkill(skillId)?.classId === classDef.id;
+
   const canUse = (skillId: SkillId): SkillAvailability => {
     const skill = getSkill(skillId);
-    if (!skill || skill.classId !== classDef.id) return { ok: false, reason: 'Esta habilidade não pertence à sua classe.' };
+    if (!skill || !belongsToClass(skillId)) return { ok: false, reason: 'Esta habilidade não pertence à sua classe.' };
+    if (skill.unlockLevel > progress.level) return { ok: false, reason: `${skill.name} requer nível ${skill.unlockLevel}.` };
     if ((cooldowns[skillId] ?? 0) > 0) return { ok: false, reason: `${skill.name} ainda está em recarga.` };
     if (state.energy < skill.energyCost) return { ok: false, reason: `${classDef.resource.label} insuficiente para ${skill.name}.` };
     return { ok: true };
@@ -60,9 +64,10 @@ export function createSkillController(progress: CharacterProgress) {
     const skill = getSkill(skillId);
     state.energy = Math.max(0, state.energy - skill.energyCost);
     cooldowns[skillId] = skill.cooldownMs;
-    if (skill.kind === 'buff') {
-      buffAttackPercent = skill.buffAttackPercent ?? 0;
-      buffRemainingMs = skill.buffDurationMs ?? 0;
+    const attackBuff = skill.effects.find((effect) => effect.type === 'buff-attack');
+    if (skill.kind === 'buff' || attackBuff) {
+      buffAttackPercent = attackBuff?.baseValue ?? skill.buffAttackPercent ?? 0;
+      buffRemainingMs = attackBuff?.durationMs ?? skill.buffDurationMs ?? 0;
       buffName = skill.name;
       buffIcon = skill.icon;
     }
@@ -75,7 +80,7 @@ export function createSkillController(progress: CharacterProgress) {
 
   const tick = (deltaMs: number, paused = false) => {
     if (paused) return;
-    for (const skill of skills) cooldowns[skill.id] = Math.max(0, (cooldowns[skill.id] ?? 0) - deltaMs);
+    for (const skill of allClassSkills) cooldowns[skill.id] = Math.max(0, (cooldowns[skill.id] ?? 0) - deltaMs);
     if (buffRemainingMs > 0) {
       buffRemainingMs = Math.max(0, buffRemainingMs - deltaMs);
       if (buffRemainingMs <= 0) { buffAttackPercent = 0; buffName = ''; buffIcon = ''; }
@@ -96,5 +101,5 @@ export function createSkillController(progress: CharacterProgress) {
     buffIcon,
   });
 
-  return { classDef, skills, state, canUse, activate, tick, refill, addResource, onBasicAttack, onDamageTaken, attackMultiplier, snapshot };
+  return { classDef, skills, allClassSkills, state, canUse, activate, tick, refill, addResource, onBasicAttack, onDamageTaken, attackMultiplier, snapshot };
 }

@@ -1,4 +1,6 @@
 import { Application, Container, Graphics, Text, Ticker } from 'pixi.js';
+import { basicAttackColor, basicAttackDamage, classUsesProjectile, executeSkillEffects, playClassAnimation } from '../classes/classCombatRuntime';
+import { ensureAdvancedClassStats, levelUpCharacterProgress } from '../classes/classProgression';
 import { LpcCharacter, type Facing } from '../character/lpcCharacter';
 import { persistSelectedCharacter, showCharacterCreator } from '../character/characterCreator';
 import { createCharacterSheet } from '../character/characterSheet';
@@ -49,6 +51,7 @@ export async function startGame() {
     const inventoryState = ensureInventoryState(progress);
     const skillController = createSkillController(progress);
     const classDef = skillController.classDef;
+    const classRuntime = ensureAdvancedClassStats(progress, classDef);
     const classSkills = skillController.skills;
     if (bootStatus) bootStatus.style.display = 'grid';
     setBootMessage(`Preparando ${config.name}...`);
@@ -312,7 +315,7 @@ export async function startGame() {
       app.ticker.add(tick);
     };
 
-    const magicLink = (target: Monster, color: number) => {
+    const projectileLink = (target: Monster, color: number) => {
       if (!settingsStore.settings.graphics.effects) return;
       const effect = new Graphics().moveTo(player.x, player.y - 34).lineTo(target.view.x, target.view.y - 22).stroke({ width: 5, color, alpha: .85 });
       effect.circle(target.view.x, target.view.y - 22, 15).stroke({ width: 3, color, alpha: .75 }); world.addChild(effect);
@@ -327,14 +330,14 @@ export async function startGame() {
     const grantExp = (amount: number) => {
       progress.exp += amount;
       let leveled = false;
-      while (progress.exp >= progress.expToNext) {
-        progress.exp -= progress.expToNext; progress.level += 1;
-        progress.expToNext = Math.round(progress.expToNext * 1.35);
-        progress.maxHp += classDef.id === 'mage' ? 8 : 12;
-        progress.attack += classDef.id === 'mage' ? 5 : 4;
-        progress.defense += 1; playerHp = progress.maxHp; leveled = true;
+      while (progress.exp >= progress.expToNext && progress.level < classDef.progression.maxLevel) {
+        progress.exp -= progress.expToNext;
+        if (!levelUpCharacterProgress(progress, classDef)) break;
+        playerHp = progress.maxHp;
+        leveled = true;
       }
-      if (leveled) showDialog(hud, `Nível ${progress.level}! HP, ataque e defesa aumentaram.`);
+      if (progress.level >= classDef.progression.maxLevel) progress.exp = Math.min(progress.exp, Math.max(0, progress.expToNext - 1));
+      if (leveled) showDialog(hud, `Nível ${progress.level}! A progressão de ${classDef.name} foi aplicada.`);
       characterSheet.refresh();
     };
 
@@ -376,7 +379,6 @@ export async function startGame() {
       inventory.refresh(); refreshQuestUi(); save(); characterSheet.refresh(); mapSystem.refresh();
     };
 
-    const attackPower = () => Math.max(1, Math.round(progress.attack * skillController.attackMultiplier()));
     const facePoint = (x: number, y: number) => {
       const dx = x - player.x, dy = y - player.y;
       const facing: Facing = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down');
@@ -404,26 +406,52 @@ export async function startGame() {
       player.position.set(bestX, bestY);
     };
 
-    const playClassAction = () => classDef.basicAttack.animation === 'spellcast' ? hero.cast() : hero.attack();
+    const healPlayer = (amount: number) => {
+      if (isDead || amount <= 0) return;
+      playerHp = Math.min(progress.maxHp, playerHp + amount);
+      progress.hp = playerHp;
+      refresh();
+    };
 
     useSkill = (skillId: SkillId) => {
       if (uiOpen() || hero.isAttacking) return;
       if (isInSafeZone(player.x, player.y)) { showDialog(hud, 'Área segura: habilidades de combate não podem ser usadas aqui.'); return; }
-      const skill = getSkill(skillId); if (!skill || skill.classId !== classDef.id) return;
-      let target: Monster | null = null; let targets: Monster[] = [];
-      if (skill.kind === 'melee' || skill.kind === 'charge' || skill.kind === 'target') {
+      const skill = getSkill(skillId); if (!skill) return;
+      let target: Monster | null = null;
+      let targets: Monster[] = [];
+      const needsEnemy = skill.targeting === 'enemy' || skill.targeting === 'area-target' || skill.targeting === 'line' || skill.targeting === 'cone';
+      if (needsEnemy) {
         target = findAttackTarget(monsters, player.x, player.y, skill.range ?? 120);
         if (!target) { showDialog(hud, `${skill.name}: nenhum alvo no alcance.`); return; }
       }
-      if (skill.kind === 'aoe') { targets = nearbyMonsters(skill.radius ?? 150); if (!targets.length) { showDialog(hud, `${skill.name}: nenhum inimigo por perto.`); return; } }
+      if (skill.targeting === 'area-self') {
+        targets = nearbyMonsters(skill.radius ?? 150);
+        if (!targets.length && skill.effects.some((effect) => effect.type === 'damage' || effect.type === 'dot')) { showDialog(hud, `${skill.name}: nenhum inimigo por perto.`); return; }
+      } else if (skill.targeting === 'area-target' && target) {
+        const radius = skill.radius ?? 150;
+        targets = monsters.filter((monster) => monster.alive && distance(target!.view.x, target!.view.y, monster.view.x, monster.view.y) <= radius);
+      } else if (target) targets = [target];
+
       const check = skillController.canUse(skillId); if ('reason' in check && check.reason) { showDialog(hud, check.reason); return; }
       const activated = skillController.activate(skillId); if ('reason' in activated && activated.reason) { showDialog(hud, activated.reason); return; }
-      const baseAttack = attackPower(), color = skill.effectColor ?? 0xf0b85d;
-      if (skill.kind === 'melee' && target) { faceTarget(target); hero.attack(); attackCooldown = 30; pulse(82, color, 280); hitMonster(target, baseAttack * (skill.damageMultiplier ?? 1), color); }
-      else if (skill.kind === 'charge' && target) { faceTarget(target); dashToward(target); hero.attack(); attackCooldown = 34; pulse(58, color, 300); hitMonster(target, baseAttack * (skill.damageMultiplier ?? 1), color); }
-      else if (skill.kind === 'target' && target) { faceTarget(target); hero.cast(); attackCooldown = 32; magicLink(target, color); hitMonster(target, baseAttack * (skill.damageMultiplier ?? 1), color); }
-      else if (skill.kind === 'aoe') { if (classDef.id === 'mage') hero.cast(); else hero.attack(); attackCooldown = 38; pulse(skill.radius ?? 165, color, 480); for (const monster of targets) hitMonster(monster, baseAttack * (skill.damageMultiplier ?? 1), color); }
-      else if (skill.kind === 'buff') { if (classDef.id === 'mage') hero.cast(); pulse(105, color, 650); floating(player.x, player.y - 105, `ATQ +${skill.buffAttackPercent ?? 0}%`, color); showDialog(hud, `${skill.name}: Ataque +${skill.buffAttackPercent ?? 0}% por ${Math.round((skill.buffDurationMs ?? 0) / 1000)}s.`); }
+      if (target) faceTarget(target);
+      if (!playClassAnimation(hero, skill.animation)) return;
+      attackCooldown = Math.max(1, Math.round((skill.castTimeMs > 0 ? skill.castTimeMs / 16.67 : 24) / Math.max(.1, classRuntime.castSpeed)));
+      const color = skill.effectColor ?? 0x9ddcff;
+      if (target && (skill.projectileKey || skill.kind === 'projectile' || skill.kind === 'target')) projectileLink(target, color);
+      executeSkillEffects({
+        progress,
+        skill,
+        target,
+        targets,
+        hitMonster,
+        healPlayer,
+        dashToTarget: dashToward,
+        addResource: skillController.addResource,
+        showPulse: pulse,
+        showFloating: (text, effectColor) => floating(player.x, player.y - 105, text, effectColor),
+        notify: (message) => showDialog(hud, message),
+      });
       skillBar.refresh(skillController.snapshot()); save();
     };
 
@@ -505,9 +533,13 @@ export async function startGame() {
       if (uiOpen() || attackCooldown > 0 || hero.isAttacking) return;
       if (isInSafeZone(player.x, player.y)) { showDialog(hud, 'Área segura: combates não são permitidos dentro da vila.'); return; }
       const target = findAttackTarget(monsters, player.x, player.y, classDef.basicAttack.range); if (!target) return;
-      faceTarget(target); if (!playClassAction()) return; attackCooldown = classDef.basicAttack.cooldownTicks;
-      if (classDef.id === 'mage') magicLink(target, 0x82b7ff);
-      hitMonster(target, attackPower(), classDef.id === 'mage' ? 0x9ddcff : 0xffc2b8);
+      faceTarget(target);
+      if (!playClassAnimation(hero, classDef.basicAttack.animation)) return;
+      attackCooldown = Math.max(1, classDef.basicAttack.cooldownTicks / Math.max(.1, classRuntime.attackSpeed));
+      const color = basicAttackColor(classDef);
+      if (classUsesProjectile(classDef)) projectileLink(target, classDef.basicAttack.projectileColor ?? color);
+      hitMonster(target, basicAttackDamage(progress, classDef, skillController.attackMultiplier()), color);
+      skillController.onBasicAttack();
     };
 
     hud.attack.addEventListener('pointerdown', attack);
@@ -552,7 +584,8 @@ export async function startGame() {
       autosaveMs += ticker.deltaMS; if (autosaveMs >= 3000) { autosaveMs = 0; save(); }
       attackCooldown = Math.max(0, attackCooldown - ticker.deltaTime);
       skillController.tick(ticker.deltaMS, uiOpen()); skillUiMs += ticker.deltaMS;
-      if (skillUiMs >= 100) { skillUiMs = 0; skillBar.refresh(skillController.snapshot(), uiOpen()); }
+      if (!isDead && !uiOpen() && classRuntime.hpRegen > 0 && playerHp < progress.maxHp) playerHp = Math.min(progress.maxHp, playerHp + classRuntime.hpRegen * ticker.deltaMS / 1000);
+      if (skillUiMs >= 100) { skillUiMs = 0; skillBar.refresh(skillController.snapshot(), uiOpen()); refresh(); }
 
       const map = progress.map || 'Floresta Inicial';
       gatheringSystem.update(player.x, player.y, map, ticker.deltaMS);
@@ -571,7 +604,7 @@ export async function startGame() {
       if (moving) {
         dx /= Math.max(1, len); dy /= Math.max(1, len);
         const facing: Facing = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down'); hero.setFacing(facing);
-        const speed = 4.4 * gmFlags.speedMultiplier * ticker.deltaTime;
+        const speed = 4.4 * classRuntime.moveSpeed * gmFlags.speedMultiplier * ticker.deltaTime;
         const nx = Math.max(40, Math.min(WORLD_W - 40, player.x + dx * speed));
         const ny = Math.max(80, Math.min(WORLD_H - 40, player.y + dy * speed));
         if (gmFlags.noclip || !collides(obstacles, nx, player.y)) player.x = nx;
@@ -589,7 +622,10 @@ export async function startGame() {
       if (!uiOpen()) {
         for (const zone of visitZonesAt(player.x, player.y, map)) announceQuestUpdates(registerQuestEvent(progress, { type: 'visit', zoneId: zone.id }));
         updateMonsters(monsters, ticker, player, progress.defense, (damage) => {
-          if (isDead || gmFlags.godMode) return; playerHp = Math.max(0, playerHp - damage); floating(player.x, player.y - 90, `-${damage}`, 0xff8f8f);
+          if (isDead || gmFlags.godMode) return;
+          playerHp = Math.max(0, playerHp - damage);
+          skillController.onDamageTaken();
+          floating(player.x, player.y - 90, `-${damage}`, 0xff8f8f);
           if (playerHp <= 0) { enterDeathState(); return; } refresh();
         });
 
