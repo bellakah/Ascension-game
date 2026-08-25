@@ -38,6 +38,7 @@ import { hydrateItemStudioRuntime } from './items/itemStudioStore';
 import { installItemInventoryVisualIntegration } from './items/itemInventoryVisualIntegration';
 import { ensureDefaultGatheringTools } from './gathering/gatheringToolMigration';
 import { ensureCollectibleMigration } from './gathering/collectibleStore';
+import { hydrateCraftStationTypesIntoPalette } from './crafting/craftStationPalette';
 import { installQuestHudNavigation } from './quests/questHudNavigation';
 
 export async function startGameApp() {
@@ -53,6 +54,7 @@ export async function startGameApp() {
   hydrateNpcDefinitionsIntoPalette();
   hydrateMonsterDefinitionsIntoPalette();
   ensureCollectibleMigration();
+  hydrateCraftStationTypesIntoPalette();
   await preparePublishedWorldRuntime();
   await installPublishedNpcRuntime();
   const unsubscribePublished = subscribePublishedMap(() => {
