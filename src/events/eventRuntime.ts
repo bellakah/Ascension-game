@@ -18,9 +18,15 @@ export function isEventRecordActive(event: EventStudioRecord, timestamp = Date.n
     return Number.isFinite(start) && Number.isFinite(end) && timestamp >= start && timestamp <= end;
   }
   const start = minutes(schedule.startTime), end = minutes(schedule.endTime);
-  if (start == null || end == null || !schedule.weekdays.includes(now.getDay())) return false;
+  if (start == null || end == null) return false;
   const current = now.getHours() * 60 + now.getMinutes();
-  return start <= end ? current >= start && current <= end : current >= start || current <= end;
+  if (start <= end) return schedule.weekdays.includes(now.getDay()) && current >= start && current <= end;
+
+  // Janela que cruza meia-noite: segunda 22:00–02:00 continua ativa
+  // na madrugada de terça, vinculada ao dia em que começou.
+  const previousDay = (now.getDay() + 6) % 7;
+  return (schedule.weekdays.includes(now.getDay()) && current >= start)
+    || (schedule.weekdays.includes(previousDay) && current <= end);
 }
 
 export function activeEventRecords(timestamp = Date.now()) {
