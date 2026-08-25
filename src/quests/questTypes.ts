@@ -29,6 +29,10 @@ export type QuestObjective = {
   itemId?: string;
   monsterKind?: MonsterKind | 'any';
   navigation?: QuestObjectiveNavigation;
+  stageId?: string;
+  stageIndex?: number;
+  stageTitle?: string;
+  stageMode?: QuestMode;
 };
 
 export type QuestReward = {

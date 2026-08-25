@@ -1,6 +1,7 @@
 import type { CharacterProgress } from '../character/characterCreator';
 import { addItem, getItem, itemQuantity, removeItem } from '../items/itemCatalog';
 import { QUEST_CATALOG, getQuestDefinition } from './questCatalog';
+import { listMissionStudioRecords } from './missionStudioStore';
 import type { QuestDefinition, QuestEvent, QuestObjective, QuestRuntimeState, QuestUpdate } from './questTypes';
 
 type QuestProgress = CharacterProgress & {
@@ -12,10 +13,43 @@ export const NPC_NAMES: Record<string, string> = {
   elandra: 'Elandra', rowan: 'Rowan', mira: 'Mira', theo: 'Theo',
 };
 
+const MISSION_FLOW = new Map(listMissionStudioRecords().map((mission) => [mission.key, mission.stages]));
+
 function totalTarget(quest: QuestDefinition) {
   return quest.objectives.reduce((total, objective) => total + Math.max(1, objective.amount ?? 1), 0);
 }
 function objectiveAmount(objective: QuestObjective) { return Math.max(1, objective.amount ?? 1); }
+
+function localDayStamp(timestamp: number) {
+  const date = new Date(timestamp);
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+function localWeekStamp(timestamp: number) {
+  const date = new Date(timestamp);
+  date.setHours(0, 0, 0, 0);
+  const mondayOffset = (date.getDay() + 6) % 7;
+  date.setDate(date.getDate() - mondayOffset);
+  return date.getTime();
+}
+function repeatResetDue(state: QuestRuntimeState, quest: QuestDefinition) {
+  if (state.status !== 'completed' || !state.completedAt) return false;
+  const mode = quest.reset ?? (quest.repeatable ? 'repeatable' : 'once');
+  if (mode === 'once' || mode === 'event') return false;
+  const now = Date.now();
+  const cooldownReady = now >= state.completedAt + Math.max(0, quest.cooldownMs ?? 0);
+  if (!cooldownReady) return false;
+  if (mode === 'repeatable') return true;
+  if (mode === 'daily') return localDayStamp(now) !== localDayStamp(state.completedAt);
+  if (mode === 'weekly') return localWeekStamp(now) !== localWeekStamp(state.completedAt);
+  return false;
+}
+function resetCompletedState(state: QuestRuntimeState) {
+  state.status = 'not_started';
+  state.objectives = {};
+  state.progress = 0;
+  state.acceptedAt = undefined;
+  state.completedAt = undefined;
+}
 
 function stateFor(progress: CharacterProgress, quest: QuestDefinition): QuestRuntimeState {
   const extended = progress as QuestProgress;
@@ -35,6 +69,7 @@ function stateFor(progress: CharacterProgress, quest: QuestDefinition): QuestRun
   raw.objectives ??= {};
   raw.progress = Math.max(0, Number(raw.progress ?? 0));
   raw.target = totalTarget(quest);
+  if (repeatResetDue(raw, quest)) resetCompletedState(raw);
   return raw;
 }
 
@@ -52,10 +87,28 @@ function objectiveDone(progress: CharacterProgress, quest: QuestDefinition, obje
   return objectiveCount(progress, quest, objective) >= objectiveAmount(objective);
 }
 
+function stageForObjective(quest: QuestDefinition, objectiveId: string) {
+  return MISSION_FLOW.get(quest.id)?.find((stage) => stage.objectives.some((objective) => objective.id === objectiveId));
+}
+
 function activeObjectives(progress: CharacterProgress, quest: QuestDefinition) {
+  const flow = MISSION_FLOW.get(quest.id);
+  if (flow?.length) {
+    for (const stage of flow) {
+      const runtimeObjectives = stage.objectives.map((entry) => quest.objectives.find((objective) => objective.id === entry.id)).filter((objective): objective is QuestObjective => Boolean(objective));
+      const pending = runtimeObjectives.filter((objective) => !objectiveDone(progress, quest, objective));
+      if (!pending.length) continue;
+      return stage.mode === 'parallel' ? pending : [pending[0]];
+    }
+    return [];
+  }
   if (quest.mode === 'parallel') return quest.objectives.filter((objective) => !objectiveDone(progress, quest, objective));
   const first = quest.objectives.find((objective) => !objectiveDone(progress, quest, objective));
   return first ? [first] : [];
+}
+
+function objectiveFlowIsSequential(quest: QuestDefinition, objective: QuestObjective) {
+  return stageForObjective(quest, objective.id)?.mode === 'sequential' || (!stageForObjective(quest, objective.id) && quest.mode === 'sequential');
 }
 
 function updateAggregate(progress: CharacterProgress, quest: QuestDefinition) {
@@ -70,7 +123,15 @@ function questIsReady(progress: CharacterProgress, quest: QuestDefinition) {
 }
 
 export function ensureQuestStates(progress: CharacterProgress) {
-  for (const quest of QUEST_CATALOG) { stateFor(progress, quest); updateAggregate(progress, quest); }
+  for (const quest of QUEST_CATALOG) {
+    stateFor(progress, quest);
+    updateAggregate(progress, quest);
+    if (quest.autoStart && isQuestAvailable(progress, quest)) {
+      const state = stateFor(progress, quest);
+      state.status = 'active'; state.acceptedAt = Date.now(); state.objectives = {};
+      updateAggregate(progress, quest);
+    }
+  }
   const extended = progress as QuestProgress;
   if (extended.trackedQuestId && !getQuestDefinition(extended.trackedQuestId)) extended.trackedQuestId = null;
   if (!extended.trackedQuestId) {
@@ -90,8 +151,10 @@ export function isQuestAvailable(progress: CharacterProgress, quest: QuestDefini
   const req = quest.requirements;
   if (!req) return true;
   if ((req.minLevel ?? 1) > progress.level) return false;
+  if (req.maxLevel && progress.level > req.maxLevel) return false;
   if (req.classIds?.length && !req.classIds.includes(progress.classId)) return false;
   if (req.completedQuests?.some((id) => getQuestState(progress, id)?.status !== 'completed')) return false;
+  if (req.requiredItems?.some((entry) => itemQuantity(progress, entry.itemId) < Math.max(1, entry.quantity))) return false;
   return true;
 }
 
@@ -136,7 +199,7 @@ export function registerQuestEvent(progress: CharacterProgress, event: QuestEven
       state.objectives[objective.id] = Math.min(objectiveAmount(objective), Number(state.objectives[objective.id] ?? 0) + 1);
       updateAggregate(progress, quest);
       updates.push({ quest, objective, objectiveCompleted: !wasDone && objectiveDone(progress, quest, objective), becameReady: questIsReady(progress, quest) });
-      if (quest.mode === 'sequential') break;
+      if (objectiveFlowIsSequential(quest, objective)) break;
     }
   }
   return updates;
@@ -172,7 +235,7 @@ function processNpcObjectives(progress: CharacterProgress, npcId: string) {
         state.objectives[objective.id] = amount;
         updateAggregate(progress, quest);
         updates.push({ quest, objective, objectiveCompleted: !wasDone, becameReady: questIsReady(progress, quest) });
-        if (quest.mode === 'sequential') break;
+        if (objectiveFlowIsSequential(quest, objective)) break;
       } else if (objective.type === 'deliver' && objective.itemId) {
         const amount = objectiveAmount(objective);
         if (itemQuantity(progress, objective.itemId) < amount) continue;
@@ -181,7 +244,7 @@ function processNpcObjectives(progress: CharacterProgress, npcId: string) {
         state.objectives[objective.id] = amount;
         updateAggregate(progress, quest);
         updates.push({ quest, objective, objectiveCompleted: true, becameReady: questIsReady(progress, quest) });
-        if (quest.mode === 'sequential') break;
+        if (objectiveFlowIsSequential(quest, objective)) break;
       }
     }
   }
@@ -257,6 +320,10 @@ export function questObjectiveProgress(progress: CharacterProgress, quest: Quest
   return { current: objectiveCount(progress, quest, objective), target: objectiveAmount(objective), done: objectiveDone(progress, quest, objective) };
 }
 
+export function getActiveQuestObjectives(progress: CharacterProgress, quest: QuestDefinition) {
+  return activeObjectives(progress, quest);
+}
+
 export function questLists(progress: CharacterProgress) {
   ensureQuestStates(progress);
   const active = QUEST_CATALOG.filter((quest) => ['active', 'ready'].includes(stateFor(progress, quest).status));
@@ -278,5 +345,6 @@ export function rewardText(quest: QuestDefinition) {
   if (quest.rewards.exp) parts.push(`${quest.rewards.exp} EXP`);
   if (quest.rewards.coins) parts.push(`${quest.rewards.coins} moedas`);
   for (const reward of quest.rewards.items ?? []) parts.push(`${reward.quantity}x ${getItem(reward.itemId)?.name ?? reward.itemId}`);
+  if (quest.rewards.chooseOne?.length) parts.push(`Escolha 1 de ${quest.rewards.chooseOne.length} recompensa(s)`);
   return parts.join(' · ');
 }

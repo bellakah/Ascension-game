@@ -38,6 +38,7 @@ import { hydrateItemStudioRuntime } from './items/itemStudioStore';
 import { installItemInventoryVisualIntegration } from './items/itemInventoryVisualIntegration';
 import { ensureDefaultGatheringTools } from './gathering/gatheringToolMigration';
 import { ensureCollectibleMigration } from './gathering/collectibleStore';
+import { installQuestHudNavigation } from './quests/questHudNavigation';
 
 export async function startGameApp() {
   installResponsiveUi();
@@ -70,6 +71,7 @@ export async function startGameApp() {
     installMarkerRuntime();
     installMinimapShape();
     installMapAutoRoute();
+    installQuestHudNavigation();
     cameraZoom.attach();
   });
 }
