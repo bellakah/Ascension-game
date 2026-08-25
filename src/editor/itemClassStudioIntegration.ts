@@ -24,24 +24,25 @@ export function installItemClassStudioIntegration(root: HTMLElement) {
     const classes = listClassDefinitions({ publishedOnly: true });
 
     for (const entry of classes) {
-      let input = grid.querySelector<HTMLInputElement>(`input[data-item-class="${CSS.escape(entry.id)}"]`);
-      if (!input) {
-        const label = document.createElement('label');
-        input = document.createElement('input');
-        input.type = 'checkbox';
-        input.dataset.itemClass = entry.id;
-        input.checked = selected.has(entry.id);
-        label.append(input, ` ${entry.name}`);
-        grid.appendChild(label);
-      }
-      if (input.dataset.dynamicClassBound === '1') continue;
-      input.dataset.dynamicClassBound = '1';
+      const existing = grid.querySelector<HTMLInputElement>(`input[data-item-class="${CSS.escape(entry.id)}"]`);
+      if (existing) continue;
+
+      const label = document.createElement('label');
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.dataset.itemClass = entry.id;
+      input.dataset.dynamicClassInjected = '1';
+      input.checked = selected.has(entry.id);
+      label.append(input, ` ${entry.name}`);
+      grid.appendChild(label);
+
       input.addEventListener('change', () => {
         const currentKey = activeItemKey(root);
         const values = new Set([...grid.querySelectorAll<HTMLInputElement>('input[data-item-class]:checked')].map((node) => node.dataset.itemClass!).filter(Boolean));
         if (currentKey) pending.set(currentKey, values);
-        // O handler original de Guerreiro/Mago coleta todos os checkboxes do grid.
-        const bridge = [...grid.querySelectorAll<HTMLInputElement>('input[data-item-class]')].find((node) => node !== input && node.dataset.dynamicClassBound !== '1');
+        // O handler original coleta todos os checkboxes do grid; disparamos um
+        // dos controles legados apenas para fazer o draft privado absorver a seleção.
+        const bridge = grid.querySelector<HTMLInputElement>('input[data-item-class]:not([data-dynamic-class-injected])');
         bridge?.dispatchEvent(new Event('change', { bubbles: true }));
       });
     }
