@@ -61,6 +61,8 @@ if (playtest === 'map') {
   void import('./editor/eventsEditorApp').then(({ startEventsEditorApp }) => startEventsEditorApp());
 } else if (editor === 'shops') {
   void import('./editor/shopsEditorApp').then(({ startShopsEditorApp }) => startShopsEditorApp());
+} else if (editor === 'crafts') {
+  void import('./editor/craftsEditorApp').then(({ startCraftsEditorApp }) => startCraftsEditorApp());
 } else {
   void import('./gameBootstrap').then(({ startGameApp }) => startGameApp());
 }
