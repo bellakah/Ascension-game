@@ -59,6 +59,8 @@ if (playtest === 'map') {
   void import('./editor/questsEditorApp').then(({ startQuestsEditorApp }) => startQuestsEditorApp());
 } else if (editor === 'events') {
   void import('./editor/eventsEditorApp').then(({ startEventsEditorApp }) => startEventsEditorApp());
+} else if (editor === 'shops') {
+  void import('./editor/shopsEditorApp').then(({ startShopsEditorApp }) => startShopsEditorApp());
 } else {
   void import('./gameBootstrap').then(({ startGameApp }) => startGameApp());
 }
