@@ -28,7 +28,7 @@ export type NpcDialogueNode = {
 export type NpcShopItem = { itemId: string; price: number; stock: number | null };
 export type NpcShopLink = {
   enabled: boolean;
-  shopId: string;
+  shopId?: string;
   currencyId?: string;
   buyMultiplier?: number;
   sellMultiplier?: number;
