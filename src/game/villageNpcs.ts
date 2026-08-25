@@ -27,6 +27,7 @@ const MERCHANTS: MerchantVisual[] = [
   { shopId: 'mira', name: 'Mira', role: 'Alquimista', icon: '⚗', x: 1180, y: 1245, body: 0x526b8f, trim: 0xb7d0ef },
   { shopId: 'silas', name: 'Silas', role: 'Banqueiro', icon: '🏦', x: 740, y: 1455, body: 0x39495f, trim: 0xd6c27d },
   { shopId: 'theo', name: 'Theo', role: 'Comerciante', icon: '🪙', x: 1200, y: 1455, body: 0x667343, trim: 0xd8d183 },
+  { shopId: 'class-trainer', name: 'Aren', role: 'Instrutor de Classes', icon: '✦', x: 980, y: 1190, body: 0x315d66, trim: 0xe1c873 },
 ];
 
 function createMerchant(world: Container, data: MerchantVisual): VillageMerchant {
@@ -54,7 +55,7 @@ function createMerchant(world: Container, data: MerchantVisual): VillageMerchant
 export function createVillageMerchants(world: Container) {
   const published = getPreparedPublishedWorldRuntime();
   const definitions = published
-    ? MERCHANTS.filter((data) => getPublishedObjectPositions(data.shopId).length > 0)
+    ? MERCHANTS.filter((data) => data.shopId === 'class-trainer' || getPublishedObjectPositions(data.shopId).length > 0)
     : MERCHANTS;
   return definitions.map((data) => createMerchant(world, data));
 }
