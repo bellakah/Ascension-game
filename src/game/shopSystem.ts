@@ -1,5 +1,6 @@
 import './shopSystem.css';
 import type { CharacterProgress } from '../character/characterCreator';
+import { createClassTrainerUi } from '../classes/classTrainer';
 import { createBankUi } from '../bank/bankUi';
 import { ITEM_CATEGORY_LABELS, ITEM_RARITY_LABELS, addItem, ensureInventoryState, getItem, itemQuantity, removeItem, type EquipmentSlot, type ItemDefinition, type ItemStats } from '../items/itemCatalog';
 import type { ShopStudioItem, ShopStudioRecord } from '../shops/shopStudioTypes';
@@ -25,7 +26,7 @@ function statHtml(item: ItemDefinition) {
 }
 
 export function createShop(progress: CharacterProgress, callbacks: ShopCallbacks) {
-  const state = ensureInventoryState(progress), bankUi = createBankUi(progress, callbacks);
+  const state = ensureInventoryState(progress), bankUi = createBankUi(progress, callbacks), trainerUi = createClassTrainerUi(progress, { onChanged: callbacks.onChanged, notify: callbacks.notify });
   let currentShop: ShopStudioRecord | null = null, mode: Mode = 'buy', selectedItemId: string | null = null, quantity = 1, search = '';
   const root = document.createElement('div'); root.id = 'shop-overlay'; root.className = 'shop-hidden';
   root.innerHTML = `<div class="shop-window" role="dialog" aria-label="Loja"><header class="shop-header"><div class="shop-merchant"><span id="shop-merchant-icon" class="shop-merchant-icon"></span><div><span class="shop-kicker">COMÉRCIO</span><h2 id="shop-merchant-name"></h2><p id="shop-merchant-role"></p></div></div><div class="shop-header-right"><div class="shop-balance"><span id="shop-currency-icon">🪙</span> <strong id="shop-balance"></strong></div><button id="shop-close" type="button">×</button></div></header><div class="shop-message"><span id="shop-greeting"></span><small id="shop-specialty"></small></div><div class="shop-toolbar"><div class="shop-tabs"><button id="shop-tab-buy">Comprar</button><button id="shop-tab-sell">Vender</button></div><label class="shop-search"><span>⌕</span><input id="shop-search" type="search" placeholder="Buscar item..."></label></div><div class="shop-body"><section class="shop-list-panel"><div class="shop-list-heading"><strong id="shop-list-title"></strong><span id="shop-list-count"></span></div><div id="shop-list" class="shop-list"></div></section><aside id="shop-detail" class="shop-detail"></aside></div><footer class="shop-footer"><span>Preços e estoque são definidos no Shop Studio.</span><span><kbd>Esc</kbd> fechar</span></footer></div>`;
@@ -84,11 +85,12 @@ export function createShop(progress: CharacterProgress, callbacks: ShopCallbacks
   buyTab.onclick = () => switchMode('buy'); sellTab.onclick = () => switchMode('sell'); searchInput.oninput = () => { search = searchInput.value.trim().toLocaleLowerCase('pt-BR'); selectedItemId = null; render(); };
   const closeShopWindow = () => { root.classList.add('shop-hidden'); root.classList.remove('shop-visible'); };
   const open = (shopId: ShopId) => {
-    if (shopId === 'silas') { closeShopWindow(); bankUi.open(); return true; }
+    if (shopId === 'silas') { closeShopWindow(); trainerUi.close(); bankUi.open(); return true; }
+    if (shopId === 'class-trainer') { closeShopWindow(); bankUi.close(); trainerUi.open(); return true; }
     const resolved = getRuntimeShop(shopId, progress); if (!resolved) { callbacks.notify('Esta loja não está disponível agora.'); return false; }
-    bankUi.close(); currentShop = resolved; mode = resolved.allowBuy ? 'buy' : 'sell'; selectedItemId = null; quantity = 1; search = ''; searchInput.value = ''; root.classList.remove('shop-hidden'); root.classList.add('shop-visible'); render(); return true;
+    bankUi.close(); trainerUi.close(); currentShop = resolved; mode = resolved.allowBuy ? 'buy' : 'sell'; selectedItemId = null; quantity = 1; search = ''; searchInput.value = ''; root.classList.remove('shop-hidden'); root.classList.add('shop-visible'); render(); return true;
   };
-  const close = () => { closeShopWindow(); bankUi.close(); };
+  const close = () => { closeShopWindow(); bankUi.close(); trainerUi.close(); };
   root.querySelector<HTMLButtonElement>('#shop-close')!.onclick = close; root.addEventListener('pointerdown', (event) => { if (event.target === root) close(); }); window.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !root.classList.contains('shop-hidden')) close(); });
-  return { root, open, close, refresh: () => { render(); bankUi.refresh(); }, isOpen: () => !root.classList.contains('shop-hidden') || bankUi.isOpen() };
+  return { root, open, close, refresh: () => { render(); bankUi.refresh(); trainerUi.refresh(); }, isOpen: () => !root.classList.contains('shop-hidden') || bankUi.isOpen() || trainerUi.isOpen() };
 }
