@@ -1,6 +1,7 @@
 import { createStandaloneStudioShell } from './standaloneStudioShell';
 import { createItemStudio } from '../items/itemStudio';
 import { ensureItemStudioMigration } from '../items/itemStudioStore';
+import { installItemClassStudioIntegration } from './itemClassStudioIntegration';
 
 function actorsUrl(section: 'npc' | 'monster') {
   const url = new URL(window.location.href);
@@ -15,6 +16,7 @@ export function startItemsEditor() {
   ensureItemStudioMigration();
 
   const studio = createItemStudio(shell.root);
+  installItemClassStudioIntegration(studio.element);
   shell.root.querySelector<HTMLButtonElement>('#mep-mode-npcs')!.onclick = () => { window.location.href = actorsUrl('npc'); };
   shell.root.querySelector<HTMLButtonElement>('#mep-mode-monsters')!.onclick = () => { window.location.href = actorsUrl('monster'); };
   shell.root.querySelector<HTMLButtonElement>('#mep-mode-items')!.onclick = () => studio.open();

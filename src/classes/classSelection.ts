@@ -1,9 +1,10 @@
 import './classSelection.css';
-import { PLAYABLE_CLASSES, type ClassId } from './classCatalog';
+import { SELECTABLE_CLASSES, type ClassId } from './classCatalog';
 
 export function showClassSelection(initial: ClassId = 'warrior'): Promise<ClassId | null> {
   return new Promise((resolve) => {
-    let selected: ClassId = initial;
+    const classes = SELECTABLE_CLASSES;
+    let selected: ClassId = classes.some((entry) => entry.id === initial) ? initial : (classes[0]?.id ?? initial);
     const root = document.createElement('div');
     root.id = 'class-select-overlay';
     root.style.position = 'fixed';
@@ -22,10 +23,17 @@ export function showClassSelection(initial: ClassId = 'warrior'): Promise<ClassI
       </div>`;
     document.body.appendChild(root);
     const grid = root.querySelector<HTMLElement>('#class-choice-grid')!;
+    const confirm = root.querySelector<HTMLButtonElement>('#class-confirm')!;
 
     const render = () => {
       grid.replaceChildren();
-      for (const entry of PLAYABLE_CLASSES) {
+      if (!classes.length) {
+        grid.innerHTML = '<div style="padding:20px;color:#d9c68c">Nenhuma classe publicada está marcada como disponível na criação.</div>';
+        confirm.disabled = true;
+        return;
+      }
+      confirm.disabled = false;
+      for (const entry of classes) {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = `class-choice-card${selected === entry.id ? ' selected' : ''}`;
@@ -38,7 +46,7 @@ export function showClassSelection(initial: ClassId = 'warrior'): Promise<ClassI
 
     const finish = (value: ClassId | null) => { root.remove(); resolve(value); };
     root.querySelector<HTMLButtonElement>('#class-cancel')!.addEventListener('click', () => finish(null));
-    root.querySelector<HTMLButtonElement>('#class-confirm')!.addEventListener('click', () => finish(selected));
+    confirm.addEventListener('click', () => finish(classes.length ? selected : null));
     render();
   });
 }

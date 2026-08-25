@@ -1,5 +1,6 @@
 import type { CharacterProgress } from '../character/characterCreator';
 import { getClassDefinition } from '../classes/classCatalog';
+import { ensureClassCharacterBootstrap } from '../classes/classCharacterBootstrap';
 import { classStatsAtLevel } from '../classes/classProgression';
 import { getSkill, getSkillsForClass, type SkillDefinition, type SkillId } from './skillCatalog';
 
@@ -19,6 +20,7 @@ export type SkillSnapshot = {
 };
 
 export function ensureSkillProgress(progress: CharacterProgress) {
+  ensureClassCharacterBootstrap(progress);
   const state = progress as SkillProgress;
   const classDef = getClassDefinition(progress.classId);
   const expectedMax = classStatsAtLevel(classDef, progress.level).resourceMax;
@@ -37,6 +39,7 @@ export function ensureSkillProgress(progress: CharacterProgress) {
 }
 
 export function createSkillController(progress: CharacterProgress) {
+  ensureClassCharacterBootstrap(progress);
   const classDef = getClassDefinition(progress.classId);
   const allClassSkills = getSkillsForClass(classDef.id);
   const skills = allClassSkills.filter((skill) => skill.unlockLevel <= progress.level);
