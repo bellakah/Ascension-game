@@ -1,5 +1,6 @@
 import type { CharacterProgress } from '../character/characterCreator';
 import { getClassDefinition } from '../classes/classCatalog';
+import { classStatsAtLevel } from '../classes/classProgression';
 import { getSkill, getSkillsForClass, type SkillDefinition, type SkillId } from './skillCatalog';
 
 type SkillProgress = CharacterProgress & { energy?: number; maxEnergy?: number };
@@ -20,8 +21,17 @@ export type SkillSnapshot = {
 export function ensureSkillProgress(progress: CharacterProgress) {
   const state = progress as SkillProgress;
   const classDef = getClassDefinition(progress.classId);
-  if (!Number.isFinite(state.maxEnergy) || Number(state.maxEnergy) < 1) state.maxEnergy = classDef.resource.max;
-  if (!Number.isFinite(state.energy)) state.energy = state.maxEnergy;
+  const expectedMax = classStatsAtLevel(classDef, progress.level).resourceMax;
+  if (!Number.isFinite(state.maxEnergy) || Number(state.maxEnergy) < 1) state.maxEnergy = expectedMax;
+  if (!Number.isFinite(state.energy)) {
+    const ratio = classDef.resource.max > 0 ? classDef.resource.startingValue / classDef.resource.max : 1;
+    state.energy = Math.max(0, Math.min(expectedMax, expectedMax * ratio));
+  }
+  if (state.maxEnergy !== expectedMax) {
+    const ratio = state.maxEnergy! > 0 ? Number(state.energy) / state.maxEnergy! : 1;
+    state.maxEnergy = expectedMax;
+    state.energy = Math.max(0, Math.min(expectedMax, expectedMax * ratio));
+  }
   state.energy = Math.max(0, Math.min(state.maxEnergy!, Number(state.energy)));
   return state as SkillProgress & { energy: number; maxEnergy: number };
 }
@@ -30,10 +40,6 @@ export function createSkillController(progress: CharacterProgress) {
   const classDef = getClassDefinition(progress.classId);
   const skills = getSkillsForClass(classDef.id);
   const state = ensureSkillProgress(progress);
-  if (progress.level <= 1 && state.maxEnergy !== classDef.resource.max) {
-    state.maxEnergy = classDef.resource.max;
-    state.energy = Math.min(state.energy, state.maxEnergy);
-  }
   const cooldowns: Partial<Record<SkillId, number>> = Object.fromEntries(skills.map((skill) => [skill.id, 0]));
   let buffAttackPercent = 0;
   let buffRemainingMs = 0;
@@ -63,6 +69,10 @@ export function createSkillController(progress: CharacterProgress) {
     return { ok: true, skill };
   };
 
+  const addResource = (amount: number) => { state.energy = Math.max(0, Math.min(state.maxEnergy, state.energy + amount)); };
+  const onBasicAttack = () => addResource(classDef.resource.gainOnBasicAttack);
+  const onDamageTaken = () => addResource(classDef.resource.gainOnDamageTaken);
+
   const tick = (deltaMs: number, paused = false) => {
     if (paused) return;
     for (const skill of skills) cooldowns[skill.id] = Math.max(0, (cooldowns[skill.id] ?? 0) - deltaMs);
@@ -70,7 +80,7 @@ export function createSkillController(progress: CharacterProgress) {
       buffRemainingMs = Math.max(0, buffRemainingMs - deltaMs);
       if (buffRemainingMs <= 0) { buffAttackPercent = 0; buffName = ''; buffIcon = ''; }
     }
-    state.energy = Math.min(state.maxEnergy, state.energy + deltaMs * classDef.resource.regenPerSecond / 1000);
+    if (classDef.resource.mode !== 'none' && classDef.resource.regenPerSecond !== 0) addResource(deltaMs * classDef.resource.regenPerSecond / 1000);
   };
 
   const refill = () => { state.energy = state.maxEnergy; };
@@ -86,5 +96,5 @@ export function createSkillController(progress: CharacterProgress) {
     buffIcon,
   });
 
-  return { classDef, skills, state, canUse, activate, tick, refill, attackMultiplier, snapshot };
+  return { classDef, skills, state, canUse, activate, tick, refill, addResource, onBasicAttack, onDamageTaken, attackMultiplier, snapshot };
 }
