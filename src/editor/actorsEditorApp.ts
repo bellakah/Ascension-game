@@ -7,6 +7,7 @@ import { createMonsterStudio } from '../monsterEditor/monsterStudio';
 import { hydrateMonsterDefinitionsIntoPalette } from '../monsterEditor/monsterStore';
 import { installStudioAppearanceUx } from './studioAppearanceUx';
 import { installStudioAnimationStateTabsIntegration } from './studioAnimationStateTabsIntegration';
+import { installNpcShopStudioIntegration } from './npcShopStudioIntegration';
 
 export async function startActorsEditor() {
   const shell = createStandaloneStudioShell('actors');
@@ -25,8 +26,6 @@ export async function startActorsEditor() {
   const ensureDropPicker = () => {
     if (dropPickerRequested) return;
     dropPickerRequested = true;
-    // Deixa a UI do editor pintar primeiro. O Item Studio só é importado quando
-    // o usuário realmente entra no Monster Studio, evitando pesar o bootstrap.
     window.setTimeout(() => {
       void import('../items/monsterDropItemPicker').then(({ installMonsterDropItemPicker }) => {
         installMonsterDropItemPicker();
@@ -58,6 +57,7 @@ export async function startActorsEditor() {
 
   installStudioAppearanceUx();
   installStudioAnimationStateTabsIntegration();
+  installNpcShopStudioIntegration(shell.root);
 
   const params = new URLSearchParams(window.location.search);
   const requested = params.get('section');
