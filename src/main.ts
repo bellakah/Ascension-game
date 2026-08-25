@@ -64,6 +64,8 @@ if (playtest === 'map') {
   void import('./editor/craftsEditorApp').then(({ startCraftsEditorApp }) => startCraftsEditorApp());
 } else if (editor === 'classes') {
   void import('./editor/classesEditorApp').then(({ startClassesEditorApp }) => startClassesEditorApp());
+} else if (editor === 'skills') {
+  void import('./editor/skillsEditorApp').then(({ startSkillsEditorApp }) => startSkillsEditorApp());
 } else {
   void import('./gameBootstrap').then(({ startGameApp }) => startGameApp());
 }
