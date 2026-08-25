@@ -1,12 +1,10 @@
 import { Container, Graphics, Text } from 'pixi.js';
 import { getPreparedPublishedWorldRuntime, getPublishedObjectPositions } from '../map/publishedMapRuntime';
+import { craftStationAssetId } from './craftStationPalette';
+import { listPublishedCraftStationTypeRecords } from './craftStudioStore';
 import { CRAFTING_STATIONS, type CraftingStationDefinition } from './recipeCatalog';
 
-export type RuntimeCraftingStation = {
-  definition: CraftingStationDefinition;
-  view: Container;
-  marker: Text;
-};
+export type RuntimeCraftingStation = { definition: CraftingStationDefinition; view: Container; marker: Text };
 
 function createForgeVisual() {
   const c = new Container();
@@ -20,7 +18,6 @@ function createForgeVisual() {
   );
   return c;
 }
-
 function createAlchemyVisual() {
   const c = new Container();
   c.addChild(
@@ -34,42 +31,47 @@ function createAlchemyVisual() {
   );
   return c;
 }
-
 function createStation(definition: CraftingStationDefinition): RuntimeCraftingStation {
   const view = new Container();
-  const art = definition.type === 'forge' ? createForgeVisual() : createAlchemyVisual();
-  view.addChild(art);
-
+  view.addChild(definition.type === 'alchemy' ? createAlchemyVisual() : createForgeVisual());
   const marker = new Text({ text: definition.icon, style: { fill: 0xe8d9a2, fontSize: 16, fontWeight: 'bold', stroke: { color: 0x132018, width: 4 } } });
-  marker.anchor.set(.5); marker.y = -55; marker.alpha = .55;
-  view.addChild(marker);
-
+  marker.anchor.set(.5); marker.y = -55; marker.alpha = .55; view.addChild(marker);
   const label = new Text({ text: definition.name, style: { fill: 0xe8eee9, fontSize: 9, fontWeight: 'bold', stroke: { color: 0x132018, width: 3 } } });
-  label.anchor.set(.5); label.y = 34; label.alpha = .72;
-  view.addChild(label);
-
+  label.anchor.set(.5); label.y = 34; label.alpha = .72; view.addChild(label);
   view.position.set(definition.x, definition.y);
   return { definition, view, marker };
+}
+
+function publishedPositions(type: string) {
+  const direct = getPublishedObjectPositions(craftStationAssetId(type));
+  if (type === 'forge') return [...direct, ...getPublishedObjectPositions('anvil_station')];
+  if (type === 'alchemy') return [...direct, ...getPublishedObjectPositions('alchemy_station')];
+  return direct;
 }
 
 export function createCraftingStations(world: Container) {
   const publishedRuntime = getPreparedPublishedWorldRuntime();
   const stations: RuntimeCraftingStation[] = [];
-  for (const definition of CRAFTING_STATIONS) {
-    const assetId = definition.type === 'forge' ? 'anvil_station' : 'alchemy_station';
-    const published = getPublishedObjectPositions(assetId)[0];
-    if (publishedRuntime && !published) continue;
-    const runtimeDefinition = published ? { ...definition, x: published.x, y: published.y } : definition;
-    const station = createStation(runtimeDefinition);
-    world.addChild(station.view);
-    stations.push(station);
+  const stationTypes = listPublishedCraftStationTypeRecords();
+  for (const type of stationTypes) {
+    const points = publishedPositions(type.key);
+    if (publishedRuntime) {
+      points.forEach((point, index) => {
+        const definition: CraftingStationDefinition = { id: `${type.key}:${index}`, name: type.name, type: type.key, map: publishedRuntime.document.name, x: point.x, y: point.y, radius: type.interactionRadius, icon: type.icon, hint: type.prompt };
+        const station = createStation(definition); world.addChild(station.view); stations.push(station);
+      });
+      continue;
+    }
+    for (const fallback of CRAFTING_STATIONS.filter((entry) => entry.type === type.key)) {
+      const definition = { ...fallback, name: type.name, radius: type.interactionRadius, icon: type.icon, hint: type.prompt };
+      const station = createStation(definition); world.addChild(station.view); stations.push(station);
+    }
   }
   return stations;
 }
 
 export function nearestCraftingStation(stations: RuntimeCraftingStation[], x: number, y: number, map = 'Floresta Inicial', hintExtra = 45) {
-  let nearest: RuntimeCraftingStation | null = null;
-  let best = Infinity;
+  let nearest: RuntimeCraftingStation | null = null, best = Infinity;
   for (const station of stations) {
     if (station.definition.map !== map) continue;
     const d = Math.hypot(x - station.definition.x, y - station.definition.y);
