@@ -7,11 +7,13 @@ if (playtest === 'map') {
     import('./npc/npcStore'),
     import('./monsterEditor/monsterStore'),
     import('./gathering/collectibleStore'),
+    import('./crafting/craftStationPalette'),
     import('./editor/map/mapPlaytest'),
-  ]).then(([{ hydrateNpcDefinitionsIntoPalette }, { hydrateMonsterDefinitionsIntoPalette }, { ensureCollectibleMigration }, { startMapPlaytest }]) => {
+  ]).then(([{ hydrateNpcDefinitionsIntoPalette }, { hydrateMonsterDefinitionsIntoPalette }, { ensureCollectibleMigration }, { hydrateCraftStationTypesIntoPalette }, { startMapPlaytest }]) => {
     hydrateNpcDefinitionsIntoPalette();
     hydrateMonsterDefinitionsIntoPalette();
     ensureCollectibleMigration();
+    hydrateCraftStationTypesIntoPalette();
     return startMapPlaytest();
   });
 } else if (editor === 'map') {
@@ -20,18 +22,20 @@ if (playtest === 'map') {
     import('./npc/npcStore'),
     import('./monsterEditor/monsterStore'),
     import('./gathering/collectibleStore'),
+    import('./crafting/craftStationPalette'),
     import('./editor/map/mapEditorProApp'),
-  ]).then(async ([{ ensureLegacyStudioDefinitions }, { hydrateNpcDefinitionsIntoPalette }, { hydrateMonsterDefinitionsIntoPalette }, { ensureCollectibleMigration }, { startMapEditor }]) => {
+  ]).then(async ([{ ensureLegacyStudioDefinitions }, { hydrateNpcDefinitionsIntoPalette }, { hydrateMonsterDefinitionsIntoPalette }, { ensureCollectibleMigration }, { hydrateCraftStationTypesIntoPalette }, { startMapEditor }]) => {
     ensureLegacyStudioDefinitions();
     hydrateNpcDefinitionsIntoPalette();
     hydrateMonsterDefinitionsIntoPalette();
     ensureCollectibleMigration();
+    hydrateCraftStationTypesIntoPalette();
     await startMapEditor();
 
-    // A biblioteca V2 já está disponível depois do start; reconstruímos previews compostos reais.
     hydrateNpcDefinitionsIntoPalette();
     hydrateMonsterDefinitionsIntoPalette();
     ensureCollectibleMigration();
+    hydrateCraftStationTypesIntoPalette();
     window.dispatchEvent(new Event('resize'));
 
     const { installMapEditorInteractionPerf } = await import('./editor/map/mapEditorInteractionPerf');
