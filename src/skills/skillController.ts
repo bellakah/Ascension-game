@@ -1,6 +1,8 @@
 import type { CharacterProgress } from '../character/characterCreator';
+import { classCharacterState } from '../classes/classAdvancement';
 import { getClassDefinition } from '../classes/classCatalog';
 import { ensureClassCharacterBootstrap } from '../classes/classCharacterBootstrap';
+import { applyActiveClassEventActions } from '../classes/classEventRuntime';
 import { classStatsAtLevel } from '../classes/classProgression';
 import { getSkill, getSkillsForClass, type SkillDefinition, type SkillId } from './skillCatalog';
 
@@ -40,8 +42,11 @@ export function ensureSkillProgress(progress: CharacterProgress) {
 
 export function createSkillController(progress: CharacterProgress) {
   ensureClassCharacterBootstrap(progress);
+  applyActiveClassEventActions(progress);
   const classDef = getClassDefinition(progress.classId);
-  const allClassSkills = getSkillsForClass(classDef.id);
+  const characterState = classCharacterState(progress);
+  const learned = (characterState.learnedSkillIds ?? []).map((id) => getSkill(id)).filter((skill): skill is SkillDefinition => Boolean(skill));
+  const allClassSkills = [...new Map([...getSkillsForClass(classDef.id), ...learned].map((skill) => [skill.id, skill])).values()].sort((a, b) => a.slot - b.slot || a.numericId - b.numericId);
   const skills = allClassSkills.filter((skill) => skill.unlockLevel <= progress.level);
   const state = ensureSkillProgress(progress);
   const cooldowns: Partial<Record<SkillId, number>> = Object.fromEntries(allClassSkills.map((skill) => [skill.id, 0]));
@@ -50,11 +55,11 @@ export function createSkillController(progress: CharacterProgress) {
   let buffName = '';
   let buffIcon = '';
 
-  const belongsToClass = (skillId: string) => classDef.skillIds.includes(skillId) || getSkill(skillId)?.classId === classDef.id;
+  const belongsToClass = (skillId: string) => classDef.skillIds.includes(skillId) || getSkill(skillId)?.classId === classDef.id || (characterState.learnedSkillIds ?? []).includes(skillId);
 
   const canUse = (skillId: SkillId): SkillAvailability => {
     const skill = getSkill(skillId);
-    if (!skill || !belongsToClass(skillId)) return { ok: false, reason: 'Esta habilidade não pertence à sua classe.' };
+    if (!skill || !belongsToClass(skillId)) return { ok: false, reason: 'Esta habilidade não pertence à sua classe nem foi aprendida.' };
     if (skill.unlockLevel > progress.level) return { ok: false, reason: `${skill.name} requer nível ${skill.unlockLevel}.` };
     if ((cooldowns[skillId] ?? 0) > 0) return { ok: false, reason: `${skill.name} ainda está em recarga.` };
     if (state.energy < skill.energyCost) return { ok: false, reason: `${classDef.resource.label} insuficiente para ${skill.name}.` };

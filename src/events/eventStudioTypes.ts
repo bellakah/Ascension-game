@@ -1,7 +1,7 @@
 export type EventStudioStatus = 'draft' | 'published' | 'disabled';
 export type EventStudioType = 'world' | 'seasonal' | 'boss' | 'timed' | 'pvp' | 'gathering' | 'gm';
 export type EventScheduleMode = 'manual' | 'window' | 'recurring';
-export type EventActionType = 'mission' | 'spawn-group' | 'portal' | 'marker' | 'shop' | 'drop-table' | 'buff';
+export type EventActionType = 'mission' | 'spawn-group' | 'portal' | 'marker' | 'shop' | 'drop-table' | 'buff' | 'unlock-class' | 'change-class' | 'learn-skill';
 
 export type EventStudioSchedule = {
   mode: EventScheduleMode;
