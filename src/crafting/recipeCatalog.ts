@@ -1,16 +1,23 @@
-export type CraftingStationType = 'forge' | 'alchemy';
+import { listPublishedCraftRecipeRecords } from './craftStudioStore';
 
-export type CraftingIngredient = { itemId: string; quantity: number };
+export type CraftingStationType = string;
+export type CraftingIngredient = { itemId: string; quantity: number; consume?: boolean };
 export type CraftingRecipe = {
   id: string;
   name: string;
   description: string;
   icon: string;
   station: CraftingStationType;
-  category: 'refining' | 'enhancement' | 'weapon' | 'armor' | 'accessory' | 'consumable';
+  category: string;
   inputs: CraftingIngredient[];
   output: { itemId: string; quantity: number };
   requiredLevel?: number;
+  requiredClasses?: string[];
+  requiredQuests?: string[];
+  requiredEventKey?: string;
+  learnMode?: 'automatic' | 'quest' | 'item' | 'event';
+  learnItemId?: string;
+  learnQuestId?: string;
   sortOrder?: number;
 };
 
@@ -18,7 +25,8 @@ export type CraftingStationDefinition = {
   id: string; name: string; type: CraftingStationType; map: string; x: number; y: number; radius: number; icon: string; hint: string;
 };
 
-// O futuro Editor de Crafting salvará receitas neste mesmo formato.
+// Seeds legados continuam exportados para compatibilidade. O runtime principal
+// usa os registros publicados do Craft Studio, que migra estes mesmos seeds.
 export const CRAFTING_RECIPES: CraftingRecipe[] = [
   { id: 'refine-iron-ingot', name: 'Lingote de Ferro', description: 'Refina minério bruto em metal utilizável na forja.', icon: '▰', station: 'forge', category: 'refining', inputs: [{ itemId: 'iron_ore', quantity: 3 }], output: { itemId: 'iron_ingot', quantity: 1 }, sortOrder: 10 },
   { id: 'refine-silver-ingot', name: 'Lingote de Prata', description: 'Prata refinada para acessórios e armas arcanas.', icon: '▱', station: 'forge', category: 'refining', inputs: [{ itemId: 'silver_ore', quantity: 3 }], output: { itemId: 'silver_ingot', quantity: 1 }, sortOrder: 20 },
@@ -40,9 +48,39 @@ export const CRAFTING_STATIONS: CraftingStationDefinition[] = [
   { id: 'clearing-alchemy', name: 'Bancada de Alquimia', type: 'alchemy', map: 'Floresta Inicial', x: 1275, y: 1355, radius: 78, icon: '⚗', hint: 'Preparar alquimia' },
 ];
 
-export const CRAFTING_CATEGORY_LABELS: Record<CraftingRecipe['category'], string> = {
+export const CRAFTING_CATEGORY_LABELS: Record<string, string> = {
   refining: 'Refino', enhancement: 'Aprimoramento', weapon: 'Armas', armor: 'Armaduras', accessory: 'Acessórios', consumable: 'Consumíveis',
 };
-export const CRAFTING_STATION_LABELS: Record<CraftingStationType, string> = { forge: 'Forja', alchemy: 'Alquimia' };
-export function recipesForStation(type: CraftingStationType) { return CRAFTING_RECIPES.filter((recipe) => recipe.station === type).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)); }
-export function getRecipe(id: string) { return CRAFTING_RECIPES.find((recipe) => recipe.id === id); }
+export const CRAFTING_STATION_LABELS: Record<string, string> = { forge: 'Forja', alchemy: 'Alquimia' };
+
+function studioRecipes(): CraftingRecipe[] {
+  const records = listPublishedCraftRecipeRecords();
+  const mapped = records.flatMap((record) => {
+    const primary = record.outputs.find((entry) => entry.kind === 'primary');
+    if (!primary?.itemId) return [];
+    return [{
+      id: record.key,
+      name: record.name,
+      description: record.description,
+      icon: record.icon,
+      station: record.stationTypeId,
+      category: record.category,
+      inputs: record.ingredients.map((entry) => ({ itemId: entry.itemId, quantity: entry.quantity, consume: entry.consume })),
+      output: { itemId: primary.itemId, quantity: primary.quantity },
+      requiredLevel: record.requirements.minLevel,
+      requiredClasses: record.requirements.classIds ? [...record.requirements.classIds] : undefined,
+      requiredQuests: record.requirements.completedQuests ? [...record.requirements.completedQuests] : undefined,
+      requiredEventKey: record.requirements.eventKey,
+      learnMode: record.requirements.learnMode,
+      learnItemId: record.requirements.learnItemId,
+      learnQuestId: record.requirements.learnQuestId,
+      sortOrder: record.sortOrder,
+    } satisfies CraftingRecipe];
+  });
+  return mapped.length ? mapped : CRAFTING_RECIPES;
+}
+
+export function recipesForStation(type: CraftingStationType) {
+  return studioRecipes().filter((recipe) => recipe.station === type).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+}
+export function getRecipe(id: string) { return studioRecipes().find((recipe) => recipe.id === id); }
