@@ -1,7 +1,8 @@
 import type { CharacterProgress } from '../character/characterCreator';
 import type { LpcCharacter } from '../character/lpcCharacter';
 import type { Monster } from '../game/monsterSystem';
-import type { SkillDefinition, SkillEffect } from '../skills/skillCatalog';
+import type { SkillDefinition } from '../skills/skillCatalog';
+import type { SkillEffect } from '../skills/skillStudioTypes';
 import type { ClassDefinition } from './classCatalog';
 import type { ClassRuntimeProgress } from './classProgression';
 
@@ -61,8 +62,6 @@ export function executeSkillEffects(ctx: CombatEffectContext) {
     if (effect.type === 'resource-gain') { ctx.addResource(value); ctx.showFloating(`+${Math.round(value)} recurso`, color); continue; }
     if (effect.type === 'resource-drain') { ctx.addResource(-value); continue; }
     if (effect.type === 'buff-attack') {
-      // Buff de ataque continua sendo mantido pelo SkillController enquanto
-      // migramos o sistema de status para effects persistentes.
       ctx.showFloating(`ATQ +${Math.round(effect.baseValue)}%`, color);
       continue;
     }
