@@ -3,7 +3,7 @@ import { npcIdFromAssetId } from '../../npc/npcStore';
 import { monsterIdFromAssetId } from '../../monsterEditor/monsterStore';
 import { collectibleIdFromAssetId } from '../../gathering/collectibleStore';
 
-type CatalogEditor = 'actors' | 'items' | 'collectibles' | 'quests' | 'events' | 'shops';
+type CatalogEditor = 'actors' | 'items' | 'collectibles' | 'quests' | 'events' | 'shops' | 'crafts';
 
 function editorUrl(editor: CatalogEditor, section?: 'npc' | 'monster', id?: string) {
   const url = new URL(window.location.href);
@@ -38,20 +38,18 @@ export function installMapEditorCatalogNav() {
   const quests = createEditorButton('mep-open-quests-editor', 'Missões', 'Abrir o Mission Studio', 'quests');
   const events = createEditorButton('mep-open-events-editor', 'Eventos', 'Abrir o Event Studio', 'events');
   const shops = createEditorButton('mep-open-shops-editor', 'Lojas', 'Abrir o Shop Studio', 'shops');
-  mode.append(actors, items, collectibles, quests, events, shops);
+  const crafts = createEditorButton('mep-open-crafts-editor', 'Crafting', 'Abrir o Craft Studio', 'crafts');
+  mode.append(actors, items, collectibles, quests, events, shops, crafts);
 
   if (!inspector) return;
 
   let activeKey = '';
   let frame = 0;
-
   const enhanceInspector = () => {
     frame = 0;
     const canvas = inspector.querySelector<HTMLCanvasElement>('.mep-inspector-hero canvas[data-asset]');
     const assetId = canvas?.dataset.asset ?? '';
-    const npcId = npcIdFromAssetId(assetId);
-    const monsterId = monsterIdFromAssetId(assetId);
-    const collectibleId = collectibleIdFromAssetId(assetId);
+    const npcId = npcIdFromAssetId(assetId), monsterId = monsterIdFromAssetId(assetId), collectibleId = collectibleIdFromAssetId(assetId);
     const key = npcId ? `npc:${npcId}` : monsterId ? `monster:${monsterId}` : collectibleId ? `collectible:${collectibleId}` : '';
     const existing = inspector.querySelector<HTMLElement>('.catalog-editor-link');
     if (key === activeKey && existing?.dataset.catalogKey === key) return;
@@ -65,7 +63,6 @@ export function installMapEditorCatalogNav() {
     };
     holder.appendChild(button); inspector.appendChild(holder);
   };
-
   const schedule = () => { if (!frame) frame = requestAnimationFrame(enhanceInspector); };
   const observer = new MutationObserver((mutations) => { if (mutations.every((mutation) => (mutation.target as HTMLElement).closest?.('.catalog-editor-link'))) return; schedule(); });
   observer.observe(inspector, { childList: true, subtree: true });
