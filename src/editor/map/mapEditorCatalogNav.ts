@@ -3,13 +3,26 @@ import { npcIdFromAssetId } from '../../npc/npcStore';
 import { monsterIdFromAssetId } from '../../monsterEditor/monsterStore';
 import { collectibleIdFromAssetId } from '../../gathering/collectibleStore';
 
-function editorUrl(editor: 'actors' | 'items' | 'collectibles', section?: 'npc' | 'monster', id?: string) {
+type CatalogEditor = 'actors' | 'items' | 'collectibles' | 'quests' | 'events';
+
+function editorUrl(editor: CatalogEditor, section?: 'npc' | 'monster', id?: string) {
   const url = new URL(window.location.href);
   url.searchParams.delete('playtest');
   url.searchParams.set('editor', editor);
   if (section) url.searchParams.set('section', section); else url.searchParams.delete('section');
   if (id) url.searchParams.set('id', id); else url.searchParams.delete('id');
   return url.toString();
+}
+
+function createEditorButton(id: string, label: string, title: string, target: CatalogEditor) {
+  const button = document.createElement('button');
+  button.id = id;
+  button.type = 'button';
+  button.className = 'mep-catalog-nav-button';
+  button.textContent = label;
+  button.title = title;
+  button.onclick = () => { window.location.href = editorUrl(target); };
+  return button;
 }
 
 export function installMapEditorCatalogNav() {
@@ -19,27 +32,22 @@ export function installMapEditorCatalogNav() {
   if (!root || !mode || root.dataset.catalogNavInstalled === '1') return;
   root.dataset.catalogNavInstalled = '1';
 
-  const actors = document.createElement('button');
-  actors.id = 'mep-open-actors-editor';
-  actors.type = 'button';
-  actors.textContent = 'NPCs / Monstros';
-  actors.title = 'Abrir o editor separado de NPCs e Monstros';
-  actors.onclick = () => { window.location.href = editorUrl('actors'); };
-
-  const items = document.createElement('button');
-  items.id = 'mep-open-items-editor';
-  items.type = 'button';
-  items.textContent = 'Itens';
-  items.title = 'Abrir o Item Studio separado';
-  items.onclick = () => { window.location.href = editorUrl('items'); };
-
-  const collectibles = document.createElement('button');
-  collectibles.id = 'mep-open-collectibles-editor';
-  collectibles.type = 'button';
-  collectibles.textContent = 'Coletáveis';
-  collectibles.title = 'Abrir o editor separado de recursos coletáveis';
-  collectibles.onclick = () => { window.location.href = editorUrl('collectibles'); };
-  mode.append(actors, items, collectibles);
+  const actors = createEditorButton(
+    'mep-open-actors-editor',
+    'NPCs / Monstros',
+    'Abrir o editor de NPCs e Monstros',
+    'actors',
+  );
+  const items = createEditorButton('mep-open-items-editor', 'Itens', 'Abrir o Item Studio', 'items');
+  const collectibles = createEditorButton(
+    'mep-open-collectibles-editor',
+    'Coletáveis',
+    'Abrir o editor de recursos coletáveis',
+    'collectibles',
+  );
+  const quests = createEditorButton('mep-open-quests-editor', 'Missões', 'Abrir o Mission Studio', 'quests');
+  const events = createEditorButton('mep-open-events-editor', 'Eventos', 'Abrir o Event Studio', 'events');
+  mode.append(actors, items, collectibles, quests, events);
 
   if (!inspector) return;
 
