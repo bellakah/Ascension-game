@@ -24,7 +24,6 @@ export type NpcDialogueNode = {
   choices: NpcDialogueChoice[];
 };
 
-// Campos legados continuam opcionais para migrar NPCs criados antes do Shop Studio.
 export type NpcShopItem = { itemId: string; price: number; stock: number | null };
 export type NpcShopLink = {
   enabled: boolean;
@@ -34,6 +33,7 @@ export type NpcShopLink = {
   sellMultiplier?: number;
   items?: NpcShopItem[];
 };
+export type NpcCraftLink = { enabled: boolean; stationTypeId?: string };
 
 export type NpcScheduleEntry = {
   hour: number;
@@ -64,6 +64,7 @@ export type NpcDefinition = {
     nodes: NpcDialogueNode[];
   };
   shop: NpcShopLink;
+  craft?: NpcCraftLink;
   quests: {
     offers: string[];
     completes: string[];
