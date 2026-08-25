@@ -28,7 +28,6 @@ if (playtest === 'map') {
     ensureCollectibleMigration();
     await startMapEditor();
 
-    // A biblioteca V2 já está disponível depois do start; reconstruímos previews compostos reais.
     hydrateNpcDefinitionsIntoPalette();
     hydrateMonsterDefinitionsIntoPalette();
     ensureCollectibleMigration();
@@ -63,6 +62,8 @@ if (playtest === 'map') {
   void import('./editor/shopsEditorApp').then(({ startShopsEditorApp }) => startShopsEditorApp());
 } else if (editor === 'crafts') {
   void import('./editor/craftsEditorApp').then(({ startCraftsEditorApp }) => startCraftsEditorApp());
+} else if (editor === 'classes') {
+  void import('./editor/classesEditorApp').then(({ startClassesEditorApp }) => startClassesEditorApp());
 } else {
   void import('./gameBootstrap').then(({ startGameApp }) => startGameApp());
 }
