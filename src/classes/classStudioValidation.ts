@@ -5,7 +5,8 @@ import type { ClassStudioRecord, ClassValidationIssue } from './classStudioTypes
 export function validateClass(record: ClassStudioRecord): ClassValidationIssue[] {
   const issues: ClassValidationIssue[] = [];
   const classes = listClassStudioRecords();
-  const items = new Set(listItemStudioRecords().map((item) => item.key));
+  const itemRecords = listItemStudioRecords();
+  const items = new Map(itemRecords.map((item) => [item.key, item]));
   const error = (code: string, message: string) => issues.push({ severity: 'error', code, message });
   const warn = (code: string, message: string) => issues.push({ severity: 'warning', code, message });
 
@@ -23,7 +24,10 @@ export function validateClass(record: ClassStudioRecord): ClassValidationIssue[]
   if (record.progression.baseExp < 1) error('base-exp', 'EXP base precisa ser maior que zero.');
 
   for (const [slot, itemId] of Object.entries(record.startingEquipment)) {
-    if (itemId && !items.has(itemId)) error(`equipment-${slot}`, `Equipamento inicial ${itemId} (${slot}) não existe no Item Studio.`);
+    if (!itemId) continue;
+    const item = items.get(itemId);
+    if (!item) error(`equipment-${slot}`, `Equipamento inicial ${itemId} (${slot}) não existe no Item Studio.`);
+    else if (item.allowedClasses?.length && !item.allowedClasses.includes(record.key)) error(`equipment-class-${slot}`, `${item.name} não permite uso pela classe ${record.name}.`);
   }
   for (const entry of record.startingItems) {
     if (!items.has(entry.itemId)) error('starting-item', `Item inicial ${entry.itemId} não existe no Item Studio.`);
@@ -44,5 +48,6 @@ export function validateClass(record: ClassStudioRecord): ClassValidationIssue[]
   if (record.status === 'published' && record.selectable && !record.skillIds.length) warn('no-skills', 'Classe selecionável ainda não possui habilidades vinculadas.');
   if (record.status === 'published' && !record.selectable && !record.parentClassId) warn('unreachable', 'Classe publicada não é inicial e ainda não possui classe pai.');
   if (!record.startingEquipment.weapon && record.selectable) warn('no-weapon', 'Classe inicial não possui arma inicial.');
+  if (record.spawn.mode === 'class' && !record.spawn.markerId && (!Number.isFinite(record.spawn.x) || !Number.isFinite(record.spawn.y))) warn('spawn-fallback', 'Spawn exclusivo sem Marker ID nem coordenadas de fallback.');
   return issues;
 }
