@@ -13,7 +13,8 @@ export function nearestPublishedNpcInteraction(x: number, y: number, maxDistance
     const py = live?.y ?? (object.y + 1) * runtime.document.tileSize;
     const distance = Math.hypot(x - px, y - py);
     if (distance > maxDistance || (best && distance >= best.distance)) continue;
-    best = { npcId, name: definition.name, shopId: definition.shop.enabled ? definition.shop.shopId : undefined, x: px, y: py, distance };
+    const shopId = definition.role === 'trainer' ? 'class-trainer' : definition.shop.enabled ? definition.shop.shopId : undefined;
+    best = { npcId, name: definition.name, shopId, x: px, y: py, distance };
   }
   return best;
 }
