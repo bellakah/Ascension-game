@@ -3,7 +3,7 @@ import { npcIdFromAssetId } from '../../npc/npcStore';
 import { monsterIdFromAssetId } from '../../monsterEditor/monsterStore';
 import { collectibleIdFromAssetId } from '../../gathering/collectibleStore';
 
-type CatalogEditor = 'actors' | 'items' | 'collectibles' | 'quests' | 'events' | 'shops' | 'crafts';
+type CatalogEditor = 'actors' | 'items' | 'collectibles' | 'quests' | 'events' | 'shops' | 'crafts' | 'classes';
 
 function editorUrl(editor: CatalogEditor, section?: 'npc' | 'monster', id?: string) {
   const url = new URL(window.location.href);
@@ -39,7 +39,8 @@ export function installMapEditorCatalogNav() {
   const events = createEditorButton('mep-open-events-editor', 'Eventos', 'Abrir o Event Studio', 'events');
   const shops = createEditorButton('mep-open-shops-editor', 'Lojas', 'Abrir o Shop Studio', 'shops');
   const crafts = createEditorButton('mep-open-crafts-editor', 'Crafting', 'Abrir o Craft Studio', 'crafts');
-  mode.append(actors, items, collectibles, quests, events, shops, crafts);
+  const classes = createEditorButton('mep-open-classes-editor', 'Classes', 'Abrir o Class Studio', 'classes');
+  mode.append(actors, items, collectibles, quests, events, shops, crafts, classes);
 
   if (!inspector) return;
 
