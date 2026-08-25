@@ -3,7 +3,21 @@ import type { ClassId } from '../classes/classCatalog';
 export type MonsterKind = string;
 export type QuestStatus = 'not_started' | 'active' | 'ready' | 'completed';
 export type QuestMode = 'sequential' | 'parallel';
-export type QuestObjectiveType = 'kill' | 'boss' | 'collect' | 'deliver' | 'talk' | 'visit' | 'interact' | 'gather' | 'craft';
+export type QuestCategory = 'story' | 'side' | 'tutorial' | 'daily' | 'weekly' | 'repeatable' | 'event' | 'world' | 'hidden';
+export type QuestObjectiveType = 'kill' | 'boss' | 'collect' | 'deliver' | 'talk' | 'visit' | 'interact' | 'gather' | 'craft' | 'use' | 'wait';
+
+export type QuestNavigationTargetType = 'npc' | 'monster' | 'resource' | 'marker' | 'portal' | 'position';
+export type QuestObjectiveNavigation = {
+  enabled?: boolean;
+  targetType?: QuestNavigationTargetType;
+  targetId?: string;
+  map?: string;
+  x?: number;
+  y?: number;
+  arrivalRadius?: number;
+  showOnMinimap?: boolean;
+  allowInterMap?: boolean;
+};
 
 export type QuestObjective = {
   id: string;
@@ -14,18 +28,22 @@ export type QuestObjective = {
   npcId?: string;
   itemId?: string;
   monsterKind?: MonsterKind | 'any';
+  navigation?: QuestObjectiveNavigation;
 };
 
 export type QuestReward = {
   exp?: number;
   coins?: number;
-  items?: Array<{ itemId: string; quantity: number }>;
+  items?: Array<{ itemId: string; quantity: number; numericId?: number }>;
+  chooseOne?: Array<{ itemId: string; quantity: number; numericId?: number }>;
 };
 
 export type QuestRequirements = {
   minLevel?: number;
+  maxLevel?: number;
   classIds?: ClassId[];
   completedQuests?: string[];
+  requiredItems?: Array<{ itemId: string; quantity: number }>;
 };
 
 export type QuestDialog = {
@@ -38,9 +56,10 @@ export type QuestDialog = {
 
 export type QuestDefinition = {
   id: string;
+  numericId?: number;
   title: string;
   summary: string;
-  category: 'story' | 'side' | 'tutorial' | 'daily';
+  category: QuestCategory;
   startNpcId: string;
   endNpcId: string;
   mode: QuestMode;
@@ -49,7 +68,14 @@ export type QuestDefinition = {
   requirements?: QuestRequirements;
   dialog?: QuestDialog;
   repeatable?: boolean;
+  reset?: 'once' | 'repeatable' | 'daily' | 'weekly' | 'event';
+  cooldownMs?: number;
+  autoStart?: boolean;
+  autoComplete?: boolean;
   sortOrder?: number;
+  tags?: string[];
+  recommendedLevel?: number;
+  icon?: string;
 };
 
 export type QuestRuntimeState = {
