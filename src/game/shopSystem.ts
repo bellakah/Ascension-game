@@ -35,8 +35,8 @@ export function createShop(progress: CharacterProgress, callbacks: ShopCallbacks
   const currencyLabel = () => currentShop?.currency.type === 'item' ? (getItem(currentShop.currency.itemId ?? '')?.name ?? 'Moeda especial') : 'moedas';
   const entries = (): RuntimeEntry[] => {
     if (!currentShop) return [];
-    if (mode === 'buy') return currentShop.allowBuy ? currentShop.items.map((stock) => { const item = getItem(stock.itemId), remaining = shopStockRemaining(currentShop!, stock); return item && remaining > 0 ? { item, price: shopBuyPrice(currentShop!, stock), owned: itemQuantity(state, item.id), stock, remaining } : null; }).filter((value): value is RuntimeEntry => Boolean(value)) : [];
-    return Array.from(new Set(state.inventory.map((stack) => stack.itemId))).map((itemId) => { const item = getItem(itemId); return item && shopAcceptsItem(currentShop!, item) ? { item, price: shopSellPrice(currentShop!, item), owned: itemQuantity(state, item.id) } : null; }).filter((value): value is RuntimeEntry => Boolean(value));
+    if (mode === 'buy') return (currentShop.allowBuy ? currentShop.items.map((stock) => { const item = getItem(stock.itemId), remaining = shopStockRemaining(currentShop!, stock); return item && remaining > 0 ? { item, price: shopBuyPrice(currentShop!, stock), owned: itemQuantity(state, item.id), stock, remaining } : null; }).filter(Boolean) : []) as RuntimeEntry[];
+    return Array.from(new Set(state.inventory.map((stack) => stack.itemId))).map((itemId) => { const item = getItem(itemId); return item && shopAcceptsItem(currentShop!, item) ? { item, price: shopSellPrice(currentShop!, item), owned: itemQuantity(state, item.id) } : null; }).filter(Boolean) as RuntimeEntry[];
   };
   const visibleEntries = () => entries().filter((entry) => !search || entry.item.name.toLocaleLowerCase('pt-BR').includes(search));
   const selectFirst = () => { const available = visibleEntries(); if (!selectedItemId || !available.some((entry) => entry.item.id === selectedItemId)) { selectedItemId = available[0]?.item.id ?? null; quantity = 1; } };
