@@ -95,6 +95,8 @@ export type ClassAdvancementRequirement = {
 
 export type ClassStudioRecord = {
   version: 2;
+  /** Alias legado. Sempre igual a `key`; será removido apenas quando todos os consumidores forem migrados. */
+  id: ClassId;
   numericId: number;
   key: ClassId;
   source: ClassStudioSource;
