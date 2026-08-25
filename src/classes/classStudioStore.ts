@@ -12,6 +12,7 @@ function legacyRecords(): ClassStudioRecord[] {
   return [
     {
       version: 2,
+      id: 'warrior',
       numericId: 1,
       key: 'warrior',
       source: 'legacy',
@@ -42,6 +43,7 @@ function legacyRecords(): ClassStudioRecord[] {
     },
     {
       version: 2,
+      id: 'mage',
       numericId: 2,
       key: 'mage',
       source: 'legacy',
@@ -74,7 +76,8 @@ function legacyRecords(): ClassStudioRecord[] {
 }
 
 function normalizeRecord(input: Partial<ClassStudioRecord> & Pick<ClassStudioRecord, 'key' | 'name' | 'numericId'>): ClassStudioRecord {
-  const fallback = legacyRecords().find((entry) => entry.key === input.key) ?? legacyRecords()[0];
+  const key = String(input.key || input.id || '').trim();
+  const fallback = legacyRecords().find((entry) => entry.key === key) ?? legacyRecords()[0];
   const baseStats = { ...fallback.baseStats, ...(input.baseStats ?? {}) };
   const resource = { ...fallback.resource, ...(input.resource ?? {}) };
   const basicAttack = { ...fallback.basicAttack, ...(input.basicAttack ?? {}) };
@@ -84,8 +87,9 @@ function normalizeRecord(input: Partial<ClassStudioRecord> & Pick<ClassStudioRec
     ...clone(fallback),
     ...input,
     version: 2,
+    id: key,
     numericId: Math.max(1, Math.floor(Number(input.numericId) || 1)),
-    key: String(input.key || '').trim(),
+    key,
     name: String(input.name || '').trim() || 'Nova Classe',
     shortName: String(input.shortName ?? input.name ?? '').trim() || 'Classe',
     status: input.status ?? 'draft',
@@ -112,7 +116,7 @@ function readFile(): ClassFile {
   try { parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null') as Partial<ClassFile> | null; } catch { parsed = null; }
   const source = Array.isArray(parsed?.records) ? parsed!.records! : [];
   const records = source.map((record) => normalizeRecord(record));
-  let changed = !source.length || parsed?.version !== 2;
+  let changed = !source.length || parsed?.version !== 2 || records.some((record, index) => source[index]?.id !== record.key);
   for (const legacy of legacyRecords()) {
     if (!records.some((record) => record.key === legacy.key)) { records.push(legacy); changed = true; }
   }
@@ -144,6 +148,7 @@ export function createClassStudioRecord(name = 'Nova Classe'): ClassStudioRecord
   const base = clone(legacyRecords()[0]);
   return normalizeRecord({
     ...base,
+    id: key,
     numericId,
     key,
     name,
@@ -166,7 +171,7 @@ export function createClassStudioRecord(name = 'Nova Classe'): ClassStudioRecord
 
 export function saveClassStudioRecord(record: ClassStudioRecord) {
   const file = readFile();
-  const copy = normalizeRecord({ ...clone(record), updatedAt: now() });
+  const copy = normalizeRecord({ ...clone(record), id: record.key, updatedAt: now() });
   if (!copy.key) throw new Error('A classe precisa de uma chave interna.');
   const keyCollision = file.records.find((entry) => entry.key === copy.key && entry.numericId !== copy.numericId);
   if (keyCollision) throw new Error(`A chave ${copy.key} já pertence à classe #${keyCollision.numericId}.`);
@@ -181,7 +186,8 @@ export function saveClassStudioRecord(record: ClassStudioRecord) {
 export function duplicateClassStudioRecord(recordOrKey: ClassStudioRecord | string) {
   const source = typeof recordOrKey === 'string' ? getClassStudioRecord(recordOrKey) : clone(recordOrKey);
   if (!source) return null;
-  const copy = normalizeRecord({ ...source, numericId: nextClassNumericId(), key: `${source.key}_copy_${Date.now().toString(36)}`, name: `${source.name} - Cópia`, shortName: `${source.shortName} Cópia`, source: 'custom', status: 'draft', selectable: false, createdAt: now(), updatedAt: now() });
+  const key = `${source.key}_copy_${Date.now().toString(36)}`;
+  const copy = normalizeRecord({ ...source, id: key, numericId: nextClassNumericId(), key, name: `${source.name} - Cópia`, shortName: `${source.shortName} Cópia`, source: 'custom', status: 'draft', selectable: false, createdAt: now(), updatedAt: now() });
   return saveClassStudioRecord(copy);
 }
 
