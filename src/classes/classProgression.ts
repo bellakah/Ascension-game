@@ -67,6 +67,7 @@ export function ensureAdvancedClassStats(progress: CharacterProgress, classDef: 
   if (!Number.isFinite(state.castSpeed)) state.castSpeed = computed.castSpeed;
   if (!Number.isFinite(state.moveSpeed)) state.moveSpeed = computed.moveSpeed;
   if (!Number.isFinite(state.hpRegen)) state.hpRegen = computed.hpRegen;
+  if (!Number.isFinite(progress.expToNext) || progress.expToNext < 1) progress.expToNext = expForLevel(classDef, progress.level);
   return state;
 }
 
@@ -95,9 +96,27 @@ export function levelUpCharacterProgress(progress: CharacterProgress, classDef: 
     progress.exp = Math.min(progress.exp, Math.max(0, progress.expToNext - 1));
     return false;
   }
+  const state = ensureAdvancedClassStats(progress, classDef);
+  const before = classStatsAtLevel(classDef, progress.level);
   progress.level += 1;
-  const stats = applyClassStatsForLevel(progress, classDef, progress.level);
-  progress.hp = stats.maxHp;
+  const after = classStatsAtLevel(classDef, progress.level);
+  // Progress mantém bônus de equipamento somados aos atributos. Por isso o
+  // level-up aplica apenas o delta da curva de classe, em vez de sobrescrever.
+  state.maxHp += after.maxHp - before.maxHp;
+  state.attack += after.attack - before.attack;
+  state.defense += after.defense - before.defense;
+  state.magicAttack += after.magicAttack - before.magicAttack;
+  state.magicDefense += after.magicDefense - before.magicDefense;
+  state.accuracy = after.accuracy;
+  state.evasion = after.evasion;
+  state.critChance = after.critChance;
+  state.critDamage = after.critDamage;
+  state.attackSpeed = after.attackSpeed;
+  state.castSpeed = after.castSpeed;
+  state.moveSpeed = after.moveSpeed;
+  state.hpRegen = after.hpRegen;
+  state.expToNext = expForLevel(classDef, progress.level);
+  progress.hp = state.maxHp;
   return true;
 }
 
