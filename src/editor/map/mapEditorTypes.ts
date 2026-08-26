@@ -38,6 +38,15 @@ export type DayNightMetadata = {
   startHour?: number;
 };
 
+export type MapBaseSurface = {
+  mode: 'none' | 'color' | 'water';
+  color: string;
+  waterStyle: 'ocean' | 'deep' | 'swamp';
+  waterSpeed: number;
+  waterOpacity: number;
+  collision: 'blocked' | 'walkable' | 'swimmable';
+};
+
 export type AscensionMapDocument = {
   version: 1;
   id: string;
@@ -53,6 +62,7 @@ export type AscensionMapDocument = {
   zones: MapZone[];
   metadata: {
     background: string;
+    baseSurface?: MapBaseSurface;
     musicId?: string;
     ambientId?: string;
     recommendedLevel?: string;
