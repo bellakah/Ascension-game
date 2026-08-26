@@ -2,6 +2,7 @@ import './mapPlaytest.css';
 import { preloadMapAssets } from './mapAssetRenderer';
 import { hydrateAssetLibraryV2 } from './mapAssetLibraryV2';
 import { objectBlocksPoint } from './mapAssetPresets';
+import { baseSurfaceBlocksPoint } from './mapBaseSurface';
 import { drawConfiguredObject } from './mapObjectRenderer';
 import { drawBlendedTerrainTile } from './mapTerrainBlend';
 import { getPaletteEntry, MAP_PALETTE_ENTRIES } from './mapEditorCatalog';
@@ -56,9 +57,7 @@ export async function startMapPlaytest() {
 
   const spawnFor = (document: AscensionMapDocument) => {
     const zone = document.zones.find((value) => value.kind === 'respawn');
-    return zone
-      ? { x: zone.x + zone.width / 2, y: zone.y + zone.height / 2 }
-      : { x: document.width / 2, y: document.height / 2 };
+    return zone ? { x: zone.x + zone.width / 2, y: zone.y + zone.height / 2 } : { x: document.width / 2, y: document.height / 2 };
   };
 
   let player = spawnFor(mapDoc);
@@ -86,7 +85,7 @@ export async function startMapPlaytest() {
   const blocked = (x: number, y: number) => {
     const tileX = Math.floor(x), tileY = Math.floor(y);
     if (tileX < 0 || tileY < 0 || tileX >= mapDoc.width || tileY >= mapDoc.height) return true;
-    return mapDoc.collision.includes(tileKey(tileX, tileY)) || objectBlocks(x, y);
+    return baseSurfaceBlocksPoint(mapDoc, x, y) || mapDoc.collision.includes(tileKey(tileX, tileY)) || objectBlocks(x, y);
   };
 
   const loadTravelMap = (targetId: string) => loadMapDocument(targetId) ?? (readPlaytestSnapshot(targetId) ?? null);
@@ -207,6 +206,12 @@ export async function startMapPlaytest() {
       for (const key of mapDoc.collision) {
         const point = parseTileKey(key);
         ctx.fillRect(point.x * tilePx - cameraX, point.y * tilePx - cameraY, tilePx, tilePx);
+      }
+      if (mapDoc.metadata.baseSurface?.mode === 'water' && mapDoc.metadata.baseSurface.collision === 'blocked') {
+        ctx.fillStyle = 'rgba(70,145,240,.14)';
+        for (let y = startY; y <= endY; y++) for (let x = startX; x <= endX; x++) if (!mapDoc.tiles[tileKey(x, y)]?.ground) {
+          ctx.fillRect(x * tilePx - cameraX, y * tilePx - cameraY, tilePx, tilePx);
+        }
       }
     }
 
