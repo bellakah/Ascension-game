@@ -1,5 +1,6 @@
 import './mapTileset.css';
 import { getAssetSourceUrl } from './mapAssetLibraryV2';
+import { MAP_PALETTE_ENTRIES } from './mapEditorCatalog';
 import { loadMapDocument, saveMapDocument } from './mapEditorStorage';
 import { openTraditionalTilesetImporter } from './mapTilesetImporter';
 import {
@@ -11,7 +12,7 @@ import {
   tilesetTileRect,
   type TilesetDefinition,
 } from './mapTilesetStore';
-import { tileKey } from './mapEditorTypes';
+import { tileKey, type MapPaletteEntry } from './mapEditorTypes';
 
 const STYLE_MODE_KEY = 'ascension.map-editor.terrain-mode.v1';
 type TraditionalTool = 'pencil' | 'eraser' | 'fill' | 'eyedropper';
@@ -23,10 +24,10 @@ const esc = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, (char) =
 
 function imageFromUrl(url: string) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error('Não foi possível abrir a imagem deste Tileset.'));
-    image.src = url;
+    const value = new Image();
+    value.onload = () => resolve(value);
+    value.onerror = () => reject(new Error('Não foi possível abrir a imagem deste Tileset.'));
+    value.src = url;
   });
 }
 
@@ -34,11 +35,7 @@ function currentMapId() { return document.querySelector<HTMLSelectElement>('#mep
 function currentMap() { const id = currentMapId(); return id ? loadMapDocument(id) : null; }
 function currentMapTileSize() { return currentMap()?.tileSize ?? 32; }
 function saveEditor() { document.querySelector<HTMLButtonElement>('#mep-save')?.click(); }
-function reloadMap(id: string) {
-  const select = document.querySelector<HTMLSelectElement>('#mep-map-select');
-  if (!select) return;
-  select.value = id; select.dispatchEvent(new Event('change', { bubbles: true }));
-}
+function reloadMap(id: string) { const select = document.querySelector<HTMLSelectElement>('#mep-map-select'); if (!select) return; select.value = id; select.dispatchEvent(new Event('change', { bubbles: true })); }
 
 function pointFromStatus(): TilePoint | null {
   const text = document.querySelector<HTMLElement>('#mep-position')?.textContent ?? '';
@@ -82,7 +79,6 @@ export function installTraditionalTilesetEditor() {
   let painting = false;
   let paintPoints: TilePoint[] = [];
   let lastPoint: TilePoint | null = null;
-  let panelHost: HTMLElement | null = null;
   let tabs: HTMLElement | null = null;
   let browser: HTMLElement | null = null;
   let sheetCanvas: HTMLCanvasElement | null = null;
@@ -90,15 +86,33 @@ export function installTraditionalTilesetEditor() {
   let statusNode: HTMLElement | null = null;
 
   const selectedTileset = () => getTileset(selectedTilesetId) ?? tilesets[0] ?? null;
-  const orderedSelection = () => ({
-    minC: Math.min(selection.c0, selection.c1), maxC: Math.max(selection.c0, selection.c1),
-    minR: Math.min(selection.r0, selection.r1), maxR: Math.max(selection.r0, selection.r1),
-  });
+  const orderedSelection = () => ({ minC: Math.min(selection.c0, selection.c1), maxC: Math.max(selection.c0, selection.c1), minR: Math.min(selection.r0, selection.r1), maxR: Math.max(selection.r0, selection.r1) });
+
+  const ensureSelectedEntry = (tileset: TilesetDefinition, assetId: string) => {
+    if (!image || MAP_PALETTE_ENTRIES.some((entry) => entry.id === assetId)) return;
+    const parsed = parseTilesetTileId(assetId); if (!parsed) return;
+    const entry: MapPaletteEntry = {
+      id: assetId,
+      palette: 'terrain',
+      label: `${tileset.name} · ${parsed.rect.x},${parsed.rect.y}`,
+      icon: '▦',
+      color: '#557586',
+      description: `Tile tradicional ${parsed.rect.width}×${parsed.rect.height} · ${tileset.name}`,
+      defaultLayer: 'ground',
+      folder: 'terrain',
+      source: 'custom',
+      tags: ['traditional-tile', `tileset:${tileset.id}`, assetId, tileset.name],
+      sprite: { src: image.src, nativeWidth: tileset.imageWidth, nativeHeight: tileset.imageHeight, sourceRect: parsed.rect, widthTiles: 1, heightTiles: 1, anchorX: 0, anchorY: 0, pixelated: true },
+    };
+    MAP_PALETTE_ENTRIES.push(entry);
+  };
+
   const stamp = (): StampCell[] => {
     const ts = selectedTileset(); if (!ts) return [];
     const box = orderedSelection(), cells: StampCell[] = [];
     for (let row = box.minR; row <= box.maxR; row++) for (let col = box.minC; col <= box.maxC; col++) {
-      const id = tilesetTileId(ts, col, row); if (id) cells.push({ dx: col - box.minC, dy: row - box.minR, assetId: id });
+      const id = tilesetTileId(ts, col, row);
+      if (id) { ensureSelectedEntry(ts, id); cells.push({ dx: col - box.minC, dy: row - box.minR, assetId: id }); }
     }
     return cells;
   };
@@ -137,7 +151,7 @@ export function installTraditionalTilesetEditor() {
     const ts = selectedTileset(); if (!ts) { image = null; renderBrowser(); return; }
     selectedTilesetId = ts.id;
     const url = await getAssetSourceUrl(ts.sourceId);
-    image = url ? await imageFromUrl(url).catch(() => null) : null;
+    image = url ? await imageFromUrl(url).catch((): null => null) : null;
     selection = { c0: 0, r0: 0, c1: 0, r1: 0 };
     renderSheet();
   };
@@ -158,16 +172,12 @@ export function installTraditionalTilesetEditor() {
       <div class="traditional-selection-meta" id="traditional-meta"></div>
       <div class="traditional-actions"><button data-trad-tool="pencil">✎ Pintar</button><button data-trad-tool="eraser">⌫ Apagar</button><button data-trad-tool="fill">▨ Fill</button><button data-trad-tool="eyedropper">⌾ Conta-gotas</button><button id="traditional-edit-grid">⚙ Grade</button><button id="traditional-delete">Excluir</button></div>`;
     sheetCanvas = browser.querySelector<HTMLCanvasElement>('#traditional-sheet')!; sheetCtx = sheetCanvas.getContext('2d')!; statusNode = browser.querySelector<HTMLElement>('#traditional-meta')!;
-    browser.querySelector<HTMLSelectElement>('#traditional-layer')!.value = mapLayer;
-    browser.querySelector<HTMLSelectElement>('#traditional-zoom')!.value = String(sheetScale);
+    browser.querySelector<HTMLSelectElement>('#traditional-layer')!.value = mapLayer; browser.querySelector<HTMLSelectElement>('#traditional-zoom')!.value = String(sheetScale);
     browser.querySelector<HTMLSelectElement>('#traditional-select')!.onchange = async (event) => { selectedTilesetId = (event.target as HTMLSelectElement).value; await loadSelectedSheet(); };
     browser.querySelector<HTMLSelectElement>('#traditional-layer')!.onchange = (event) => { mapLayer = (event.target as HTMLSelectElement).value === 'detail' ? 'detail' : 'ground'; syncStatus(); };
     browser.querySelector<HTMLSelectElement>('#traditional-zoom')!.onchange = (event) => { sheetScale = Number((event.target as HTMLSelectElement).value) || .5; renderSheet(); };
     browser.querySelector<HTMLButtonElement>('#traditional-import')!.onclick = importTileset;
-    browser.querySelectorAll<HTMLButtonElement>('[data-trad-tool]').forEach((button) => {
-      button.classList.toggle('active', button.dataset.tradTool === tool);
-      button.onclick = () => { tool = button.dataset.tradTool as TraditionalTool; renderBrowser(); void loadSelectedSheet(); };
-    });
+    browser.querySelectorAll<HTMLButtonElement>('[data-trad-tool]').forEach((button) => { button.classList.toggle('active', button.dataset.tradTool === tool); button.onclick = () => { tool = button.dataset.tradTool as TraditionalTool; renderBrowser(); void loadSelectedSheet(); }; });
     browser.querySelector<HTMLButtonElement>('#traditional-edit-grid')!.onclick = () => showGridEditor();
     browser.querySelector<HTMLButtonElement>('#traditional-delete')!.onclick = () => showDeleteInfo();
 
@@ -192,11 +202,9 @@ export function installTraditionalTilesetEditor() {
   };
 
   const setMode = (next: 'natural' | 'tileset') => {
-    mode = next; localStorage.setItem(STYLE_MODE_KEY, mode);
-    panel.classList.toggle('traditional-hidden-main', mode === 'tileset');
-    tabs?.querySelectorAll<HTMLButtonElement>('button').forEach((button) => button.classList.toggle('active', button.dataset.terrainMode === mode));
-    browser?.classList.toggle('hidden', mode !== 'tileset');
-    if (mode === 'tileset') { renderBrowser(); }
+    mode = next; localStorage.setItem(STYLE_MODE_KEY, mode); panel.classList.toggle('traditional-hidden-main', mode === 'tileset');
+    tabs?.querySelectorAll<HTMLButtonElement>('button').forEach((button) => button.classList.toggle('active', button.dataset.terrainMode === mode)); browser?.classList.toggle('hidden', mode !== 'tileset');
+    if (mode === 'tileset') renderBrowser();
   };
 
   function importTileset() {
@@ -212,23 +220,19 @@ export function installTraditionalTilesetEditor() {
     document.body.appendChild(modal);
     modal.querySelectorAll<HTMLButtonElement>('[data-close]').forEach((button) => button.onclick = () => modal.remove());
     modal.querySelector<HTMLFormElement>('form')!.onsubmit = async (event) => {
-      event.preventDefault();
-      const { saveTileset } = await import('./mapTilesetStore');
+      event.preventDefault(); const { saveTileset } = await import('./mapTilesetStore');
       saveTileset({ ...ts, tileWidth: Number(modal.querySelector<HTMLInputElement>('#teg-w')!.value) || ts.tileWidth, tileHeight: Number(modal.querySelector<HTMLInputElement>('#teg-h')!.value) || ts.tileHeight, margin: Number(modal.querySelector<HTMLInputElement>('#teg-margin')!.value) || 0, spacing: Number(modal.querySelector<HTMLInputElement>('#teg-spacing')!.value) || 0, offsetX: Number(modal.querySelector<HTMLInputElement>('#teg-x')!.value) || 0, offsetY: Number(modal.querySelector<HTMLInputElement>('#teg-y')!.value) || 0 });
       await hydrateTilesetsIntoPalette(); modal.remove(); tilesets = listTilesets(); renderBrowser();
     };
   }
 
-  function showDeleteInfo() {
-    const ts = selectedTileset(); if (!ts) return;
-    alert('A exclusão definitiva do Tileset será habilitada junto ao relatório de dependências, para impedir que mapas fiquem com tiles órfãos. Por enquanto use Editar grade ou importe outro Tileset.');
-  }
+  function showDeleteInfo() { const ts = selectedTileset(); if (!ts) return; alert('A exclusão definitiva do Tileset será habilitada junto ao relatório de dependências, para impedir que mapas fiquem com tiles órfãos. Por enquanto use Editar grade ou importe outro Tileset.'); }
 
   const ensurePanelUi = () => {
     const title = panel.querySelector<HTMLElement>('#mep-panel-title')?.textContent;
     if (title !== 'TERRENO') { tabs?.remove(); browser?.remove(); tabs = null; browser = null; panel.classList.remove('traditional-hidden-main'); return; }
     if (tabs && browser) return;
-    panelHost = panel.querySelector<HTMLElement>('.mep-search') ?? panel.firstElementChild as HTMLElement;
+    const panelHost = panel.querySelector<HTMLElement>('.mep-search') ?? panel.firstElementChild as HTMLElement;
     tabs = document.createElement('div'); tabs.className = 'traditional-tabs'; tabs.innerHTML = `<button data-terrain-mode="natural">Natural Blend</button><button data-terrain-mode="tileset">Tileset</button>`;
     browser = document.createElement('section'); browser.className = 'traditional-browser hidden';
     panelHost?.insertAdjacentElement('afterend', tabs); tabs.insertAdjacentElement('afterend', browser);
@@ -238,10 +242,8 @@ export function installTraditionalTilesetEditor() {
 
   const applyStampAtPoints = (points: TilePoint[], erase = false) => {
     const id = currentMapId(); if (!id || !points.length) return;
-    saveEditor();
-    const map = loadMapDocument(id); if (!map) return;
-    const cells = stamp();
-    if (!cells.length && !erase) return;
+    saveEditor(); const map = loadMapDocument(id); if (!map) return;
+    const cells = stamp(); if (!cells.length && !erase) return;
     const unique = new Map(points.map((point) => [`${point.x},${point.y}`, point]));
     for (const point of unique.values()) {
       if (erase) {
@@ -252,11 +254,8 @@ export function installTraditionalTilesetEditor() {
         continue;
       }
       for (const cell of cells) {
-        const x = point.x + cell.dx, y = point.y + cell.dy;
-        if (x < 0 || y < 0 || x >= map.width || y >= map.height) continue;
-        const key = tileKey(x, y), value = map.tiles[key] ?? {};
-        if (mapLayer === 'detail') value.detail = cell.assetId; else value.ground = cell.assetId;
-        map.tiles[key] = value;
+        const x = point.x + cell.dx, y = point.y + cell.dy; if (x < 0 || y < 0 || x >= map.width || y >= map.height) continue;
+        const key = tileKey(x, y), value = map.tiles[key] ?? {}; if (mapLayer === 'detail') value.detail = cell.assetId; else value.ground = cell.assetId; map.tiles[key] = value;
       }
     }
     saveMapDocument(map); reloadMap(id);
@@ -267,8 +266,7 @@ export function installTraditionalTilesetEditor() {
     const cells = stamp(); if (cells.length !== 1) { alert('Fill usa uma seleção de 1×1 tile.'); return; }
     saveEditor(); const map = loadMapDocument(id); if (!map) return;
     const getValue = (x: number, y: number) => { const tile = map.tiles[tileKey(x, y)]; return mapLayer === 'detail' ? (tile?.detail ?? '') : (tile?.ground ?? ''); };
-    const target = getValue(point.x, point.y), replacement = cells[0].assetId;
-    if (target === replacement) return;
+    const target = getValue(point.x, point.y), replacement = cells[0].assetId; if (target === replacement) return;
     const queue = [point], seen = new Set<string>();
     while (queue.length) {
       const next = queue.shift()!; if (next.x < 0 || next.y < 0 || next.x >= map.width || next.y >= map.height) continue;
@@ -285,8 +283,7 @@ export function installTraditionalTilesetEditor() {
     const parsed = parseTilesetTileId(id); if (!parsed) return;
     const ts = getTileset(parsed.tilesetId); if (!ts) return;
     selectedTilesetId = ts.id; tilesets = listTilesets(); renderBrowser(); await loadSelectedSheet();
-    const col = Math.round((parsed.rect.x - ts.offsetX - ts.margin) / Math.max(1, ts.tileWidth + ts.spacing));
-    const row = Math.round((parsed.rect.y - ts.offsetY - ts.margin) / Math.max(1, ts.tileHeight + ts.spacing));
+    const col = Math.round((parsed.rect.x - ts.offsetX - ts.margin) / Math.max(1, ts.tileWidth + ts.spacing)), row = Math.round((parsed.rect.y - ts.offsetY - ts.margin) / Math.max(1, ts.tileHeight + ts.spacing));
     selection = { c0: clamp(col, 0, ts.columns - 1), c1: clamp(col, 0, ts.columns - 1), r0: clamp(row, 0, ts.rows - 1), r1: clamp(row, 0, ts.rows - 1) }; renderSheet();
   };
 
@@ -302,26 +299,18 @@ export function installTraditionalTilesetEditor() {
   canvas.addEventListener('pointermove', () => {
     if (mode !== 'tileset' || !painting) return;
     const point = pointFromStatus(); if (!point || (lastPoint && point.x === lastPoint.x && point.y === lastPoint.y)) return;
-    const cells = stamp();
-    if (cells.length > 1) return; // Stamp multi-tile é colocado por clique para não sobrepor padrões durante drag.
-    if (lastPoint) paintPoints.push(...bresenham(lastPoint, point).slice(1)); else paintPoints.push(point);
-    lastPoint = point;
+    if (stamp().length > 1) return;
+    if (lastPoint) paintPoints.push(...bresenham(lastPoint, point).slice(1)); else paintPoints.push(point); lastPoint = point;
   });
 
-  const finishPaint = () => {
-    if (!painting) return; painting = false;
-    applyStampAtPoints(paintPoints, tool === 'eraser'); paintPoints = []; lastPoint = null;
-  };
-  window.addEventListener('pointerup', finishPaint, { capture: true });
-  window.addEventListener('blur', finishPaint);
+  const finishPaint = () => { if (!painting) return; painting = false; applyStampAtPoints(paintPoints, tool === 'eraser'); paintPoints = []; lastPoint = null; };
+  window.addEventListener('pointerup', finishPaint, { capture: true }); window.addEventListener('blur', finishPaint);
 
   let frame = 0;
   const scan = () => { frame = 0; ensurePanelUi(); };
   const observer = new MutationObserver(() => { if (!frame) frame = requestAnimationFrame(scan); });
   observer.observe(panel, { childList: true, subtree: true, characterData: true });
-
   void hydrateTilesetsIntoPalette().then(() => { tilesets = listTilesets(); ensurePanelUi(); if (mode === 'tileset') renderBrowser(); });
   ensurePanelUi();
-
-  window.addEventListener('pagehide', () => { observer.disconnect(); if (frame) cancelAnimationFrame(frame); window.removeEventListener('pointerup', finishPaint, { capture: true }); window.removeEventListener('blur', finishPaint); }, { once: true });
+  window.addEventListener('pagehide', () => { observer.disconnect(); if (frame) cancelAnimationFrame(frame); window.removeEventListener('blur', finishPaint); }, { once: true });
 }
