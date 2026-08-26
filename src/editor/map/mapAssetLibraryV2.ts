@@ -174,6 +174,25 @@ export async function getAssetSourceInfo(sourceId: string): Promise<AssetSourceI
   return source ? { id: source.id, name: source.name, width: source.width, height: source.height, createdAt: source.createdAt } : null;
 }
 
+/** Remove o PNG original somente quando nenhum asset recortado ainda depende dele. */
+export async function deleteAssetSourceIfUnused(sourceId: string) {
+  const db = await openDb();
+  try {
+    const countTx = db.transaction(ASSET_STORE, 'readonly');
+    const count = await requestToPromise(countTx.objectStore(ASSET_STORE).index('sourceId').count(sourceId));
+    if (count > 0) return false;
+    const sourceTx = db.transaction(SOURCE_STORE, 'readwrite');
+    sourceTx.objectStore(SOURCE_STORE).delete(sourceId);
+    await transactionDone(sourceTx);
+    const url = sourceUrls.get(sourceId);
+    if (url) URL.revokeObjectURL(url);
+    sourceUrls.delete(sourceId);
+    return true;
+  } finally {
+    db.close();
+  }
+}
+
 export async function addAssetsToLibrary(sourceId: string, values: AssetLibraryCreateInput[]) {
   const records: AssetRecord[] = values.map((value) => ({ ...value, id: uid('asset'), sourceId, createdAt: Date.now() }));
   const db = await openDb();
