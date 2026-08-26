@@ -47,6 +47,8 @@ if (playtest === 'map') {
     const { installTraditionalTilesetEditor } = await import('./editor/map/mapTraditionalTilesetEditor');
     installTraditionalTilesetEditor();
 
+    const { installMapWorldManagement } = await import('./editor/map/mapWorldManagement');
+    installMapWorldManagement();
     const { installMapEditorInteractionPerf } = await import('./editor/map/mapEditorInteractionPerf');
     installMapEditorInteractionPerf();
     const { installMapEditorVisualPolish } = await import('./editor/map/mapEditorVisualPolish');
