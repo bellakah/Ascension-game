@@ -43,7 +43,7 @@ function setLayerValue(map: AscensionMapDocument, rule: AutotileRule, x: number,
 }
 
 export function autotileVariantIds(rule: AutotileRule) {
-  return new Set(Object.values(rule.variants).filter(Boolean));
+  return new Set([...Object.values(rule.variants).filter(Boolean), ...(rule.legacyAssetIds ?? []).filter(Boolean)]);
 }
 
 export function isAutotileMember(map: AscensionMapDocument, rule: AutotileRule, variants: Set<string>, x: number, y: number) {
@@ -105,8 +105,6 @@ export function applyAutotilePoints(map: AscensionMapDocument, rule: AutotileRul
   for (const point of points) if (inside(map, point.x, point.y)) unique.set(tileKey(point.x, point.y), point);
   let changed = 0;
 
-  // Primeiro altera a ocupação lógica de todos os pontos. Depois calcula as
-  // máscaras, evitando que o resultado dependa da ordem de arraste do mouse.
   for (const point of unique.values()) {
     if (erase) {
       if (isAutotileMember(map, rule, variants, point.x, point.y)) changed += setLayerValue(map, rule, point.x, point.y, null) ? 1 : 0;
@@ -128,7 +126,7 @@ export function applyAutotilePoints(map: AscensionMapDocument, rule: AutotileRul
   return { changed, usedAssetIds: [...used], missingMasks: missingAutotileMasks(rule) };
 }
 
-/** Recalcula todas as células já pertencentes à regra; útil após editar variantes. */
+/** Recalcula todas as células atuais ou legadas pertencentes à regra. */
 export function reflowAutotileMap(map: AscensionMapDocument, rule: AutotileRule): AutotileApplyResult {
   const variants = autotileVariantIds(rule);
   const points: AutotilePoint[] = [];
