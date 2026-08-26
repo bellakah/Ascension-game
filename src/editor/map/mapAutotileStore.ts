@@ -10,6 +10,8 @@ export type AutotileRule = {
   mode: AutotileMode;
   /** Chave = máscara canônica decimal. Valor = tile ID tradicional. */
   variants: Record<string, string>;
+  /** IDs usados anteriormente; permitem migrar mapas após trocar variantes. */
+  legacyAssetIds: string[];
   createdAt: number;
   updatedAt: number;
 };
@@ -31,6 +33,10 @@ function normalize(input: Partial<AutotileRule>): AutotileRule {
       variants[String(canonical)] = value;
     }
   }
+  const activeIds = new Set(Object.values(variants));
+  const legacyAssetIds = Array.isArray(input.legacyAssetIds)
+    ? [...new Set(input.legacyAssetIds.map(String).filter((id) => id && !activeIds.has(id)))]
+    : [];
   return {
     version: 1,
     id: String(input.id || uid()),
@@ -39,6 +45,7 @@ function normalize(input: Partial<AutotileRule>): AutotileRule {
     layer: input.layer === 'detail' ? 'detail' : 'ground',
     mode,
     variants,
+    legacyAssetIds,
     createdAt: Number(input.createdAt) || Date.now(),
     updatedAt: Number(input.updatedAt) || Date.now(),
   };
@@ -113,7 +120,7 @@ export function saveAutotileRule(input: Partial<AutotileRule> & Pick<AutotileRul
 export function duplicateAutotileRule(id: string) {
   const source = getAutotileRule(id);
   if (!source) return null;
-  return saveAutotileRule({ ...source, id: undefined, name: `${source.name} (cópia)`, variants: { ...source.variants } });
+  return saveAutotileRule({ ...source, id: undefined, name: `${source.name} (cópia)`, variants: { ...source.variants }, legacyAssetIds: [...source.legacyAssetIds] });
 }
 
 export function deleteAutotileRule(id: string) {
