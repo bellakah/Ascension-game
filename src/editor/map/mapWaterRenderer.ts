@@ -156,6 +156,15 @@ export function drawWaterTextureSurface(
   },
 ) {
   ctx.save();
+
+  // A Base Surface é chamada por célula vazia do mapa. O frame de água pode ser
+  // muito maior que o tile lógico (ex.: água 129×129 em mapa 32×32), então a
+  // pintura precisa ficar estritamente recortada à célula atual. Sem este clip,
+  // a água de células vazias desenhadas depois invade e cobre Ground já pintado.
+  ctx.beginPath();
+  ctx.rect(options.screenX, options.screenY, options.width, options.height);
+  ctx.clip();
+
   ctx.globalAlpha *= Math.max(.05, Math.min(1, Number(surface.waterOpacity) || 1));
   ctx.fillStyle = surface.color;
   ctx.fillRect(options.screenX, options.screenY, options.width, options.height);
