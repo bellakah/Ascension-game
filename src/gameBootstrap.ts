@@ -39,6 +39,7 @@ import { installItemInventoryVisualIntegration } from './items/itemInventoryVisu
 import { ensureDefaultGatheringTools } from './gathering/gatheringToolMigration';
 import { ensureCollectibleMigration } from './gathering/collectibleStore';
 import { installQuestHudNavigation } from './quests/questHudNavigation';
+import { hydrateTilesetsIntoPalette } from './editor/map/mapTilesetStore';
 
 export async function startGameApp() {
   installResponsiveUi();
@@ -53,6 +54,7 @@ export async function startGameApp() {
   hydrateNpcDefinitionsIntoPalette();
   hydrateMonsterDefinitionsIntoPalette();
   ensureCollectibleMigration();
+  await hydrateTilesetsIntoPalette();
   await preparePublishedWorldRuntime();
   await installPublishedNpcRuntime();
   const unsubscribePublished = subscribePublishedMap(() => {

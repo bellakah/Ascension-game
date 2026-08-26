@@ -7,11 +7,13 @@ if (playtest === 'map') {
     import('./npc/npcStore'),
     import('./monsterEditor/monsterStore'),
     import('./gathering/collectibleStore'),
+    import('./editor/map/mapTilesetStore'),
     import('./editor/map/mapPlaytest'),
-  ]).then(([{ hydrateNpcDefinitionsIntoPalette }, { hydrateMonsterDefinitionsIntoPalette }, { ensureCollectibleMigration }, { startMapPlaytest }]) => {
+  ]).then(async ([{ hydrateNpcDefinitionsIntoPalette }, { hydrateMonsterDefinitionsIntoPalette }, { ensureCollectibleMigration }, { hydrateTilesetsIntoPalette }, { startMapPlaytest }]) => {
     hydrateNpcDefinitionsIntoPalette();
     hydrateMonsterDefinitionsIntoPalette();
     ensureCollectibleMigration();
+    await hydrateTilesetsIntoPalette();
     return startMapPlaytest();
   });
 } else if (editor === 'map') {
@@ -35,6 +37,8 @@ if (playtest === 'map') {
 
     const { installMapBaseSurfaceEditorIntegration } = await import('./editor/map/mapBaseSurfaceEditorIntegration');
     installMapBaseSurfaceEditorIntegration();
+    const { installTraditionalTilesetEditor } = await import('./editor/map/mapTraditionalTilesetEditor');
+    installTraditionalTilesetEditor();
     const { installMapEditorInteractionPerf } = await import('./editor/map/mapEditorInteractionPerf');
     installMapEditorInteractionPerf();
     const { installMapEditorVisualPolish } = await import('./editor/map/mapEditorVisualPolish');
