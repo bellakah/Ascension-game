@@ -33,6 +33,8 @@ if (playtest === 'map') {
     ensureCollectibleMigration();
     window.dispatchEvent(new Event('resize'));
 
+    const { installMapBaseSurfaceEditorIntegration } = await import('./editor/map/mapBaseSurfaceEditorIntegration');
+    installMapBaseSurfaceEditorIntegration();
     const { installMapEditorInteractionPerf } = await import('./editor/map/mapEditorInteractionPerf');
     installMapEditorInteractionPerf();
     const { installMapEditorVisualPolish } = await import('./editor/map/mapEditorVisualPolish');
@@ -53,7 +55,7 @@ if (playtest === 'map') {
 } else if (editor === 'items') {
   void import('./editor/itemsEditorApp').then(({ startItemsEditor }) => startItemsEditor());
 } else if (editor === 'collectibles') {
-  void import('./editor/collectiblesEditorApp').then(({ startCollectiblesEditor }) => startCollectiblesEditor());
+  void import('./editor/collectiblesEditorApp').then(({ startCollectiblesEditorApp }) => startCollectiblesEditorApp());
 } else if (editor === 'quests') {
   void import('./editor/questsEditorApp').then(({ startQuestsEditorApp }) => startQuestsEditorApp());
 } else if (editor === 'events') {
