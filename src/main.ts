@@ -37,10 +37,16 @@ if (playtest === 'map') {
 
     const { installMapBaseSurfaceEditorIntegration } = await import('./editor/map/mapBaseSurfaceEditorIntegration');
     installMapBaseSurfaceEditorIntegration();
-    const { installTraditionalTilesetEditor } = await import('./editor/map/mapTraditionalTilesetEditor');
-    installTraditionalTilesetEditor();
+
+    // Extensões que assumem o gesto do canvas são instaladas primeiro. Quando
+    // inativas apenas retornam e o núcleo tradicional recebe o mesmo evento.
     const { installMapTilemapProductivity } = await import('./editor/map/mapTilemapProductivity');
     installMapTilemapProductivity();
+    const { installMapAutotileEditor } = await import('./editor/map/mapAutotileEditor');
+    installMapAutotileEditor();
+    const { installTraditionalTilesetEditor } = await import('./editor/map/mapTraditionalTilesetEditor');
+    installTraditionalTilesetEditor();
+
     const { installMapEditorInteractionPerf } = await import('./editor/map/mapEditorInteractionPerf');
     installMapEditorInteractionPerf();
     const { installMapEditorVisualPolish } = await import('./editor/map/mapEditorVisualPolish');
