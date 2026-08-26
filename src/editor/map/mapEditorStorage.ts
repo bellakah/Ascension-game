@@ -1,5 +1,6 @@
-import type { AscensionMapDocument, MapObject, MapZone } from './mapEditorTypes';
+import type { AscensionMapDocument, MapBaseSurface, MapObject, MapZone } from './mapEditorTypes';
 import { tileKey } from './mapEditorTypes';
+import { DEFAULT_COLOR_SURFACE, normalizeBaseSurface } from './mapBaseSurface';
 
 const STORAGE_KEY = 'ascension.map-editor.documents.v1';
 const ACTIVE_KEY = 'ascension.map-editor.active.v1';
@@ -13,21 +14,38 @@ function makeId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+function normalizeDocument(document: AscensionMapDocument): AscensionMapDocument {
+  const copy = clone(document);
+  copy.metadata ??= { background: '#527b45' };
+  copy.metadata.background ||= '#527b45';
+  copy.metadata.baseSurface = normalizeBaseSurface(copy.metadata.baseSurface, copy.metadata.background);
+  return copy;
+}
+
 function loadFile(): MapFile {
   try {
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '') as Partial<MapFile>;
-    return { version: 1, documents: Array.isArray(parsed.documents) ? parsed.documents : [] };
+    const documents = Array.isArray(parsed.documents) ? parsed.documents.map((value) => normalizeDocument(value as AscensionMapDocument)) : [];
+    return { version: 1, documents };
   } catch {
     return { version: 1, documents: [] };
   }
 }
 
 function saveFile(file: MapFile) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(file));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, documents: file.documents.map(normalizeDocument) }));
 }
 
-export function createBlankMap(name = 'Novo Mapa', width = 69, height = 50, tileSize = 32): AscensionMapDocument {
+export function createBlankMap(
+  name = 'Novo Mapa',
+  width = 69,
+  height = 50,
+  tileSize = 32,
+  baseSurface: Partial<MapBaseSurface> = DEFAULT_COLOR_SURFACE,
+  fillGround = false,
+): AscensionMapDocument {
   const now = Date.now();
+  const surface = normalizeBaseSurface(baseSurface, baseSurface.color || '#527b45');
   const document: AscensionMapDocument = {
     version: 1,
     id: makeId('map'),
@@ -41,10 +59,12 @@ export function createBlankMap(name = 'Novo Mapa', width = 69, height = 50, tile
     objects: [],
     collision: [],
     zones: [],
-    metadata: { background: '#527b45', recommendedLevel: '1–15', notes: '' },
+    metadata: { background: surface.color, baseSurface: surface, recommendedLevel: '1–15', notes: '' },
   };
-  for (let y = 0; y < document.height; y++) {
-    for (let x = 0; x < document.width; x++) document.tiles[tileKey(x, y)] = { ground: 'grass' };
+  if (fillGround) {
+    for (let y = 0; y < document.height; y++) {
+      for (let x = 0; x < document.width; x++) document.tiles[tileKey(x, y)] = { ground: 'grass' };
+    }
   }
   return document;
 }
@@ -58,7 +78,7 @@ function zone(kind: MapZone['kind'], x: number, y: number, width: number, height
 }
 
 export function createStarterMap(): AscensionMapDocument {
-  const map = createBlankMap('Floresta Inicial', 69, 50, 32);
+  const map = createBlankMap('Floresta Inicial', 69, 50, 32, DEFAULT_COLOR_SURFACE, true);
   map.id = 'floresta-inicial-editor';
 
   for (let y = 0; y < map.height; y++) {
@@ -119,7 +139,7 @@ export function loadMapDocument(id: string) {
 
 export function saveMapDocument(document: AscensionMapDocument) {
   const file = loadFile();
-  const copy = clone(document);
+  const copy = normalizeDocument(document);
   copy.updatedAt = Date.now();
   const index = file.documents.findIndex((entry) => entry.id === copy.id);
   if (index >= 0) file.documents[index] = copy;
@@ -150,6 +170,7 @@ export function loadOrCreateActiveMap() {
 export function importMapDocument(raw: string): AscensionMapDocument {
   const value = JSON.parse(raw) as Partial<AscensionMapDocument>;
   if (value.version !== 1 || !value.id || !value.name || !Number.isFinite(value.width) || !Number.isFinite(value.height)) throw new Error('Arquivo de mapa inválido ou incompatível.');
+  const background = value.metadata?.background || '#527b45';
   const document: AscensionMapDocument = {
     version: 1,
     id: String(value.id),
@@ -163,7 +184,15 @@ export function importMapDocument(raw: string): AscensionMapDocument {
     objects: Array.isArray(value.objects) ? value.objects : [],
     collision: Array.isArray(value.collision) ? value.collision : [],
     zones: Array.isArray(value.zones) ? value.zones : [],
-    metadata: { background: value.metadata?.background || '#527b45', musicId: value.metadata?.musicId, ambientId: value.metadata?.ambientId, recommendedLevel: value.metadata?.recommendedLevel, notes: value.metadata?.notes },
+    metadata: {
+      background,
+      baseSurface: normalizeBaseSurface(value.metadata?.baseSurface, background),
+      musicId: value.metadata?.musicId,
+      ambientId: value.metadata?.ambientId,
+      recommendedLevel: value.metadata?.recommendedLevel,
+      notes: value.metadata?.notes,
+      dayNight: value.metadata?.dayNight,
+    },
   };
   return saveMapDocument(document);
 }
