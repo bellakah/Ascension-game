@@ -14,7 +14,7 @@ import {
   saveAutotileRule,
   type AutotileRule,
 } from './mapAutotileStore';
-import { ensureTilesetEntries, getTileset, listTilesets, parseTilesetTileId, tilesetTileId, tilesetTileRect, type TilesetDefinition } from './mapTilesetStore';
+import { ensureTilesetEntries, getTileset, listTilesets, parseTilesetTileId, tilesetTileId, tilesetTileRect } from './mapTilesetStore';
 
 type Point = { x: number; y: number };
 type BrushMode = 'off' | 'paint' | 'erase';
@@ -173,7 +173,7 @@ export function installMapAutotileEditor() {
     const tilesetId = currentTilesetId() || listTilesets()[0]?.id || '';
     if (!tilesetId) { window.alert('Importe um Tileset antes de criar uma Terrain Rule.'); return; }
     const tileset = getTileset(tilesetId);
-    const created = saveAutotileRule({ name: `Caminho · ${tileset?.name ?? 'Tileset'}`, tilesetId, layer: 'ground', mode: 'path16', variants: {} });
+    const created = saveAutotileRule({ name: `Caminho · ${tileset?.name ?? 'Tileset'}`, tilesetId, layer: 'ground', mode: 'path16', variants: {}, legacyAssetIds: [] });
     selectRule(created.id); selectedMask = 0; setBrushMode('off');
   };
 
@@ -183,16 +183,16 @@ export function installMapAutotileEditor() {
     const tilesetId = host.querySelector<HTMLSelectElement>('#autotile-tileset')?.value || rule.tilesetId;
     const layer = host.querySelector<HTMLSelectElement>('#autotile-layer')?.value === 'detail' ? 'detail' : 'ground';
     const mode = host.querySelector<HTMLSelectElement>('#autotile-mode')?.value === 'blob47' ? 'blob47' : 'path16';
-    let variants = { ...rule.variants };
-    if (tilesetId !== rule.tilesetId && Object.keys(variants).length) {
-      if (!window.confirm('Trocar o Tileset remove as variantes configuradas desta regra. Continuar?')) { renderStudio(host); return; }
-      variants = {};
+    let variants = { ...rule.variants }, legacyAssetIds = [...rule.legacyAssetIds];
+    if (tilesetId !== rule.tilesetId && (Object.keys(variants).length || legacyAssetIds.length)) {
+      if (!window.confirm('Trocar o Tileset remove as variantes e aliases configurados desta regra. Continuar?')) { renderStudio(host); return; }
+      variants = {}; legacyAssetIds = [];
     }
-    if (mode !== rule.mode && Object.keys(variants).length) {
-      if (!window.confirm('Trocar Path16/Blob47 remove as variantes configuradas desta regra. Continuar?')) { renderStudio(host); return; }
-      variants = {};
+    if (mode !== rule.mode && (Object.keys(variants).length || legacyAssetIds.length)) {
+      if (!window.confirm('Trocar Path16/Blob47 remove as variantes e aliases configurados desta regra. Continuar?')) { renderStudio(host); return; }
+      variants = {}; legacyAssetIds = [];
     }
-    const saved = saveAutotileRule({ ...rule, name, tilesetId, layer, mode, variants });
+    const saved = saveAutotileRule({ ...rule, name, tilesetId, layer, mode, variants, legacyAssetIds });
     selectRule(saved.id);
     const masks = requiredAutotileMasks(saved.mode); if (!masks.includes(selectedMask)) selectedMask = masks[0] ?? 0;
     renderStudio(host);
@@ -208,7 +208,7 @@ export function installMapAutotileEditor() {
       ? `Pincel Autotile ativo · ${rule.name}${painting ? ` · ${paintPoints.length} células no traço` : ''}`
       : brushMode === 'erase'
         ? `Borracha Autotile ativa · apaga somente células da regra “${rule.name}”.`
-        : `${rule.name} · ${missing.length ? `${missing.length} variantes faltando (fallback ativo)` : 'regra completa'}.`;
+        : `${rule.name} · ${missing.length ? `${missing.length} variantes faltando (fallback ativo)` : 'regra completa'}${rule.legacyAssetIds.length ? ` · ${rule.legacyAssetIds.length} alias(es) de migração` : ''}.`;
   };
 
   const renderStudio = (host: HTMLElement) => {
@@ -225,7 +225,7 @@ export function installMapAutotileEditor() {
       <div class="autotile-row"><select id="autotile-rule-select"><option value="">${rules.length ? 'Selecionar regra…' : 'Nenhuma regra'}</option>${rules.map((value) => `<option value="${esc(value.id)}" ${value.id === rule?.id ? 'selected' : ''}>${esc(value.name)} · ${value.mode === 'blob47' ? 'Blob47' : 'Path16'}</option>`).join('')}</select><button id="autotile-new">＋ Nova</button></div>
       ${rule ? `<section class="autotile-editor-card">
         <div class="autotile-fields"><label>Nome<input id="autotile-name" value="${esc(rule.name)}"></label><label>Tipo<select id="autotile-mode"><option value="path16" ${rule.mode === 'path16' ? 'selected' : ''}>Path16 · estradas/rios</option><option value="blob47" ${rule.mode === 'blob47' ? 'selected' : ''}>Blob47 · costa/terreno</option></select></label><label>Tileset<select id="autotile-tileset">${tilesets.map((value) => `<option value="${esc(value.id)}" ${value.id === rule.tilesetId ? 'selected' : ''}>${esc(value.name)}</option>`).join('')}</select></label><label>Camada<select id="autotile-layer"><option value="ground" ${rule.layer === 'ground' ? 'selected' : ''}>Ground</option><option value="detail" ${rule.layer === 'detail' ? 'selected' : ''}>Detail</option></select></label></div>
-        <div class="autotile-progress ${missing === 0 ? 'ready' : ''}">${configured}/${masks.length} variantes configuradas${missing ? ` · ${missing} faltando` : ' · pronta para uso'}</div>
+        <div class="autotile-progress ${missing === 0 ? 'ready' : ''}">${configured}/${masks.length} variantes configuradas${missing ? ` · ${missing} faltando` : ' · pronta para uso'}${rule.legacyAssetIds.length ? ` · ${rule.legacyAssetIds.length} alias(es)` : ''}</div>
         <div class="autotile-mask-card">${topologyHtml(rule, selectedMask)}<div class="autotile-variant-tools"><select id="autotile-mask">${masks.map((mask) => `<option value="${mask}" ${mask === selectedMask ? 'selected' : ''}>${esc(autotileMaskLabel(rule.mode, mask))}${rule.variants[String(mask)] ? ' ✓' : ''}</option>`).join('')}</select><canvas id="autotile-variant-preview" width="64" height="64"></canvas><small>${rule.variants[String(selectedMask)] ? esc(rule.variants[String(selectedMask)]) : 'Nenhum tile atribuído. Máscaras ausentes usam fallback até a regra ser completada.'}</small><div class="autotile-row"><button id="autotile-pick">Escolher tile</button><button id="autotile-clear-mask">Limpar variante</button></div></div></div>
         <div class="autotile-actions"><button id="autotile-paint" class="${brushMode === 'paint' ? 'active' : ''}">✎ Pincel Auto</button><button id="autotile-erase" class="${brushMode === 'erase' ? 'active' : ''}">⌫ Borracha Auto</button><button id="autotile-stop">Parar</button><button id="autotile-reflow">↻ Recalcular mapa</button><button id="autotile-duplicate">Duplicar regra</button><button id="autotile-delete" class="danger">Excluir regra</button></div>
       </section>` : '<div class="autotile-progress">Path16 cria estradas/rios conectados. Blob47 cria costas, ilhas e massas de terreno com cantos internos/externos.</div>'}
@@ -240,17 +240,23 @@ export function installMapAutotileEditor() {
       const fresh = selectedRule(); if (!fresh) return;
       void openTilePicker(fresh, selectedMask, (assetId) => {
         const latest = selectedRule(); if (!latest) return;
+        const previous = latest.variants[String(selectedMask)];
+        const legacy = new Set(latest.legacyAssetIds);
+        if (previous && previous !== assetId) legacy.add(previous);
+        legacy.delete(assetId);
         const variants = { ...latest.variants, [String(selectedMask)]: assetId };
-        const saved = saveAutotileRule({ ...latest, variants });
-        void ensureTilesetEntries([assetId]);
+        const saved = saveAutotileRule({ ...latest, variants, legacyAssetIds: [...legacy] });
+        void ensureTilesetEntries([assetId, ...saved.legacyAssetIds]);
         selectedMask = nextMissingMask(saved, selectedMask);
         renderStudio(host);
       });
     };
     host.querySelector<HTMLButtonElement>('#autotile-clear-mask')!.onclick = () => {
       const latest = selectedRule(); if (!latest) return;
+      const previous = latest.variants[String(selectedMask)];
+      const legacy = new Set(latest.legacyAssetIds); if (previous) legacy.add(previous);
       const variants = { ...latest.variants }; delete variants[String(selectedMask)];
-      saveAutotileRule({ ...latest, variants }); renderStudio(host);
+      saveAutotileRule({ ...latest, variants, legacyAssetIds: [...legacy] }); renderStudio(host);
     };
     host.querySelector<HTMLButtonElement>('#autotile-paint')!.onclick = () => setBrushMode(brushMode === 'paint' ? 'off' : 'paint');
     host.querySelector<HTMLButtonElement>('#autotile-erase')!.onclick = () => setBrushMode(brushMode === 'erase' ? 'off' : 'erase');
@@ -263,7 +269,7 @@ export function installMapAutotileEditor() {
     host.querySelector<HTMLButtonElement>('#autotile-reflow')!.onclick = async () => {
       const latest = selectedRule(), mapId = currentMapId(); if (!latest || !mapId) return;
       saveEditor(); const map = loadMapDocument(mapId); if (!map) return;
-      await ensureTilesetEntries(Object.values(latest.variants));
+      await ensureTilesetEntries([...Object.values(latest.variants), ...latest.legacyAssetIds]);
       const result = reflowAutotileMap(map, latest); saveMapDocument(map); reloadMap(mapId);
       window.alert(`Terrain Rule recalculada. ${result.changed} tile(s) ajustados.`);
     };
@@ -303,7 +309,7 @@ export function installMapAutotileEditor() {
     const rule = selectedRule(), mapId = currentMapId();
     if (!rule || !mapId || !points.length) { refreshExistingStudio(); return; }
     saveEditor(); const map = loadMapDocument(mapId); if (!map) return;
-    await ensureTilesetEntries(Object.values(rule.variants));
+    await ensureTilesetEntries([...Object.values(rule.variants), ...rule.legacyAssetIds]);
     applyAutotilePoints(map, rule, points, brushMode === 'erase');
     saveMapDocument(map); reloadMap(mapId); refreshExistingStudio();
   };
