@@ -40,10 +40,20 @@ export type DayNightMetadata = {
 
 export type MapBaseSurface = {
   mode: 'none' | 'color' | 'water';
+  /** Cor usada por superfícies sólidas e como fallback enquanto a água carrega. */
   color: string;
+  /** Compatibilidade com mapas criados pela água procedural antiga. */
   waterStyle: 'ocean' | 'deep' | 'swamp';
+  /** ID da Water Library local. Quando ausente a água usa apenas `color`. */
+  waterAssetId?: string;
   waterSpeed: number;
   waterOpacity: number;
+  /** Escala visual do padrão da água; 1 preserva o tamanho nativo do frame. */
+  waterScale?: number;
+  waterTintMode?: 'original' | 'colorize';
+  waterTint?: string;
+  waterTintStrength?: number;
+  waterBrightness?: number;
   collision: 'blocked' | 'walkable' | 'swimmable';
 };
 
