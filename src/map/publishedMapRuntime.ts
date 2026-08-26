@@ -3,9 +3,11 @@ import { getMapAssetImage } from '../editor/map/mapAssetRenderer';
 import { hydrateAssetLibraryV2 } from '../editor/map/mapAssetLibraryV2';
 import { getPaletteEntry, MAP_PALETTE_ENTRIES } from '../editor/map/mapEditorCatalog';
 import { circleHitboxRadii, getAssetPreset, objectVisualBounds } from '../editor/map/mapAssetPresets';
+import { mapBaseSurface } from '../editor/map/mapBaseSurface';
 import { drawBlendedTerrainTile } from '../editor/map/mapTerrainBlend';
 import type { AscensionMapDocument, MapAnimationFrame, MapObject, MapPaletteEntry, MapSpriteRect } from '../editor/map/mapEditorTypes';
 import { parseTileKey, tileKey } from '../editor/map/mapEditorTypes';
+import { addPublishedBaseSurface, cleanupPublishedBaseSurface } from './publishedBaseSurface';
 import { loadPublishedMap } from './publishedMapStore';
 
 export type PublishedObstacle =
@@ -111,18 +113,19 @@ function addTerrainChunks(view: Container, map: AscensionMapDocument) {
       canvas.height = ch;
       const ctx = canvas.getContext('2d');
       if (!ctx) continue;
-      ctx.fillStyle = map.metadata.background || '#527b45';
-      ctx.fillRect(0, 0, cw, ch);
+      ctx.clearRect(0, 0, cw, ch);
       const startX = Math.floor(cx / tileSize);
       const startY = Math.floor(cy / tileSize);
       const endX = Math.min(map.width - 1, Math.ceil((cx + cw) / tileSize));
       const endY = Math.min(map.height - 1, Math.ceil((cy + ch) / tileSize));
       for (let y = startY; y <= endY; y++) for (let x = startX; x <= endX; x++) {
-        const tile = map.tiles[tileKey(x, y)] ?? { ground: 'grass' };
+        const tile = map.tiles[tileKey(x, y)];
         const px = x * tileSize - cx;
         const py = y * tileSize - cy;
-        drawBlendedTerrainTile(ctx, map, { x, y, screenX: px, screenY: py, tilePixels: tileSize, layer: 'ground', now });
-        if (tile.detail) drawBlendedTerrainTile(ctx, map, { x, y, screenX: px, screenY: py, tilePixels: tileSize, layer: 'detail', alpha: .78, now });
+        // A Base Surface é uma camada Pixi independente e animada. Chunks só
+        // recebem Ground/Detail reais para não congelar água dentro do canvas.
+        if (tile?.ground) drawBlendedTerrainTile(ctx, map, { x, y, screenX: px, screenY: py, tilePixels: tileSize, layer: 'ground', now });
+        if (tile?.detail) drawBlendedTerrainTile(ctx, map, { x, y, screenX: px, screenY: py, tilePixels: tileSize, layer: 'detail', alpha: .78, now });
       }
       const sprite = Sprite.from(canvas);
       sprite.position.set(cx, cy);
@@ -132,10 +135,31 @@ function addTerrainChunks(view: Container, map: AscensionMapDocument) {
   }
 }
 
+function addBlockedWaterRuns(obstacles: PublishedObstacle[], map: AscensionMapDocument) {
+  const surface = mapBaseSurface(map);
+  if (surface.mode !== 'water' || surface.collision !== 'blocked') return;
+  const tileSize = map.tileSize;
+  for (let y = 0; y < map.height; y++) {
+    let runStart = -1;
+    const flush = (endX: number) => {
+      if (runStart < 0) return;
+      obstacles.push({ kind: 'rect', x: runStart * tileSize, y: y * tileSize, width: (endX - runStart) * tileSize, height: tileSize });
+      runStart = -1;
+    };
+    for (let x = 0; x <= map.width; x++) {
+      const isWater = x < map.width && !map.tiles[tileKey(x, y)]?.ground;
+      if (isWater && runStart < 0) runStart = x;
+      if (!isWater) flush(x);
+    }
+  }
+}
+
 function buildObstacles(map: AscensionMapDocument) {
   const obstacles: PublishedObstacle[] = [];
   const tileSize = map.tileSize;
   const addCircle = (x: number, y: number, radius = tileSize * .42) => obstacles.push({ kind: 'circle', x, y, radius });
+
+  addBlockedWaterRuns(obstacles, map);
 
   for (const key of map.collision) {
     const point = parseTileKey(key);
@@ -151,27 +175,12 @@ function buildObstacles(map: AscensionMapDocument) {
       const bw = bounds.width * tileSize, bh = bounds.height * tileSize;
       const hitbox = preset.hitbox;
       if (hitbox.type === 'rectangle') {
-        obstacles.push({
-          kind: 'rect',
-          x: bx + hitbox.x * bw,
-          y: by + hitbox.y * bh,
-          width: hitbox.width * bw,
-          height: hitbox.height * bh,
-        });
+        obstacles.push({ kind: 'rect', x: bx + hitbox.x * bw, y: by + hitbox.y * bh, width: hitbox.width * bw, height: hitbox.height * bh });
       } else if (hitbox.type === 'circle') {
         const { radiusX, radiusY } = circleHitboxRadii(hitbox);
-        obstacles.push({
-          kind: 'ellipse',
-          x: bx + hitbox.x * bw,
-          y: by + hitbox.y * bh,
-          radiusX: radiusX * bw,
-          radiusY: radiusY * bh,
-        });
+        obstacles.push({ kind: 'ellipse', x: bx + hitbox.x * bw, y: by + hitbox.y * bh, radiusX: radiusX * bw, radiusY: radiusY * bh });
       } else if (hitbox.points.length >= 3) {
-        obstacles.push({
-          kind: 'polygon',
-          points: hitbox.points.map((point) => ({ x: bx + point.x * bw, y: by + point.y * bh })),
-        });
+        obstacles.push({ kind: 'polygon', points: hitbox.points.map((point) => ({ x: bx + point.x * bw, y: by + point.y * bh })) });
       }
       continue;
     }
@@ -201,6 +210,7 @@ export async function loadPublishedWorldRuntime(): Promise<PublishedWorldRuntime
 
   const view = new Container();
   view.sortableChildren = true;
+  addPublishedBaseSurface(view, map);
   addTerrainChunks(view, map);
   const visualObjects = map.objects.filter((object) => !FUNCTIONAL_ASSETS.has(object.assetId));
   visualObjects.sort((a, b) => a.y - b.y);
@@ -208,11 +218,7 @@ export async function loadPublishedWorldRuntime(): Promise<PublishedWorldRuntime
     const objectEntry = getPaletteEntry(object.assetId);
     const objectView = createObjectView(objectEntry, object, map.tileSize);
     const depthMode = getAssetPreset(objectEntry).depthMode ?? 'auto';
-    objectView.zIndex = depthMode === 'ground'
-      ? -500_000
-      : depthMode === 'foreground'
-        ? 500_000
-        : (object.y + 1) * map.tileSize;
+    objectView.zIndex = depthMode === 'ground' ? -500_000 : depthMode === 'foreground' ? 500_000 : (object.y + 1) * map.tileSize;
     view.addChild(objectView);
   }
 
@@ -227,6 +233,7 @@ export async function loadPublishedWorldRuntime(): Promise<PublishedWorldRuntime
 }
 
 export async function preparePublishedWorldRuntime() {
+  if (preparedRuntime) cleanupPublishedBaseSurface(preparedRuntime.view);
   preparedRuntime = await loadPublishedWorldRuntime();
   return preparedRuntime;
 }
