@@ -78,7 +78,7 @@ async function drawVariantPreview(host: HTMLElement, rule: AutotileRule, mask: n
   const tileset = parsed ? getTileset(parsed.tilesetId) : null;
   if (!parsed || !tileset) return;
   const url = await getAssetSourceUrl(tileset.sourceId); if (!url || !canvas.isConnected) return;
-  const image = await loadImage(url).catch(() => null); if (!image || !canvas.isConnected) return;
+  const image = await loadImage(url).catch((): null => null); if (!image || !canvas.isConnected) return;
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(image, parsed.rect.x, parsed.rect.y, parsed.rect.width, parsed.rect.height, 0, 0, canvas.width, canvas.height);
 }
@@ -88,7 +88,7 @@ async function openTilePicker(rule: AutotileRule, mask: number, onPick: (assetId
   if (!tileset) { window.alert('Selecione um Tileset válido para esta regra.'); return; }
   const url = await getAssetSourceUrl(tileset.sourceId);
   if (!url) { window.alert('O PNG original deste Tileset não está disponível.'); return; }
-  const image = await loadImage(url).catch(() => null);
+  const image = await loadImage(url).catch((): null => null);
   if (!image) return;
 
   const modal = document.createElement('div'); modal.className = 'pro-modal-backdrop';
@@ -314,8 +314,6 @@ export function installMapAutotileEditor() {
     saveMapDocument(map); reloadMap(mapId); refreshExistingStudio();
   };
 
-  // Este listener precisa ser instalado antes do núcleo tradicional. Quando o
-  // Autotile está desligado ele não interfere; quando ativo ele assume o gesto.
   canvas.addEventListener('pointerdown', (event) => {
     if (brushMode === 'off' || !isTilesetMode() || event.button !== 0) return;
     const rule = selectedRule(), point = pointFromStatus();
