@@ -33,6 +33,8 @@ if (playtest === 'map') {
     ensureCollectibleMigration();
     window.dispatchEvent(new Event('resize'));
 
+    const { installMapBaseSurfaceEditorIntegration } = await import('./editor/map/mapBaseSurfaceEditorIntegration');
+    installMapBaseSurfaceEditorIntegration();
     const { installMapEditorInteractionPerf } = await import('./editor/map/mapEditorInteractionPerf');
     installMapEditorInteractionPerf();
     const { installMapEditorVisualPolish } = await import('./editor/map/mapEditorVisualPolish');

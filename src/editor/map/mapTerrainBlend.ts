@@ -1,5 +1,6 @@
 import { drawTerrainAsset, getMapAssetImage } from './mapAssetRenderer';
 import { getPaletteEntry } from './mapEditorCatalog';
+import { drawMapBaseSurface } from './mapBaseSurface';
 import type { AscensionMapDocument, MapPaletteEntry } from './mapEditorTypes';
 import { tileKey } from './mapEditorTypes';
 
@@ -36,7 +37,7 @@ function terrainId(map: AscensionMapDocument, x: number, y: number, layer: 'grou
   if (x < 0 || y < 0 || x >= map.width || y >= map.height) return null;
   const tile = map.tiles[tileKey(x, y)];
   if (layer === 'detail') return tile?.detail ?? null;
-  return tile?.ground ?? 'grass';
+  return tile?.ground ?? null;
 }
 
 function terrainCode(id: string | null) {
@@ -48,11 +49,6 @@ function terrainCode(id: string | null) {
   return next;
 }
 
-/**
- * Cheap fingerprint used on every frame. It deliberately avoids arrays, Sets,
- * Maps and canvas work. Most tiles only pay these few comparisons and then use
- * an already cached image.
- */
 function localFingerprint(map: AscensionMapDocument, tileX: number, tileY: number, layer: 'ground' | 'detail', currentId: string) {
   let hash = 2166136261 >>> 0;
   let mixed = false;
@@ -92,7 +88,6 @@ function neighborhood(map: AscensionMapDocument, tileX: number, tileY: number, l
 }
 
 function warpedWorldPoint(x: number, y: number) {
-  // Continuous low-frequency warp keeps borders organic without following tile edges.
   const wx = Math.sin(y * 1.43 + Math.sin(x * .81) * 1.25) * .082 + Math.sin(y * 3.7) * .020;
   const wy = Math.sin(x * 1.57 + Math.cos(y * .76) * 1.18) * .082 + Math.cos(x * 3.35) * .020;
   return { x: x + wx, y: y + wy };
@@ -164,8 +159,6 @@ function trimCache<T>(cache: Map<string, T>, maximum: number) {
 }
 
 function renderSizeFor(tilePixels: number) {
-  // Stable size buckets prevent zoom from rebuilding every terrain blend for
-  // every tiny wheel step. The cached source is simply scaled on screen.
   if (tilePixels <= 10) return 8;
   if (tilePixels <= 14) return 12;
   if (tilePixels <= 20) return 16;
@@ -298,7 +291,22 @@ export function clearTerrainBlendCache() {
 export function drawBlendedTerrainTile(ctx: CanvasRenderingContext2D, map: AscensionMapDocument, options: TerrainDrawOptions) {
   const layer = options.layer ?? 'ground';
   const id = terrainId(map, options.x, options.y, layer);
-  if (!id) return;
+  if (!id) {
+    if (layer === 'ground') {
+      const worldScale = options.tilePixels / Math.max(1, map.tileSize);
+      drawMapBaseSurface(ctx, map, {
+        screenX: options.screenX,
+        screenY: options.screenY,
+        width: options.tilePixels + .8,
+        height: options.tilePixels + .8,
+        worldX: options.x * map.tileSize,
+        worldY: options.y * map.tileSize,
+        scale: worldScale,
+        now: options.now,
+      });
+    }
+    return;
+  }
   const current = getPaletteEntry(id);
   const alpha = options.alpha ?? 1;
 
