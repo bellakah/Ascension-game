@@ -39,6 +39,7 @@ type AssetRecord = {
 };
 
 export type AssetLibraryCreateInput = Omit<AssetRecord, 'id' | 'sourceId' | 'createdAt'>;
+export type AssetSourceInfo = Pick<SourceRecord, 'id' | 'name' | 'width' | 'height' | 'createdAt'>;
 
 const sourceUrls = new Map<string, string>();
 
@@ -82,6 +83,16 @@ async function getAll<T>(storeName: string) {
   try {
     const transaction = db.transaction(storeName, 'readonly');
     return await requestToPromise(transaction.objectStore(storeName).getAll()) as T[];
+  } finally {
+    db.close();
+  }
+}
+
+async function getSourceRecord(sourceId: string) {
+  const db = await openDb();
+  try {
+    const transaction = db.transaction(SOURCE_STORE, 'readonly');
+    return await requestToPromise(transaction.objectStore(SOURCE_STORE).get(sourceId)) as SourceRecord | undefined;
   } finally {
     db.close();
   }
@@ -151,6 +162,16 @@ export async function addAssetSource(file: Blob, name: string, width: number, he
     db.close();
   }
   return record.id;
+}
+
+export async function getAssetSourceUrl(sourceId: string) {
+  const source = await getSourceRecord(sourceId);
+  return source ? sourceUrl(source) : null;
+}
+
+export async function getAssetSourceInfo(sourceId: string): Promise<AssetSourceInfo | null> {
+  const source = await getSourceRecord(sourceId);
+  return source ? { id: source.id, name: source.name, width: source.width, height: source.height, createdAt: source.createdAt } : null;
 }
 
 export async function addAssetsToLibrary(sourceId: string, values: AssetLibraryCreateInput[]) {
