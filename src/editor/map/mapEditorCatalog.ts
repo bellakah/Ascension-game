@@ -98,8 +98,23 @@ function customToEntry(value: StoredCustomAsset): MapPaletteEntry {
 
 export const MAP_PALETTE_ENTRIES: MapPaletteEntry[] = [...BASE_ENTRIES, ...loadCustomAssets().map(customToEntry)];
 
+const paletteEntryById = new Map<string, MapPaletteEntry>();
+let indexedPaletteLength = -1;
+
+function syncPaletteIndex() {
+  if (indexedPaletteLength === MAP_PALETTE_ENTRIES.length) return;
+  paletteEntryById.clear();
+  for (const value of MAP_PALETTE_ENTRIES) paletteEntryById.set(value.id, value);
+  indexedPaletteLength = MAP_PALETTE_ENTRIES.length;
+}
+
+export function invalidateMapPaletteIndex() {
+  indexedPaletteLength = -1;
+}
+
 export function getPaletteEntry(id: string) {
-  return MAP_PALETTE_ENTRIES.find((value) => value.id === id) ?? MAP_PALETTE_ENTRIES[0];
+  syncPaletteIndex();
+  return paletteEntryById.get(id) ?? MAP_PALETTE_ENTRIES[0];
 }
 
 export function registerCustomMapAsset(input: Omit<StoredCustomAsset, 'id'>) {
@@ -109,5 +124,6 @@ export function registerCustomMapAsset(input: Omit<StoredCustomAsset, 'id'>) {
   localStorage.setItem(CUSTOM_ASSET_KEY, JSON.stringify(stored));
   const entry = customToEntry(value);
   MAP_PALETTE_ENTRIES.push(entry);
+  invalidateMapPaletteIndex();
   return entry;
 }
