@@ -2,12 +2,18 @@ import type { AscensionMapDocument, MapBaseSurface, MapObject, MapZone } from '.
 import { tileKey } from './mapEditorTypes';
 import { DEFAULT_COLOR_SURFACE, normalizeBaseSurface } from './mapBaseSurface';
 
-const STORAGE_KEY = 'ascension.map-editor.documents.v1';
+const LEGACY_STORAGE_KEY = 'ascension.map-editor.documents.v1';
+const INDEX_KEY = 'ascension.map-editor.documents.v2.index';
+const DOCUMENT_PREFIX = 'ascension.map-editor.document.v2.';
 const ACTIVE_KEY = 'ascension.map-editor.active.v1';
 
 type MapFile = { version: 1; documents: AscensionMapDocument[] };
+type MapIndex = { version: 2; ids: string[] };
+type StorageMode = 'v2' | 'legacy';
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+let documentCache: Map<string, AscensionMapDocument> | null = null;
+let storageMode: StorageMode = 'v2';
 
 function makeId(prefix: string) {
   if ('randomUUID' in crypto) return `${prefix}-${crypto.randomUUID()}`;
@@ -22,18 +28,107 @@ function normalizeDocument(document: AscensionMapDocument): AscensionMapDocument
   return copy;
 }
 
-function loadFile(): MapFile {
+function readLegacyDocuments() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '') as Partial<MapFile>;
-    const documents = Array.isArray(parsed.documents) ? parsed.documents.map((value) => normalizeDocument(value as AscensionMapDocument)) : [];
-    return { version: 1, documents };
+    const parsed = JSON.parse(localStorage.getItem(LEGACY_STORAGE_KEY) ?? '') as Partial<MapFile>;
+    return Array.isArray(parsed.documents) ? parsed.documents.map((value) => normalizeDocument(value as AscensionMapDocument)) : [];
   } catch {
-    return { version: 1, documents: [] };
+    return [] as AscensionMapDocument[];
   }
 }
 
-function saveFile(file: MapFile) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, documents: file.documents.map(normalizeDocument) }));
+function readV2Index(): MapIndex | null {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(INDEX_KEY) ?? '') as Partial<MapIndex>;
+    if (parsed.version !== 2 || !Array.isArray(parsed.ids)) return null;
+    return { version: 2, ids: parsed.ids.map(String) };
+  } catch {
+    return null;
+  }
+}
+
+function cleanupV2(ids: Iterable<string>) {
+  for (const id of ids) localStorage.removeItem(`${DOCUMENT_PREFIX}${id}`);
+  localStorage.removeItem(INDEX_KEY);
+}
+
+function tryMigrateLegacy(documents: AscensionMapDocument[]) {
+  if (!documents.length) return true;
+  const written: string[] = [];
+  try {
+    for (const document of documents) {
+      localStorage.setItem(`${DOCUMENT_PREFIX}${document.id}`, JSON.stringify(document));
+      written.push(document.id);
+    }
+    const index: MapIndex = { version: 2, ids: documents.map((document) => document.id) };
+    localStorage.setItem(INDEX_KEY, JSON.stringify(index));
+    // O arquivo antigo só é removido depois que todos os documentos e o índice
+    // foram gravados. Se houver quota insuficiente, o catch mantém o legado.
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+    return true;
+  } catch {
+    cleanupV2(written);
+    return false;
+  }
+}
+
+function ensureDocumentCache() {
+  if (documentCache) return documentCache;
+  const next = new Map<string, AscensionMapDocument>();
+  const index = readV2Index();
+
+  if (index) {
+    storageMode = 'v2';
+    for (const id of index.ids) {
+      try {
+        const raw = localStorage.getItem(`${DOCUMENT_PREFIX}${id}`);
+        if (!raw) continue;
+        const document = normalizeDocument(JSON.parse(raw) as AscensionMapDocument);
+        next.set(document.id, document);
+      } catch { /* ignora somente o documento corrompido */ }
+    }
+    documentCache = next;
+    return next;
+  }
+
+  const legacy = readLegacyDocuments();
+  for (const document of legacy) next.set(document.id, document);
+  storageMode = tryMigrateLegacy(legacy) ? 'v2' : 'legacy';
+  documentCache = next;
+  return next;
+}
+
+function persistLegacy(cache: Map<string, AscensionMapDocument>) {
+  const file: MapFile = { version: 1, documents: [...cache.values()].map(normalizeDocument) };
+  localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(file));
+}
+
+function persistIndex(cache: Map<string, AscensionMapDocument>) {
+  const index: MapIndex = { version: 2, ids: [...cache.keys()] };
+  localStorage.setItem(INDEX_KEY, JSON.stringify(index));
+}
+
+function fallbackToLegacy(cache: Map<string, AscensionMapDocument>) {
+  // Se um save isolado falhar por quota, reconstruímos o arquivo legado a
+  // partir do cache vivo e removemos o índice V2. No próximo reload o editor
+  // volta ao modo antigo com todos os mapas intactos.
+  persistLegacy(cache);
+  cleanupV2(cache.keys());
+  storageMode = 'legacy';
+}
+
+function persistDocument(document: AscensionMapDocument) {
+  const cache = ensureDocumentCache();
+  if (storageMode === 'legacy') {
+    persistLegacy(cache);
+    return;
+  }
+  try {
+    localStorage.setItem(`${DOCUMENT_PREFIX}${document.id}`, JSON.stringify(document));
+    persistIndex(cache);
+  } catch {
+    fallbackToLegacy(cache);
+  }
 }
 
 export function createBlankMap(
@@ -129,30 +224,35 @@ export function createStarterMap(): AscensionMapDocument {
 }
 
 export function listMapDocuments() {
-  return loadFile().documents.map(clone);
+  return [...ensureDocumentCache().values()].map(clone);
 }
 
 export function loadMapDocument(id: string) {
-  const document = loadFile().documents.find((entry) => entry.id === id);
+  const document = ensureDocumentCache().get(id);
   return document ? clone(document) : null;
 }
 
 export function saveMapDocument(document: AscensionMapDocument) {
-  const file = loadFile();
+  const cache = ensureDocumentCache();
   const copy = normalizeDocument(document);
   copy.updatedAt = Date.now();
-  const index = file.documents.findIndex((entry) => entry.id === copy.id);
-  if (index >= 0) file.documents[index] = copy;
-  else file.documents.push(copy);
-  saveFile(file);
+  cache.set(copy.id, copy);
+  persistDocument(copy);
   localStorage.setItem(ACTIVE_KEY, copy.id);
   return clone(copy);
 }
 
 export function deleteMapDocument(id: string) {
-  const file = loadFile();
-  file.documents = file.documents.filter((entry) => entry.id !== id);
-  saveFile(file);
+  const cache = ensureDocumentCache();
+  cache.delete(id);
+  if (storageMode === 'v2') {
+    try {
+      localStorage.removeItem(`${DOCUMENT_PREFIX}${id}`);
+      persistIndex(cache);
+    } catch {
+      fallbackToLegacy(cache);
+    }
+  } else persistLegacy(cache);
   if (localStorage.getItem(ACTIVE_KEY) === id) localStorage.removeItem(ACTIVE_KEY);
 }
 
