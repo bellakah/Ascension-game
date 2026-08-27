@@ -34,6 +34,11 @@ const BLEND_SIGMA = 0.62;
 const MASK_MIN = 14;
 const MASK_MAX = 44;
 
+let baseSpanPass = Number.NaN;
+let baseSpanMapId = '';
+let baseSpanTilePixels = 0;
+const baseSpanEndByRow = new Map<number, number>();
+
 function terrainId(map: AscensionMapDocument, x: number, y: number, layer: 'ground' | 'detail') {
   if (x < 0 || y < 0 || x >= map.width || y >= map.height) return null;
   const tile = map.tiles[tileKey(x, y)];
@@ -189,16 +194,57 @@ function cachedBlendTile(map: AscensionMapDocument, options: TerrainDrawOptions,
   return finalCanvas;
 }
 
-export function clearTerrainBlendCache() { blendedTileCache.clear(); plainTileCache.clear(); }
+function drawBaseSurfaceSpan(ctx: CanvasRenderingContext2D, map: AscensionMapDocument, options: TerrainDrawOptions) {
+  // O Map Editor percorre cada linha da esquerda para a direita usando o mesmo
+  // timestamp de render. Aproveitamos essa ordem para desenhar uma sequência de
+  // células vazias como UMA faixa de Base Surface, em vez de água célula a célula.
+  if (options.now === undefined) {
+    const worldScale = options.tilePixels / Math.max(1, map.tileSize);
+    drawMapBaseSurface(ctx, map, { screenX: options.screenX, screenY: options.screenY, width: options.tilePixels + .8, height: options.tilePixels + .8, worldX: options.x * map.tileSize, worldY: options.y * map.tileSize, scale: worldScale, now: options.now, onReady: options.onReady });
+    return;
+  }
+
+  if (baseSpanPass !== options.now || baseSpanMapId !== map.id || baseSpanTilePixels !== options.tilePixels) {
+    baseSpanPass = options.now;
+    baseSpanMapId = map.id;
+    baseSpanTilePixels = options.tilePixels;
+    baseSpanEndByRow.clear();
+  }
+
+  const previousEnd = baseSpanEndByRow.get(options.y);
+  if (previousEnd !== undefined && options.x <= previousEnd) return;
+
+  let endX = options.x;
+  while (endX + 1 < map.width && terrainId(map, endX + 1, options.y, 'ground') === null) endX++;
+  baseSpanEndByRow.set(options.y, endX);
+
+  const cells = endX - options.x + 1;
+  const worldScale = options.tilePixels / Math.max(1, map.tileSize);
+  drawMapBaseSurface(ctx, map, {
+    screenX: options.screenX,
+    screenY: options.screenY,
+    width: cells * options.tilePixels + .8,
+    height: options.tilePixels + .8,
+    worldX: options.x * map.tileSize,
+    worldY: options.y * map.tileSize,
+    scale: worldScale,
+    now: options.now,
+    onReady: options.onReady,
+  });
+}
+
+export function clearTerrainBlendCache() {
+  blendedTileCache.clear();
+  plainTileCache.clear();
+  baseSpanEndByRow.clear();
+  baseSpanPass = Number.NaN;
+}
 
 export function drawBlendedTerrainTile(ctx: CanvasRenderingContext2D, map: AscensionMapDocument, options: TerrainDrawOptions) {
   const layer = options.layer ?? 'ground';
   const id = terrainId(map, options.x, options.y, layer);
   if (!id) {
-    if (layer === 'ground') {
-      const worldScale = options.tilePixels / Math.max(1, map.tileSize);
-      drawMapBaseSurface(ctx, map, { screenX: options.screenX, screenY: options.screenY, width: options.tilePixels + .8, height: options.tilePixels + .8, worldX: options.x * map.tileSize, worldY: options.y * map.tileSize, scale: worldScale, now: options.now });
-    }
+    if (layer === 'ground') drawBaseSurfaceSpan(ctx, map, options);
     return;
   }
   const current = getPaletteEntry(id), alpha = options.alpha ?? 1;
