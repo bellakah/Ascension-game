@@ -8,6 +8,7 @@ export type PreparedWaterFrames = {
 
 const preparedCache = new Map<string, PreparedWaterFrames>();
 const pendingCache = new Map<string, Promise<PreparedWaterFrames | null>>();
+let patternCache = new WeakMap<HTMLCanvasElement, WeakMap<CanvasRenderingContext2D, CanvasPattern>>();
 const MAX_FRAME_SETS = 24;
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
@@ -52,8 +53,6 @@ function colorize(canvas: HTMLCanvasElement, surface: MapBaseSurface) {
   const brightnessFactor = 1 + brightness / 100;
   const data = image.data;
 
-  // Recoloração calculada uma única vez por combinação asset/tint. O luminance
-  // original preserva sombras e reflexos claros do pixel art comprado.
   for (let offset = 0; offset < data.length; offset += 4) {
     if (data[offset + 3] === 0) continue;
     const r = data[offset], g = data[offset + 1], b = data[offset + 2];
@@ -87,14 +86,26 @@ function buildFrames(asset: WaterAssetDefinition, image: HTMLImageElement, surfa
   return frames;
 }
 
+function repeatedPattern(ctx: CanvasRenderingContext2D, frame: HTMLCanvasElement) {
+  let byContext = patternCache.get(frame);
+  if (!byContext) { byContext = new WeakMap(); patternCache.set(frame, byContext); }
+  const cached = byContext.get(ctx);
+  if (cached) return cached;
+  const pattern = ctx.createPattern(frame, 'repeat');
+  if (pattern) byContext.set(ctx, pattern);
+  return pattern;
+}
+
 export function clearPreparedWaterFrames(assetId?: string) {
   if (!assetId) {
     preparedCache.clear();
     pendingCache.clear();
+    patternCache = new WeakMap();
     return;
   }
   for (const key of [...preparedCache.keys()]) if (key.startsWith(`${assetId}|`)) preparedCache.delete(key);
   for (const key of [...pendingCache.keys()]) if (key.startsWith(`${assetId}|`)) pendingCache.delete(key);
+  patternCache = new WeakMap();
 }
 
 export async function prepareWaterFrames(surface: MapBaseSurface): Promise<PreparedWaterFrames | null> {
@@ -141,7 +152,7 @@ export function waterFrameIndex(asset: WaterAssetDefinition, surface: MapBaseSur
 
 export function drawWaterTextureSurface(
   ctx: CanvasRenderingContext2D,
-  map: AscensionMapDocument,
+  _map: AscensionMapDocument,
   surface: MapBaseSurface,
   options: {
     screenX: number;
@@ -156,11 +167,6 @@ export function drawWaterTextureSurface(
   },
 ) {
   ctx.save();
-
-  // A Base Surface é chamada por célula vazia do mapa. O frame de água pode ser
-  // muito maior que o tile lógico (ex.: água 129×129 em mapa 32×32), então a
-  // pintura precisa ficar estritamente recortada à célula atual. Sem este clip,
-  // a água de células vazias desenhadas depois invade e cobre Ground já pintado.
   ctx.beginPath();
   ctx.rect(options.screenX, options.screenY, options.width, options.height);
   ctx.clip();
@@ -175,17 +181,28 @@ export function drawWaterTextureSurface(
   if (!frame) { ctx.restore(); return; }
 
   const waterScale = clamp(Number(surface.waterScale ?? 1), .1, 8);
-  const drawWidth = Math.max(1, frame.width * waterScale * options.scale);
-  const drawHeight = Math.max(1, frame.height * waterScale * options.scale);
+  const scaleFactor = Math.max(.01, waterScale * options.scale);
+  const drawWidth = Math.max(1, frame.width * scaleFactor);
+  const drawHeight = Math.max(1, frame.height * scaleFactor);
   const phaseX = ((options.worldX * options.scale) % drawWidth + drawWidth) % drawWidth;
   const phaseY = ((options.worldY * options.scale) % drawHeight + drawHeight) % drawHeight;
   const startX = options.screenX - phaseX;
   const startY = options.screenY - phaseY;
-  const endX = options.screenX + options.width + drawWidth;
-  const endY = options.screenY + options.height + drawHeight;
+  const pattern = repeatedPattern(ctx, frame);
+
   ctx.imageSmoothingEnabled = false;
-  for (let y = startY; y < endY; y += drawHeight) {
-    for (let x = startX; x < endX; x += drawWidth) ctx.drawImage(frame, x, y, drawWidth + .5, drawHeight + .5);
+  if (pattern) {
+    // Um único fillRect repete o frame dentro da área recortada. Antes o editor
+    // executava loops de drawImage para cada célula vazia, multiplicando o custo
+    // em mapas grandes de água.
+    ctx.translate(startX, startY);
+    ctx.scale(scaleFactor, scaleFactor);
+    ctx.fillStyle = pattern;
+    ctx.fillRect(0, 0, (options.width + phaseX) / scaleFactor + frame.width, (options.height + phaseY) / scaleFactor + frame.height);
+  } else {
+    const endX = options.screenX + options.width + drawWidth;
+    const endY = options.screenY + options.height + drawHeight;
+    for (let y = startY; y < endY; y += drawHeight) for (let x = startX; x < endX; x += drawWidth) ctx.drawImage(frame, x, y, drawWidth + .5, drawHeight + .5);
   }
   ctx.restore();
 }

@@ -84,6 +84,8 @@ export function installTraditionalTilesetEditor() {
   let sheetCanvas: HTMLCanvasElement | null = null;
   let sheetCtx: CanvasRenderingContext2D | null = null;
   let statusNode: HTMLElement | null = null;
+  let directPaintReady = false;
+  let directAssetId = '';
 
   const selectedTileset = () => getTileset(selectedTilesetId) ?? tilesets[0] ?? null;
   const orderedSelection = () => ({ minC: Math.min(selection.c0, selection.c1), maxC: Math.max(selection.c0, selection.c1), minR: Math.min(selection.r0, selection.r1), maxR: Math.max(selection.r0, selection.r1) });
@@ -119,12 +121,28 @@ export function installTraditionalTilesetEditor() {
 
   const syncCoreLayer = () => {
     const layerSelect = document.querySelector<HTMLSelectElement>('#mep-terrain-layer');
-    if (!layerSelect) return;
-    layerSelect.value = mapLayer;
-    layerSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    if (!layerSelect) return false;
+    if (layerSelect.value !== mapLayer) {
+      layerSelect.value = mapLayer;
+      layerSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    return true;
+  };
+
+  const syncCoreTool = () => {
+    if (tool === 'eyedropper') return false;
+    const coreTool = tool === 'pencil' ? 'brush' : tool;
+    const button = document.querySelector<HTMLButtonElement>(`#mep-context [data-context-tool="${coreTool}"]`);
+    if (!button) return false;
+    if (!button.classList.contains('active')) button.click();
+    return true;
   };
 
   const syncCoreEntry = (assetId: string) => {
+    if (directPaintReady && directAssetId === assetId) {
+      syncCoreLayer(); syncCoreTool();
+      return true;
+    }
     const search = document.querySelector<HTMLInputElement>('#mep-search');
     if (!search) return false;
     const previous = search.value;
@@ -134,25 +152,30 @@ export function installTraditionalTilesetEditor() {
     if (!card) {
       search.value = previous;
       search.dispatchEvent(new Event('input', { bubbles: true }));
+      directPaintReady = false;
       return false;
     }
     card.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     search.value = previous;
     search.dispatchEvent(new Event('input', { bubbles: true }));
-    syncCoreLayer();
+    directAssetId = assetId;
+    directPaintReady = true;
+    syncCoreLayer(); syncCoreTool();
     return true;
   };
 
   const syncSingleTileToCore = () => {
     const cells = stamp();
-    return cells.length === 1 && syncCoreEntry(cells[0].assetId);
+    if (cells.length !== 1) { directPaintReady = false; directAssetId = ''; return false; }
+    return syncCoreEntry(cells[0].assetId);
   };
 
   const syncStatus = () => {
     if (!statusNode) return;
     const box = orderedSelection();
     const cells = stamp();
-    statusNode.innerHTML = `<strong>${box.maxC - box.minC + 1}×${box.maxR - box.minR + 1} tiles</strong><span>${cells.length} célula(s) no Stamp • ${mapLayer === 'ground' ? 'Ground' : 'Detail'}${cells.length === 1 && tool === 'pencil' ? ' • pintura direta' : ''}</span>`;
+    const direct = cells.length === 1 && tool !== 'eyedropper';
+    statusNode.innerHTML = `<strong>${box.maxC - box.minC + 1}×${box.maxR - box.minR + 1} tiles</strong><span>${cells.length} célula(s) no Stamp • ${mapLayer === 'ground' ? 'Ground' : 'Detail'}${direct ? ' • pincel nativo' : ''}</span>`;
   };
 
   const renderSheet = () => {
@@ -185,8 +208,14 @@ export function installTraditionalTilesetEditor() {
     const url = await getAssetSourceUrl(ts.sourceId);
     image = url ? await imageFromUrl(url).catch((): null => null) : null;
     selection = { c0: 0, r0: 0, c1: 0, r1: 0 };
+    directPaintReady = false; directAssetId = '';
     renderSheet();
-    if (tool === 'pencil') syncSingleTileToCore();
+    if (tool !== 'eyedropper') syncSingleTileToCore();
+  };
+
+  const refreshToolButtons = () => {
+    browser?.querySelectorAll<HTMLButtonElement>('[data-trad-tool]').forEach((button) => button.classList.toggle('active', button.dataset.tradTool === tool));
+    syncStatus();
   };
 
   const renderBrowser = () => {
@@ -207,10 +236,16 @@ export function installTraditionalTilesetEditor() {
     sheetCanvas = browser.querySelector<HTMLCanvasElement>('#traditional-sheet')!; sheetCtx = sheetCanvas.getContext('2d')!; statusNode = browser.querySelector<HTMLElement>('#traditional-meta')!;
     browser.querySelector<HTMLSelectElement>('#traditional-layer')!.value = mapLayer; browser.querySelector<HTMLSelectElement>('#traditional-zoom')!.value = String(sheetScale);
     browser.querySelector<HTMLSelectElement>('#traditional-select')!.onchange = async (event) => { selectedTilesetId = (event.target as HTMLSelectElement).value; await loadSelectedSheet(); };
-    browser.querySelector<HTMLSelectElement>('#traditional-layer')!.onchange = (event) => { mapLayer = (event.target as HTMLSelectElement).value === 'detail' ? 'detail' : 'ground'; syncCoreLayer(); syncStatus(); };
+    browser.querySelector<HTMLSelectElement>('#traditional-layer')!.onchange = (event) => { mapLayer = (event.target as HTMLSelectElement).value === 'detail' ? 'detail' : 'ground'; syncCoreLayer(); if (tool !== 'eyedropper') syncSingleTileToCore(); syncStatus(); };
     browser.querySelector<HTMLSelectElement>('#traditional-zoom')!.onchange = (event) => { sheetScale = Number((event.target as HTMLSelectElement).value) || .5; renderSheet(); };
     browser.querySelector<HTMLButtonElement>('#traditional-import')!.onclick = importTileset;
-    browser.querySelectorAll<HTMLButtonElement>('[data-trad-tool]').forEach((button) => { button.classList.toggle('active', button.dataset.tradTool === tool); button.onclick = () => { tool = button.dataset.tradTool as TraditionalTool; renderBrowser(); void loadSelectedSheet(); }; });
+    browser.querySelectorAll<HTMLButtonElement>('[data-trad-tool]').forEach((button) => {
+      button.onclick = () => {
+        tool = button.dataset.tradTool as TraditionalTool;
+        refreshToolButtons();
+        if (tool !== 'eyedropper') { syncSingleTileToCore(); syncCoreTool(); }
+      };
+    });
     browser.querySelector<HTMLButtonElement>('#traditional-edit-grid')!.onclick = () => showGridEditor();
     browser.querySelector<HTMLButtonElement>('#traditional-delete')!.onclick = () => showDeleteInfo();
 
@@ -220,7 +255,7 @@ export function installTraditionalTilesetEditor() {
       const px = (event.clientX - rect.left) * sheetCanvas!.width / Math.max(1, rect.width), py = (event.clientY - rect.top) * sheetCanvas!.height / Math.max(1, rect.height);
       const col = clamp(Math.floor((px - ts.offsetX - ts.margin) / Math.max(1, ts.tileWidth + ts.spacing)), 0, Math.max(0, ts.columns - 1));
       const row = clamp(Math.floor((py - ts.offsetY - ts.margin) / Math.max(1, ts.tileHeight + ts.spacing)), 0, Math.max(0, ts.rows - 1));
-      selection = { c0: col, r0: row, c1: col, r1: row }; selectionDragging = true; sheetCanvas!.setPointerCapture(event.pointerId); renderSheet();
+      selection = { c0: col, r0: row, c1: col, r1: row }; selectionDragging = true; directPaintReady = false; directAssetId = ''; sheetCanvas!.setPointerCapture(event.pointerId); renderSheet();
     };
     sheetCanvas.onpointermove = (event) => {
       if (!selectionDragging) return;
@@ -230,7 +265,8 @@ export function installTraditionalTilesetEditor() {
       selection.c1 = clamp(Math.floor((px - ts.offsetX - ts.margin) / Math.max(1, ts.tileWidth + ts.spacing)), 0, Math.max(0, ts.columns - 1));
       selection.r1 = clamp(Math.floor((py - ts.offsetY - ts.margin) / Math.max(1, ts.tileHeight + ts.spacing)), 0, Math.max(0, ts.rows - 1)); renderSheet();
     };
-    sheetCanvas.onpointerup = () => { selectionDragging = false; if (tool === 'pencil') syncSingleTileToCore(); };
+    sheetCanvas.onpointerup = () => { selectionDragging = false; if (tool !== 'eyedropper') syncSingleTileToCore(); };
+    refreshToolButtons();
     void loadSelectedSheet();
   };
 
@@ -242,7 +278,7 @@ export function installTraditionalTilesetEditor() {
 
   function importTileset() {
     const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/png,image/webp,image/jpeg';
-    input.onchange = () => { const file = input.files?.[0]; if (!file) return; void openTraditionalTilesetImporter(file, { preferredTileSize: currentMapTileSize(), onCreated: async (created) => { await hydrateTilesetsIntoPalette(); tilesets = listTilesets(); selectedTilesetId = created.id; renderBrowser(); } }); };
+    input.onchange = () => { const file = input.files?.[0]; if (!file) return; void openTraditionalTilesetImporter(file, { preferredTileSize: currentMapTileSize(), onCreated: async (created) => { await hydrateTilesetsIntoPalette(); tilesets = listTilesets(); selectedTilesetId = created.id; directPaintReady = false; directAssetId = ''; renderBrowser(); } }); };
     input.click();
   }
 
@@ -255,7 +291,7 @@ export function installTraditionalTilesetEditor() {
     modal.querySelector<HTMLFormElement>('form')!.onsubmit = async (event) => {
       event.preventDefault(); const { saveTileset } = await import('./mapTilesetStore');
       saveTileset({ ...ts, tileWidth: Number(modal.querySelector<HTMLInputElement>('#teg-w')!.value) || ts.tileWidth, tileHeight: Number(modal.querySelector<HTMLInputElement>('#teg-h')!.value) || ts.tileHeight, margin: Number(modal.querySelector<HTMLInputElement>('#teg-margin')!.value) || 0, spacing: Number(modal.querySelector<HTMLInputElement>('#teg-spacing')!.value) || 0, offsetX: Number(modal.querySelector<HTMLInputElement>('#teg-x')!.value) || 0, offsetY: Number(modal.querySelector<HTMLInputElement>('#teg-y')!.value) || 0 });
-      await hydrateTilesetsIntoPalette(); modal.remove(); tilesets = listTilesets(); renderBrowser();
+      await hydrateTilesetsIntoPalette(); modal.remove(); tilesets = listTilesets(); directPaintReady = false; directAssetId = ''; renderBrowser();
     };
   }
 
@@ -263,7 +299,7 @@ export function installTraditionalTilesetEditor() {
 
   const ensurePanelUi = () => {
     const title = panel.querySelector<HTMLElement>('#mep-panel-title')?.textContent;
-    if (title !== 'TERRENO') { tabs?.remove(); browser?.remove(); tabs = null; browser = null; panel.classList.remove('traditional-hidden-main'); return; }
+    if (title !== 'TERRENO') { tabs?.remove(); browser?.remove(); tabs = null; browser = null; panel.classList.remove('traditional-hidden-main'); directPaintReady = false; directAssetId = ''; return; }
     if (tabs && browser) return;
     const panelHost = panel.querySelector<HTMLElement>('.mep-search') ?? panel.firstElementChild as HTMLElement;
     tabs = document.createElement('div'); tabs.className = 'traditional-tabs'; tabs.innerHTML = `<button data-terrain-mode="natural">Natural Blend</button><button data-terrain-mode="tileset">Tileset</button>`;
@@ -273,77 +309,69 @@ export function installTraditionalTilesetEditor() {
     setMode(mode);
   };
 
-  const applyStampAtPoints = (points: TilePoint[], erase = false) => {
+  // Multi-stamps ainda usam a transação antiga, porém agora somente uma vez no
+  // final do gesto. O caso comum 1×1 nunca passa por save/reload.
+  const applyStampAtPoints = (points: TilePoint[]) => {
     const id = currentMapId(); if (!id || !points.length) return;
     saveEditor(); const map = loadMapDocument(id); if (!map) return;
-    const cells = stamp(); if (!cells.length && !erase) return;
+    const cells = stamp(); if (cells.length <= 1) return;
     const unique = new Map(points.map((point) => [`${point.x},${point.y}`, point]));
-    for (const point of unique.values()) {
-      if (erase) {
-        if (point.x < 0 || point.y < 0 || point.x >= map.width || point.y >= map.height) continue;
-        const key = tileKey(point.x, point.y), value = map.tiles[key] ?? {};
-        if (mapLayer === 'detail') delete value.detail; else delete value.ground;
-        if (!value.ground && !value.detail) delete map.tiles[key]; else map.tiles[key] = value;
-        continue;
-      }
-      for (const cell of cells) {
-        const x = point.x + cell.dx, y = point.y + cell.dy; if (x < 0 || y < 0 || x >= map.width || y >= map.height) continue;
-        const key = tileKey(x, y), value = map.tiles[key] ?? {}; if (mapLayer === 'detail') value.detail = cell.assetId; else value.ground = cell.assetId; map.tiles[key] = value;
-      }
-    }
-    saveMapDocument(map); reloadMap(id);
-  };
-
-  const floodAt = (point: TilePoint) => {
-    const id = currentMapId(); if (!id) return;
-    const cells = stamp(); if (cells.length !== 1) { alert('Fill usa uma seleção de 1×1 tile.'); return; }
-    saveEditor(); const map = loadMapDocument(id); if (!map) return;
-    const getValue = (x: number, y: number) => { const tile = map.tiles[tileKey(x, y)]; return mapLayer === 'detail' ? (tile?.detail ?? '') : (tile?.ground ?? ''); };
-    const target = getValue(point.x, point.y), replacement = cells[0].assetId; if (target === replacement) return;
-    const queue = [point], seen = new Set<string>();
-    while (queue.length) {
-      const next = queue.shift()!; if (next.x < 0 || next.y < 0 || next.x >= map.width || next.y >= map.height) continue;
-      const key = tileKey(next.x, next.y); if (seen.has(key) || getValue(next.x, next.y) !== target) continue; seen.add(key);
-      const value = map.tiles[key] ?? {}; if (mapLayer === 'detail') value.detail = replacement; else value.ground = replacement; map.tiles[key] = value;
-      queue.push({ x: next.x + 1, y: next.y }, { x: next.x - 1, y: next.y }, { x: next.x, y: next.y + 1 }, { x: next.x, y: next.y - 1 });
+    for (const point of unique.values()) for (const cell of cells) {
+      const x = point.x + cell.dx, y = point.y + cell.dy; if (x < 0 || y < 0 || x >= map.width || y >= map.height) continue;
+      const key = tileKey(x, y), value = map.tiles[key] ?? {}; if (mapLayer === 'detail') value.detail = cell.assetId; else value.ground = cell.assetId; map.tiles[key] = value;
     }
     saveMapDocument(map); reloadMap(id);
   };
 
   const eyedropAt = async (point: TilePoint) => {
+    // Conta-gotas é uma ação rara; força o autosave pendente para ler o estado
+    // mais recente sem manter um segundo documento vivo concorrendo com o core.
+    saveEditor();
     const map = currentMap(); if (!map) return;
     const id = mapLayer === 'detail' ? map.tiles[tileKey(point.x, point.y)]?.detail : map.tiles[tileKey(point.x, point.y)]?.ground;
     const parsed = parseTilesetTileId(id); if (!parsed) return;
     const ts = getTileset(parsed.tilesetId); if (!ts) return;
     selectedTilesetId = ts.id; tilesets = listTilesets(); renderBrowser(); await loadSelectedSheet();
     const col = Math.round((parsed.rect.x - ts.offsetX - ts.margin) / Math.max(1, ts.tileWidth + ts.spacing)), row = Math.round((parsed.rect.y - ts.offsetY - ts.margin) / Math.max(1, ts.tileHeight + ts.spacing));
-    selection = { c0: clamp(col, 0, ts.columns - 1), c1: clamp(col, 0, ts.columns - 1), r0: clamp(row, 0, ts.rows - 1), r1: clamp(row, 0, ts.rows - 1) }; renderSheet();
-    if (tool === 'pencil') syncSingleTileToCore();
+    selection = { c0: clamp(col, 0, ts.columns - 1), c1: clamp(col, 0, ts.columns - 1), r0: clamp(row, 0, ts.rows - 1), r1: clamp(row, 0, ts.rows - 1) }; directPaintReady = false; directAssetId = ''; renderSheet();
+    tool = 'pencil'; refreshToolButtons(); syncSingleTileToCore();
   };
 
   canvas.addEventListener('pointerdown', (event) => {
     if (mode !== 'tileset' || event.button !== 0) return;
+    const cells = stamp();
 
-    // O caso comum (1×1 + Pintar) usa o pincel nativo do editor. Isso evita
-    // editar uma cópia no localStorage e depois recarregar o mapa a cada clique.
-    // O próprio Map Editor passa a cuidar de Undo/Redo, autosave, render e câmera.
-    if (tool === 'pencil' && syncSingleTileToCore()) return;
+    if (event.altKey || tool === 'eyedropper') {
+      const point = pointFromStatus(); if (!point) return;
+      event.preventDefault(); event.stopImmediatePropagation(); void eyedropAt(point); return;
+    }
 
+    // 1×1 usa exclusivamente o input/pincel nativo. A seleção é sincronizada
+    // quando muda, não a cada clique no mapa. Isso elimina reconstruções da
+    // biblioteca e o antigo ciclo save → reload por pincelada.
+    if (cells.length === 1 && (tool === 'pencil' || tool === 'fill')) {
+      if (!directPaintReady) syncSingleTileToCore();
+      if (directPaintReady) return;
+    }
+    if (tool === 'eraser') { syncCoreLayer(); syncCoreTool(); return; }
+    if (tool === 'fill' && cells.length !== 1) {
+      event.preventDefault(); event.stopImmediatePropagation(); alert('Fill usa uma seleção de 1×1 tile.'); return;
+    }
+
+    // Stamp 2×2 ou maior continua sendo tratado como uma única operação.
+    if (tool !== 'pencil' || cells.length <= 1) return;
     const point = pointFromStatus(); if (!point) return;
     event.preventDefault(); event.stopImmediatePropagation();
-    if (event.altKey || tool === 'eyedropper') { void eyedropAt(point); return; }
-    if (tool === 'fill') { floodAt(point); return; }
     painting = true; paintPoints = [point]; lastPoint = point;
   }, { capture: true });
 
   canvas.addEventListener('pointermove', () => {
     if (mode !== 'tileset' || !painting) return;
     const point = pointFromStatus(); if (!point || (lastPoint && point.x === lastPoint.x && point.y === lastPoint.y)) return;
-    if (stamp().length > 1) return;
     if (lastPoint) paintPoints.push(...bresenham(lastPoint, point).slice(1)); else paintPoints.push(point); lastPoint = point;
   });
 
-  const finishPaint = () => { if (!painting) return; painting = false; applyStampAtPoints(paintPoints, tool === 'eraser'); paintPoints = []; lastPoint = null; };
+  const finishPaint = () => { if (!painting) return; painting = false; applyStampAtPoints(paintPoints); paintPoints = []; lastPoint = null; };
   window.addEventListener('pointerup', finishPaint, { capture: true }); window.addEventListener('blur', finishPaint);
 
   let frame = 0;
